@@ -2,6 +2,8 @@ import os
 import numpy as np
 import open3d as o3d
 import torch
+import sys
+
 from tqdm import tqdm
 
 from ..data_types.branch import BranchSkeleton
@@ -39,7 +41,9 @@ def select_path_points(
     """
 
     point_path, dists, _ = nn(
-        points, path_verts, r=radii.max().item()
+        points,
+        path_verts,
+        r=radii.max().item(),
     )  # nearest path idx for each point
     valid = dists[point_path >= 0] < radii[point_path[point_path >= 0]].squeeze(
         1
@@ -72,6 +76,7 @@ def sample_tree(
     all_points,
     root_idx=0,
     visualize=False,
+    pbar=None,
 ):
     """
     Medial Points: NN estimated medial points
@@ -91,16 +96,17 @@ def sample_tree(
     idx_lookup = {}
     branches = {}
 
-    tubes = []
+    # tubes = []
 
     while True:
-        os.system("clear")
-        print(f"{(distances > 0).sum().item() / medial_pts.shape[0]:.4f}")
-
         farthest = distances.argmax().item()  # Get fartherest away medial point
 
         if distances[farthest] <= 0:
             break
+
+        if pbar:
+            pts_sampled = f"{100 * (1.0 - ((distances > 0).sum().item() / medial_pts.shape[0])):.2f}"
+            pbar.set_postfix_str(f"Sampling Graph: {pts_sampled} %")
 
         path_vertices_idx, first_idx = trace_route(
             preds, farthest, allocated=allocated_path_points

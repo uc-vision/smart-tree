@@ -153,8 +153,7 @@ class LabelledCloud(Cloud):
 
     def medial_voxel_down_sample(self, voxel_size):
         idx = voxel_downsample_idxs(self.medial_pts, voxel_size)
-        print(idx)
-        quit()
+
         return self.filter(idx)
 
     def to_torch(self):

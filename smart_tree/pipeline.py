@@ -110,7 +110,7 @@ class Pipeline:
             skeleton.repair()
 
         if self.smooth_skeletons:
-            print("Smoothing.")
+            print("Smoothing...")
             skeleton.smooth()
 
     @staticmethod
