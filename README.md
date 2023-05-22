@@ -1,2 +1,71 @@
-# smart-tree
-Neural Medial Axis Approximation of Point Clouds for 3D Tree Skeletonization
+# 💡 Smart-Tree: Neural Medial Axis Approximation of Point Clouds for 3D Tree Skeletonization 🌳
+This GitHub repository contains code from the the paper "Smart-Tree: Neural Medial Axis Approximation of Point Clouds for 3D Tree Skeletonization". <br>
+The code provided, is a deep-learning based skeletonization method for point clouds.
+
+<table>
+<tr>
+  <td style="text-align: center"><img src="images/botanic-pcd.png", height=100%></td>
+  <td style="text-align: center"><img src="images/botanic-branch-mesh.png", height=100%></td>
+  <td style="text-align: center"><img src="images/botanic-skeleton.png", height=100%></td>
+</tr>
+<tr>
+  <td align="center">Input point cloud.</td>
+  <td align="center">Mesh output.</td>
+  <td align="center">Skeleton output.</td>
+</tr>
+</table>
+
+
+## 💾 Data:
+
+Please download data from this <a href="https://github.com/uc-vision/synthetic-trees">link</a>.
+
+
+## 🔧 Installation:
+
+First make sure you have conda installed.
+To install smart-tree please use: <br>`bash create-env.sh`<br>
+Then activate the enviroment using: <br>`conda activate smart-tree`
+
+
+## 📈 Training:
+
+To train the model open smart_tree/conf/tree-dataset.yaml.
+
+You will need to update (alternatively these can be overwritten with hydra): 
+
+- training.dataset.json_path to the location of where your smart_tree/conf/tree-split.json is stored. 
+- training.dataset.directory to the location of where you downloaded the data (you can choose wether to train on the data with foliage or without based on the directory you supply).
+
+You can experiement / adjust hyper-parameter settings too.
+
+The model will then train using the following:
+
+`train-smart-tree`
+
+The best model weights and model will be stored in the generated outputs directory.
+
+## ▶️ Inference / ☠️ Skeletonization:
+
+We supply two different weights `noble-elevator-58` contains branch / foliage segmentation. Where as `peach-forest-65` is only trained on branching structure points. <br>
+If you wish to run smart-tree using your own weights you will need to update the model paths in the tree-dataset.yaml. <br>
+
+To run smart-tree use `run-smart-tree +path=cloud_path` , where `cloud_path` is the path of the point cloud you want to skeletonize. <br>
+Skeletonization specific parameters can be adjusted within the `smart_tree/conf/tree-dataset.yaml` config.
+
+## 📜 Citation:
+Please use the following BibTeX entry to cite our work: <br>
+
+```
+@inproceedings{TODO,
+    author = {TODO},
+     title = {{TODO}},
+ booktitle = {TODO},
+     pages = {TODO},
+      year = {TODO}}
+```
+
+## 📥 Contact 
+
+Should you have any questions, comments or suggestions please use the following contact details:
+harry.dobbs@pg.canterbury.ac.nz

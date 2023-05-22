@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Smart-Tree"
+authors = [
+    {name = "Harry Dobbs", email = "harrydobbs87@gmail.com"},
+]
+description = "Neural Network Point Cloud Tree Skeletonization"
+readme = "README.rst"
+requires-python = ">=3.8"
+license = {text = "BSD-3"}
+dependencies = [
+    'numpy',
+    'open3d',
+    'hydra-core>=1.2.0',
+    'click',
+#   'opencv-python',
+#   'pytorch3d@https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py38_cu113_pyt1110/pytorch3d-0.7.2-cp38-cp38-linux_x86_64.whl',
+#    'jaxtyping',
+#    'scikit-image',
+#    'scikit-learn',
+#    'scipy',
+    'oauthlib',
+#   'type_enforced',
+    'spconv-cu117',
+    'wandb',
+    'cmapy',
+    'pykeops',
+ #   'seaborn',
+    'plyfile',
+    'py_structs'
+]
+dynamic = ["version"]
+
+[tool.setuptools.packages]
+find = {}  # Scan the project directory with the default parameters
+
+[project.scripts]
+run-smart-tree = "smart_tree.cli:main"
+train-smart-tree = "smart_tree.model.train:main"
+view-npz = "smart_tree.scripts.view_npz:main"
+view-pcd = "smart_tree.scripts.view_pcd:main"
+
+#[project.scripts]
+
+

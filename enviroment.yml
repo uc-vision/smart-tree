@@ -1,0 +1,20 @@
+name: smart-tree
+channels:
+  - pytorch
+  - conda-forge
+  - nvidia
+  - rapidsai
+  - nodefaults
+  
+dependencies:
+  - python=3.8.*  # or don't specify the version and use the latest stable Python
+  - mamba
+  - pip  # pip must be mentioned explicitly, or conda-lock will fail
+  #- poetry=1.*  # or 1.1.*, or no version at all -- as you want
+  - conda-forge:cudatoolkit-dev=11.7 # need NVCC for compiling FRNN
+#  - conda-forge:cudatoolkit=11.7
+  - pytorch::pytorch-cuda=11.7
+  - pytorch::pytorch
+  - rapidsai::rapids=23.02
+  - rapidsai::cugraph=23.02
+  - rapidsai::cudf=23.02
