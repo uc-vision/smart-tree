@@ -47,10 +47,15 @@ The best model weights and model will be stored in the generated outputs directo
 
 ## ▶️ Inference / ☠️ Skeletonization:
 
-We supply two different weights `noble-elevator-58` contains branch / foliage segmentation. Where as `peach-forest-65` is only trained on branching structure points. <br>
+We supply two different models with weights:
+* `noble-elevator-58` contains branch / foliage segmentation. <br>
+* `peach-forest-65` is only trained on points from branching structure. <br>
+
 If you wish to run smart-tree using your own weights you will need to update the model paths in the tree-dataset.yaml. <br>
 
-To run smart-tree use `run-smart-tree +path=cloud_path` , where `cloud_path` is the path of the point cloud you want to skeletonize. <br>
+To run smart-tree use: <br>
+`run-smart-tree +path=cloud_path` <br>
+where `cloud_path` is the path of the point cloud you want to skeletonize. <br>
 Skeletonization specific parameters can be adjusted within the `smart_tree/conf/tree-dataset.yaml` config.
 
 ## 📜 Citation:
