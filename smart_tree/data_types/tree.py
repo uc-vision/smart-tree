@@ -93,7 +93,9 @@ class TreeSkeleton:
                 continue
 
             if branch.parent_id in branches_to_keep:
-                if branch.length > min_length and branch.radii[0] > min_radius:
+                if branch.length > min_length and (
+                    (branch.radii[0] > min_radius) or branch.radii[-1] > min_radius
+                ):
                     branches_to_keep[branch_id] = branch
 
         self.branches = branches_to_keep
