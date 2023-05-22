@@ -1,4 +1,6 @@
-# 💡 Smart-Tree: Neural Medial Axis Approximation of Point Clouds for 3D Tree Skeletonization 🌳
+#  <center> 💡🧠🤔 Smart-Tree: Neural Medial Axis Approximation of Point Clouds for 3D Tree Skeletonization 🌳🌲🌴 </center>
+
+## 📝 Description:
 
 This GitHub repository contains code from the the paper "Smart-Tree: Neural Medial Axis Approximation of Point Clouds for 3D Tree Skeletonization". <br>
 The code provided, is a deep-learning based skeletonization method for point clouds.
@@ -51,7 +53,7 @@ We supply two different models with weights:
 * `noble-elevator-58` contains branch / foliage segmentation. <br>
 * `peach-forest-65` is only trained on points from branching structure. <br>
 
-If you wish to run smart-tree using your own weights you will need to update the model paths in the tree-dataset.yaml. <br>
+If you wish to run smart-tree using your own weights you will need to update the model paths in the `tree-dataset.yaml`. <br>
 
 To run smart-tree use: <br>
 `run-smart-tree +path=cloud_path` <br>

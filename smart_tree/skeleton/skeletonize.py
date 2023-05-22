@@ -3,7 +3,7 @@ import open3d as o3d
 import open3d.visualization.rendering as rendering
 import torch
 from cugraph import sssp
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from ..data_types.tree import TreeSkeleton, DisjointTreeSkeleton
 from ..util.mesh.geometries import (
@@ -69,36 +69,25 @@ class Skeletonizer:
             max_components=self.max_number_components,
         )
 
-        return DisjointTreeSkeleton(
-            skeletons=[
-                self.process_subgraph(
-                    subgraph,
-                    cloud.medial_pts,
-                    cloud.xyz,
-                    cloud.radii.unsqueeze(1),
-                    self.min_connection_length,
-                    self.device,
-                    skeleton_id,
-                )
-                for skeleton_id, subgraph in enumerate(
-                    tqdm(subgraphs, desc="Processing Skeleton Fragment", leave=False)
-                )
-            ]
-        )
+        skeletons = []
+        pbar = tqdm(subgraphs, position=0, leave=False)
+
+        for skeleton_id, subgraph in enumerate(pbar):
+            pbar.set_description(f"Processing Subgraph {skeleton_id}")
+            skeletons.append(self.process_subgraph(subgraph, cloud, skeleton_id, pbar))
+
+        return DisjointTreeSkeleton(skeletons)
 
     def process_subgraph(
         self,
         subgraph,
-        medial_points,
-        points,
-        radii,
-        min_edge,
-        device=torch.device("cuda:0"),
+        cloud,
         skeleton_id=0,
+        pbar=None,
     ) -> TreeSkeleton:
         edges, edge_weights = decompose_cuda_graph(subgraph, self.device)
 
-        root_idx = edges[torch.argmin(medial_points[edges[:, 0]][:, 1])][0].item()
+        root_idx = edges[torch.argmin(cloud.medial_pts[edges[:, 0]][:, 1])][0].item()
 
         verts, preds, distance = shortest_paths(
             root_idx,
@@ -107,13 +96,20 @@ class Skeletonizer:
             renumber=False,
         )
 
-        predecessor_graph = pred_graph(verts, preds, medial_points)
+        predecessor_graph = pred_graph(verts, preds, cloud.medial_pts)
 
         distances = torch.as_tensor(
             sssp(predecessor_graph, source=root_idx)["distance"]
         ).to(self.device)
 
-        branches = sample_tree(medial_points, radii, preds, distances, points)
+        branches = sample_tree(
+            cloud.medial_pts,
+            cloud.radii.unsqueeze(1),
+            preds,
+            distances,
+            cloud.xyz,
+            pbar=pbar,
+        )
 
         return TreeSkeleton(skeleton_id, branches)
 

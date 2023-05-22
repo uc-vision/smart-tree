@@ -67,9 +67,9 @@ model_inference:
 
 skeletonizer:
   K: 16
-  min_connection_length: 0.02 
+  min_connection_length: 0.00 #.02
   minimum_graph_vertices: 32
-  max_number_components: 1000
+  max_number_components: 30
   voxel_downsample: False
   edge_non_linear: None
 
@@ -98,8 +98,8 @@ pipeline:
   repair_skeletons : True
   smooth_skeletons : True
   prune_skeletons : True
-  min_skeleton_radius : 0 #0.005
-  min_skeleton_length : 0
+  min_skeleton_radius : 0.001 #0.005
+  min_skeleton_length : 0.02
   view_model_output : False
   view_skeletons : True
   save_outputs : False

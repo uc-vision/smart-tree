@@ -110,7 +110,6 @@ def main(cfg: DictConfig):
 
                 model_output = model.forward(sparse_input)
 
-                # print(model_output)
                 loss = model.compute_loss(model_output, targets, loss_mask)
                 total_loss = loss["radius"] + loss["direction"] + loss["class"]
 
