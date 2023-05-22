@@ -1,4 +1,4 @@
-#  <center> 💡🧠🤔 Smart-Tree: Neural Medial Axis Approximation of Point Clouds for 3D Tree Skeletonization 🌳🌲🌴 </center>
+##  <center> 💡🧠🤔 Smart-Tree 🌳🌲🌴 </center>
 
 ## 📝 Description:
 
