@@ -67,9 +67,9 @@ model_inference:
 
 skeletonizer:
   K: 16
-  min_connection_length: 0.00 #.02
+  min_connection_length: 0.02 
   minimum_graph_vertices: 32
-  max_number_components: 30
+  max_number_components: 100
   voxel_downsample: False
   edge_non_linear: None
 
@@ -77,17 +77,17 @@ skeletonizer:
 pipeline:
   
   preprocessing:
-    # Scale:
-    #     _target_:  smart_tree.dataset.augmentations.Scale
-    #     min_scale: 1
-    #     max_scale: 1
+    #  Scale:
+    #      _target_:  smart_tree.dataset.augmentations.Scale
+    #      min_scale: 0.1
+    #      max_scale: 0.1
     # Scale:
     #   _target_:  smart_tree.dataset.augmentations.Scale
     #   min_scale: 1
     #   max_scale: 1
-    # VoxelDownsample:
-    #    _target_:  smart_tree.dataset.augmentations.VoxelDownsample
-    #    voxel_size : 0.01
+    VoxelDownsample:
+       _target_:  smart_tree.dataset.augmentations.VoxelDownsample
+       voxel_size : 0.01
     #FixedRotate:
     #   _target_:  smart_tree.dataset.augmentations.FixedRotate
     #   xyz: [0, 0, 90]
@@ -95,15 +95,19 @@ pipeline:
     #   _target_:  smart_tree.dataset.augmentations.CentreCloud
 
 
-  repair_skeletons : True
-  smooth_skeletons : True
-  prune_skeletons : True
-  min_skeleton_radius : 0.001 #0.005
-  min_skeleton_length : 0.02
-  view_model_output : False
+  view_model_output : True
   view_skeletons : True
   save_outputs : False
   branch_classes: [0]
   cmap:
-    - [1, 0, 0] # Trunk
-    - [0, 1, 0] # Foliage
+    - [0.325, 0.207, 0.039] # Trunk
+    - [0.290, 0.703, 0.254] # Foliage
+
+
+
+
+  repair_skeletons : True
+  smooth_skeletons : True
+  prune_skeletons : False # need to fix as some skeletons don't know their start I guess?
+  min_skeleton_radius : 0.05 #0.005
+  min_skeleton_length : 0.02

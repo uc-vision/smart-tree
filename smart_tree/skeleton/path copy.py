@@ -118,18 +118,18 @@ def sample_tree(
 
         end_points = torch.unique(torch.cat((end_points, idx_points, idx_path)))
 
-        if len(path_vertices_idx) < 2:
-            continue
+        if len(path_vertices_idx) > 1:
+            branches[branch_id] = BranchSkeleton(
+                branch_id,
+                xyz=medial_pts[path_vertices_idx].cpu().numpy(),
+                radii=medial_radii[path_vertices_idx].cpu().numpy(),
+                parent_id=find_branch_parent(int(path_vertices_idx[0]), idx_lookup),
+                child_id=-1,
+            )
 
-        branches[branch_id] = BranchSkeleton(
-            branch_id,
-            xyz=medial_pts[path_vertices_idx].cpu().numpy(),
-            radii=medial_radii[path_vertices_idx].cpu().numpy(),
-            parent_id=find_branch_parent(int(path_vertices_idx[0]), idx_lookup),
-            child_id=-1,
-        )
-
-        idx_lookup[branch_id] = idx_path.cpu().tolist() + idx_points.cpu().tolist()
-        branch_id += 1
+            idx_lookup[branch_id] = (
+                path_vertices_idx.cpu().tolist() + idx_points.cpu().tolist()
+            )
+            branch_id += 1
 
     return branches

@@ -39,8 +39,6 @@ class Skeletonizer:
         max_number_components: int,
         device=torch.device("cuda:0"),
     ):
-        print("Initalizing Skeletonizer")
-
         self.K = K
         self.min_connection_length = min_connection_length
         self.minimum_graph_vertices = minimum_graph_vertices

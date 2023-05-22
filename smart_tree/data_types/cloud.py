@@ -99,9 +99,13 @@ class LabelledCloud(Cloud):
     vector: torch.Tensor
     class_l: torch.Tensor
 
-    def __post_init__(self):
-        num_classes = int(torch.max(self.class_l, 0)[0].item())
-        self.cmap = torch.rand(num_classes + 1, 3)
+    @property
+    def number_classes(self):
+        return int(torch.max(self.class_l, 0)[0].item()) + 1
+
+    @property
+    def cmap(self):
+        return torch.rand(self.number_classes, 3)
 
     def filter(self, mask):
         return LabelledCloud(
@@ -120,11 +124,7 @@ class LabelledCloud(Cloud):
         return self.filter(mask)
 
     def view(self, cmap=[]):
-        if len(cmap) != 0:
-            cmap = cmap
-        else:
-            cmap = self.cmap
-
+        cmap = cmap if cmap != [] else self.cmap
         cpu_cld = self.to_device("cpu")
         input_cld = cpu_cld.to_o3d_cld()
         segmented_cld = o3d_cloud(cpu_cld.xyz, colours=cmap[cpu_cld.class_l])

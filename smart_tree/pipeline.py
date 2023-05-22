@@ -41,7 +41,6 @@ class Pipeline:
         cmap=[[1, 0, 0], [0, 1, 0]],
         device=torch.device("cuda:0"),
     ):
-        print("Setting up pipeline...")
         self.inferer = inferer
         self.skeletonizer = skeletonizer
 
@@ -73,7 +72,7 @@ class Pipeline:
         # Run point cloud through model to predict class, radius, direction
         lc: LabelledCloud = self.inferer.forward(cloud).to_device("cuda")
         if self.view_model_output:
-            lc.view(cmap=self.cmap)
+            lc.view(self.cmap)
 
         # Filter only the branch points for skeletonizaiton
         branch_cloud: LabelledCloud = lc.filter_by_class(self.branch_classes)
@@ -88,8 +87,8 @@ class Pipeline:
                 [
                     skeleton.to_o3d_tube(),
                     skeleton.to_o3d_lineset(),
-                    cloud.to_o3d_cld(),
                     skeleton.to_o3d_tube(colour=False),
+                    cloud.to_o3d_cld(),
                 ],
                 line_width=5,
             )
@@ -97,7 +96,7 @@ class Pipeline:
         if self.save_outputs:
             save_o3d_mesh("skeleton.ply", skeleton.to_o3d_lineset())
             save_o3d_lineset("mesh.ply", skeleton.to_o3d_tube())
-            save_o3d_cloud("mesh.ply", cloud.to_o3d_cld())
+            save_o3d_cloud("cloud.ply", cloud.to_o3d_cld())
 
     def post_process(self, skeleton: DisjointTreeSkeleton):
         if self.prune_skeletons:
@@ -110,7 +109,6 @@ class Pipeline:
             skeleton.repair()
 
         if self.smooth_skeletons:
-            print("Smoothing...")
             skeleton.smooth()
 
     @staticmethod
