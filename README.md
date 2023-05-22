@@ -1,4 +1,5 @@
 # 💡 Smart-Tree: Neural Medial Axis Approximation of Point Clouds for 3D Tree Skeletonization 🌳
+
 This GitHub repository contains code from the the paper "Smart-Tree: Neural Medial Axis Approximation of Point Clouds for 3D Tree Skeletonization". <br>
 The code provided, is a deep-learning based skeletonization method for point clouds.
 
