@@ -83,6 +83,7 @@ def main(cfg: DictConfig):
 
     epochs_no_improve = 0
     best_val_loss = torch.inf
+    num_input_feats = 6 if cfg.use_colour else 3
 
     # Training Epochs
     for epoch in tqdm(range(0, cfg.num_epoch), leave=False):
@@ -96,7 +97,7 @@ def main(cfg: DictConfig):
         ):
             with amp_ctx:
                 sparse_input = sparse_from_batch(
-                    features[:, :3],
+                    features[:, :num_input_feats],
                     coordinates,
                     device=device,
                 )
@@ -143,7 +144,7 @@ def main(cfg: DictConfig):
                 desc="Validating",
             ):
                 sparse_input = sparse_from_batch(
-                    features[:, :3],
+                    features[:, :num_input_feats],
                     coordinates,
                     device=device,
                 )

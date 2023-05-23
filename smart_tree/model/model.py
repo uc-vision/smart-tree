@@ -22,9 +22,13 @@ class Smart_Tree(nn.Module):
         direction_fc_planes,
         class_fc_planes,
         bias=False,
+        branch_classes=[0],
         algo=spconv.ConvAlgo.Native,
+        device=torch.device("cuda"),
     ):
         super().__init__()
+
+        self.branch_classes = torch.tensor(branch_classes, device=device)
 
         norm_fn = functools.partial(
             nn.BatchNorm1d, eps=1e-4, momentum=0.1
@@ -51,7 +55,6 @@ class Smart_Tree(nn.Module):
             algo=algo,
         )
 
-        # Three Heads...
         self.radius_head = SparseFC(
             radius_fc_planes,
             norm_fn,
@@ -108,16 +111,18 @@ class Smart_Tree(nn.Module):
         class_target = targets[:, [3]]
         direction_target, radius_target = torch_normalized(targets[:, :3])
 
-        vector_mask = (
-            class_target == 0
-        )  # only compute vector loss on points that are meant to be branches
-        vector_mask = vector_mask.reshape(-1)
+        mask = torch.isin(
+            class_target,
+            self.branch_classes,
+        )
+
+        mask = mask.reshape(-1)
 
         losses["radius"] = self.compute_radius_loss(
-            radius_pred[vector_mask], radius_target[vector_mask]
+            radius_pred[mask], radius_target[mask]
         )
         losses["direction"] = self.compute_direction_loss(
-            direction_pred[vector_mask], direction_target[vector_mask]
+            direction_pred[mask], direction_target[mask]
         )
         losses["class"] = self.compute_class_loss(class_pred, class_target)
 
