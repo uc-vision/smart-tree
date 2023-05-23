@@ -42,6 +42,7 @@ class ModelInference:
         buffer_size: float,
         num_workers=8,
         batch_size=4,
+        use_colour=False,
         device=torch.device("cuda:0"),
     ):
         print("Initalizing Model Inference")
@@ -54,6 +55,8 @@ class ModelInference:
 
         self.num_workers = num_workers
         self.batch_size = batch_size
+
+        self.num_input_feats = 6 if use_colour else 3
 
     def forward(self, cloud: Cloud, return_masked=True):
         outputs, inputs, masks = [], [], []
@@ -71,7 +74,7 @@ class ModelInference:
             dataloader, desc="Inferring", leave=False
         ):
             sparse_input = sparse_from_batch(
-                features[:, :3],
+                features[:, : self.num_input_feats],
                 coordinates,
                 device=self.device,
             )
@@ -111,6 +114,7 @@ class ModelInference:
             buffer_size=cfg.buffer_size,
             num_workers=cfg.num_workers,
             batch_size=cfg.batch_size,
+            use_colour=cfg.use_colour,
         )
 
 

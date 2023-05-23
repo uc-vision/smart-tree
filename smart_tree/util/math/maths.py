@@ -16,15 +16,16 @@ def torch_normalized(v):
     return F.normalize(v), v.pow(2).sum(1).sqrt().unsqueeze(1)
 
 
-def euler_angles_to_rotation(xyz: List) -> torch.tensor:
-    x, y, z = xyz
+def euler_angles_to_rotation(xyz: List, device=torch.device("cuda")) -> torch.tensor:
+    x, y, z = xyz.to(device=device)
 
     R_X = torch.tensor(
         [
             [1.0, 0.0, 0.0],
             [0.0, torch.cos(x), -torch.sin(x)],
             [0.0, torch.sin(x), torch.cos(x)],
-        ]
+        ],
+        device=device,
     )
 
     R_Y = torch.tensor(
@@ -32,7 +33,8 @@ def euler_angles_to_rotation(xyz: List) -> torch.tensor:
             [torch.cos(y), 0.0, torch.sin(y)],
             [0.0, 1.0, 0.0],
             [-torch.sin(y), 0.0, torch.cos(y)],
-        ]
+        ],
+        device=device,
     )
 
     R_Z = torch.tensor(
@@ -40,7 +42,8 @@ def euler_angles_to_rotation(xyz: List) -> torch.tensor:
             [torch.cos(z), -torch.sin(z), 0.0],
             [torch.sin(z), torch.cos(z), 0.0],
             [0.0, 0.0, 1.0],
-        ]
+        ],
+        device=device,
     )
 
     return torch.mm(R_Z, torch.mm(R_Y, R_X))

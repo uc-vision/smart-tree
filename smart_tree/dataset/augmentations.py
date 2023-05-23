@@ -33,7 +33,7 @@ class FixedRotate(Augmentation):
 
     def __call__(self, cloud):
         self.rot_mat = euler_angles_to_rotation(
-            torch.tensor(self.xyz), device=cloud.device
+            torch.tensor(self.xyz), device=cloud.xyz.device
         ).float()
         return cloud.rotate(self.rot_mat)
 
@@ -60,6 +60,19 @@ class FixedTranslate(Augmentation):
         return cloud.translate(self.xyz)
 
 
+class RandomTranslate(Augmentation):
+    def __init__(self, std):
+        self.std = torch.tensor(std)
+
+    def __call__(self, cloud):
+        return cloud.translate(
+            torch.normal(
+                torch.zeros(3, device=cloud.xyz.device),
+                std=self.std.to(cloud.xyz.device),
+            )
+        )
+
+
 class RandomDropout(Augmentation):
     def __init__(self, max_drop_out):
         self.max_drop_out = max_drop_out
@@ -74,6 +87,25 @@ class RandomDropout(Augmentation):
             high=cloud.xyz.shape[0], size=(num_indices, 1), device=cloud.xyz.device
         ).squeeze(1)
         return cloud.filter(indices)
+
+
+class RandomColourDropout(Augmentation):
+    def __init__(self, max_drop_out):
+        self.max_drop_out = max_drop_out
+
+    def __call__(self, cloud):
+        num_indices = int(
+            (1.0 - (self.max_drop_out * torch.rand(1, device=cloud.rgb.device)))
+            * cloud.xyz.shape[0]
+        )
+
+        indices = torch.randint(
+            high=cloud.rgb.shape[0], size=(num_indices, 1), device=cloud.rgb.device
+        ).squeeze(1)
+
+        cloud.rgb[indices] = torch.ones_like(cloud.rgb[indices])
+
+        return cloud
 
 
 class AugmentationPipeline:
