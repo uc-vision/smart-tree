@@ -2,12 +2,16 @@ import random
 
 import numpy as np
 import torch
+import random
+import open3d as o3d
 
+from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import List
 
-from smart_tree.data_types.cloud import Cloud
+from smart_tree.data_types.cloud import Cloud, LabelledCloud
 from smart_tree.util.math.maths import euler_angles_to_rotation
+from smart_tree.util.file import load_o3d_mesh
 from hydra.utils import call, get_original_cwd, instantiate, to_absolute_path
 
 
@@ -73,6 +77,53 @@ class RandomTranslate(Augmentation):
         )
 
 
+class RandomMesh(Augmentation):
+    def __init__(
+        self,
+        mesh_directory: Path,
+        voxel_size: float,
+        number_meshes: int,
+        min_size: float,
+        max_size: float,
+    ):
+        self.mesh_paths = list(mesh_directory.glob("*"))
+        self.voxel_size = voxel_size
+        self.number_meshes = number_meshes
+        self.min_size = min_size
+        self.max_size = max_size
+        self.class_number = 3
+
+    def __call__(self, cloud):
+        for i in range(self.number_meshes):
+            mesh = load_o3d_mesh(
+                str(self.mesh_paths[random.randint(0, len(self.mesh_paths))])
+            )
+
+            mesh = mesh.scale(0.01, center=mesh.get_center())
+
+            mesh = mesh.translate(-mesh.get_center())
+
+            mesh_pts = mesh.sample_points_uniformly(
+                int(1000 * mesh.get_surface_area() / self.voxel_size),
+            ).paint_uniform_color(np.random.rand(3))
+
+            lc = LabelledCloud.from_o3d_cld(
+                mesh_pts,
+                class_l=torch.ones(np.asarray(mesh_pts.points).shape[0])
+                * self.class_number,
+            )
+
+            cloud += lc
+
+        # load random mesh
+        # voxelize mesh
+        # create labelled cloud
+        # randomly translate / rotate it
+        # return new cloud
+
+        return cloud
+
+
 class RandomDropout(Augmentation):
     def __init__(self, max_drop_out):
         self.max_drop_out = max_drop_out
@@ -127,13 +178,26 @@ class AugmentationPipeline:
 
 if __name__ == "__main__":
     from pathlib import Path
-    from smart_tree.util.file import load_cloud
+    from smart_tree.util.file import load_data_npz
     from smart_tree.util.visualizer.view import o3d_viewer
 
-    cld = load_cloud(
-        Path("/media/harry/harry's-data/PhD/training-data/apple/apple_1.npz")
+    mesh_adder = RandomMesh(
+        mesh_directory=Path("/local/Datasets/Thingi10K/raw_meshes/"),
+        voxel_size=0.01,
+        number_meshes=5,
+        min_size=0.01,
+        max_size=0.5,
     )
 
+    cld, _ = load_data_npz(Path("/local/_smart-tree/evaluation-data/gt/apple_12.npz"))
+
+    cld = mesh_adder(cld)
+
+    cld.view()
+
+    # o3d_viewer([cld])
+
+    quit()
     centre = CentreCloud()
     rotater = FixedRotate(torch.tensor([torch.pi / 2, torch.pi / 2, torch.pi * 2]))
     do = RandomDropout(0.5)
