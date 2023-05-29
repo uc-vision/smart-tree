@@ -1,0 +1,116 @@
+training:
+
+  name: "tree"
+  wblogging: "online" 
+  fp16: False
+  num_epoch: 10
+  lr_decay: True
+  early_stop_epoch: 20
+  early_stop: True
+  use_colour: False
+
+  dataset:
+    _target_: smart_tree.dataset.dataset.TreeDataset
+    voxel_size: 0.01
+    json_path: /local/uc-vision/smart-tree/smart_tree/conf/tree-split.json
+    directory: /local/uc-vision/dataset/branches/
+    blocking: True
+    block_size: 4
+    buffer_size: 0.4
+
+    # augmentation:
+    #     _target_:  smart_tree.dataset.augmentations.Scale
+    #     min_scale: 0.9
+    #     max_scale: 1.1
+      
+    #     _target_:  smart_tree.dataset.augmentations.RandomDropout
+    #     max_drop_out: 0.1
+      
+    #     _target_:  smart_tree.dataset.augmentations.RandomColourDropout
+    #     max_drop_out: 0.1
+
+  data_loader:
+    _target_: torch.utils.data.DataLoader
+    batch_size: 16
+    drop_last: True
+    pin_memory: False
+    num_workers: 0
+    #prefetch_factor: 
+    shuffle: True
+    collate_fn:
+      _target_: smart_tree.model.sparse.batch_collate
+      _partial_: True
+
+  model:
+    _target_: smart_tree.model.model.Smart_Tree
+    input_channels: 3
+    unet_planes: [8, 16, 32, 64, 128, 256]
+    radius_fc_planes: [8, 8, 4, 1]
+    direction_fc_planes: [8, 8, 4, 3]
+    class_fc_planes: [8, 8, 4, 2] # last one is number of classes..
+    bias: False
+
+  optimizer:
+    _target_: torch.optim.Adam # SGD, Adadelta etc
+    lr: 0.1
+    #eps: 0.00001
+
+
+  scheduler:
+    _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+    mode: "min"
+
+
+model_inference: 
+  model_path: /local/uc-vision/smart-tree/smart_tree/model/weights/noble-elevator-58_model.pt
+  weights_path: /local/uc-vision/smart-tree/smart_tree/model/weights/noble-elevator-58_model_weights.pt
+  voxel_size: 0.01
+  block_size: 4
+  buffer_size: 0.4
+  num_workers : 8
+  batch_size : 4
+  use_colour: False
+
+skeletonizer:
+  K: 16
+  min_connection_length: 0.00 #.02
+  minimum_graph_vertices: 32
+  max_number_components: 30
+  voxel_downsample: False
+  edge_non_linear: None
+
+
+pipeline:
+  
+  preprocessing:
+    # Scale:
+    #     _target_:  smart_tree.dataset.augmentations.Scale
+    #     min_scale: 1
+    #     max_scale: 1
+    # Scale:
+    #   _target_:  smart_tree.dataset.augmentations.Scale
+    #   min_scale: 1
+    #   max_scale: 1
+    # VoxelDownsample:
+    #    _target_:  smart_tree.dataset.augmentations.VoxelDownsample
+    #    voxel_size : 0.01
+
+    # FixedRotate:
+    #    _target_:  smart_tree.dataset.augmentations.FixedRotate
+    #    xyz: [0, 0, 90]
+    # CentreCloud:
+    #    _target_:  smart_tree.dataset.augmentations.CentreCloud
+
+
+  repair_skeletons : True
+  smooth_skeletons : True
+  prune_skeletons : True
+  min_skeleton_radius : 0.001 #0.005
+  min_skeleton_length : 0.02
+  view_model_output : True
+  view_skeletons : True
+  save_outputs : False
+  branch_classes: [0]
+  cmap:
+    - [1, 0, 0] # Trunk
+    - [0, 1, 0] # Foliage
