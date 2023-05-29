@@ -9,6 +9,8 @@ from hydra.utils import call, get_original_cwd, instantiate, to_absolute_path
 from omegaconf import DictConfig, OmegaConf
 from py_structs.torch import map_tensors
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
+
 from tqdm import tqdm
 
 import wandb
@@ -159,7 +161,7 @@ def test():
 
         xyz = xyz[:, :3]  # [mask]
         radius = out[:, [0]]  # [mask]
-        direction = out[:, 1:4]  # [mask]
+        direction = F.normalize(out[:, 1:4])  # [mask]
 
         new_xyz = xyz + torch.exp(radius) * direction
 

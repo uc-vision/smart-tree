@@ -1,11 +1,14 @@
 import contextlib
 import logging
 import os
+import time
+
 from functools import partial
 
 import hydra
 import numpy as np
 import torch
+import torch.nn.functional as F
 from hydra.core.hydra_config import HydraConfig
 from hydra.utils import call, get_original_cwd, instantiate, to_absolute_path
 from omegaconf import DictConfig, OmegaConf
@@ -73,13 +76,14 @@ def main(cfg: DictConfig):
     # Optimizer / Scheduler
     optimizer = instantiate(cfg.optimizer, params=model.parameters())
     scheduler = instantiate(cfg.scheduler, optimizer=optimizer)
-
-    # FP-16
-    amp_ctx = torch.cuda.amp.autocast() if cfg.fp16 else contextlib.nullcontext()
     scaler = torch.cuda.amp.grad_scaler.GradScaler(
-        growth_factor=1.1, backoff_factor=0.90, growth_interval=1
+        init_scale=1 / 100, growth_interval=100
     )
     clip = 1
+
+    amp_ctx = contextlib.nullcontext()
+    if cfg.fp16:
+        amp_ctx = torch.cuda.amp.autocast()
 
     epochs_no_improve = 0
     best_val_loss = torch.inf
@@ -95,42 +99,53 @@ def main(cfg: DictConfig):
             leave=False,
             desc="Training...",
         ):
+            if cfg.fp16:
+                features = features.half()
+
             with amp_ctx:
                 sparse_input = sparse_from_batch(
                     features[:, :num_input_feats],
                     coordinates,
                     device=device,
                 )
-                targets = map_tensors(
-                    features[:, 6:10],
-                    partial(
-                        torch.Tensor.to,
-                        device=device,
-                    ),
-                )
-
+                targets = features[:, 6:10].to(device)
                 model_output = model.forward(sparse_input)
 
                 loss = model.compute_loss(model_output, targets, loss_mask)
                 total_loss = loss["radius"] + loss["direction"] + loss["class"]
 
-            if cfg.fp16:
-                scaler.scale(
-                    loss["radius"] + loss["direction"] + loss["class"]
-                ).backward()
-                scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
-                scaler.step(optimizer)
-                scaler.update()
-            else:
-                total_loss.backward()
-                optimizer.step()
+                if cfg.fp16:
+                    assert total_loss.dtype is torch.float32
+                    scaler.scale(total_loss).backward()
+                    scaler.unscale_(optimizer)
+
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
+
+                    scaler.step(optimizer)
+                    scaler.update()
+                    scale = scaler.get_scale()
+                else:
+                    total_loss.backward()
+                    optimizer.step()
+
+            # if cfg.fp16:
+            #     scaler.scale(
+            #         loss["radius"] + loss["direction"] + loss["class"]
+            #     ).backward()
+            #     scaler.unscale_(optimizer)
+            #     torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
+            #     scaler.step(optimizer)
+            #     scaler.update()
+            #     scale = scaler.get_scale()
+            # else:
 
             optimizer.zero_grad()
 
             epoch_training_loss["radius"] += loss["radius"].item()
             epoch_training_loss["direction"] += loss["direction"].item()
             epoch_training_loss["class"] += loss["class"].item()
+
+        print(sum(epoch_training_loss.values()))
 
         # Validation Loop
         with torch.no_grad():
@@ -143,39 +158,40 @@ def main(cfg: DictConfig):
                 leave=False,
                 desc="Validating",
             ):
-                sparse_input = sparse_from_batch(
-                    features[:, :num_input_feats],
-                    coordinates,
-                    device=device,
-                )
-                targets = map_tensors(
-                    features[:, 6:10],
-                    partial(torch.Tensor.to, device=device),
-                )
+                if cfg.fp16:
+                    features = features.half()
 
                 with amp_ctx:
+                    sparse_input = sparse_from_batch(
+                        features[:, :num_input_feats],
+                        coordinates,
+                        device=device,
+                    )
+                    targets = features[:, 6:10].to(device)
+
                     model_output = model.forward(sparse_input)
                     loss = model.compute_loss(model_output, targets, loss_mask)
 
-                val_preds["radius"].append(torch.exp(model_output[:, [0]]))
-                val_preds["direction"].append(model_output[:, 1:4])
-                val_preds["class"].append(torch.argmax(model_output[:, 4:], dim=1))
+                    val_preds["radius"].append(torch.exp(model_output[:, [0]]))
+                    val_preds["direction"].append(model_output[:, 1:4])
+                    val_preds["class"].append(torch.argmax(model_output[:, 4:], dim=1))
 
-                direction_target, radius_target = torch_normalized(targets[:, :3])
-                val_targets["radius"].append(radius_target.squeeze(1))
-                val_targets["direction"].append(direction_target)
-                val_targets["class"].append(targets[:, 3])
+                    direction_target, radius_target = torch_normalized(targets[:, :3])
+                    val_targets["radius"].append(radius_target.squeeze(1))
+                    val_targets["direction"].append(direction_target)
+                    val_targets["class"].append(targets[:, 3])
 
-                epoch_validation_loss["radius"] += loss["radius"]
-                epoch_validation_loss["direction"] += loss["direction"]
-                epoch_validation_loss["class"] += loss["class"]
+                    epoch_validation_loss["radius"] += loss["radius"]
+                    epoch_validation_loss["direction"] += loss["direction"]
+                    epoch_validation_loss["class"] += loss["class"]
 
-            val_los = sum(epoch_validation_loss.values())
+            val_los = torch.nan_to_num(sum(epoch_validation_loss.values()), nan=1e10)
             val_preds = concate_dict_of_tensors(val_preds)
             val_targets = concate_dict_of_tensors(val_targets)
 
             scheduler.step(val_los) if cfg.lr_decay else None
 
+            print(val_los)
         if val_los < best_val_loss:
             epochs_no_improve = 0
             best_val_loss = val_los
@@ -189,10 +205,13 @@ def main(cfg: DictConfig):
             log.info(f"Weights Saved at epoch: {epoch}")
 
             batch_filter = coordinates[:, 0] == 0  # First Item ...
-            xyz = features[:, :3][batch_filter].to(torch.device("cpu"))
-            output = model_output[batch_filter].to(torch.device("cpu"))
+            xyz = features[:, :3][batch_filter]
+            output = model_output[batch_filter]
 
-            vector = torch.exp(output[:, [0]]) * output[:, 1:4]
+            vector = torch.exp(output[:, [0]]) * F.normalize(output[:, 1:4])
+
+            xyz = xyz.to(torch.device("cpu"))
+            vector = vector.to(torch.device("cpu"))
 
             rgb_img = o3d_headless_render(
                 [
@@ -212,56 +231,56 @@ def main(cfg: DictConfig):
             log.info("Training Ended (Evaluation Test Score Not Improving)")
             break
 
-        wandb.log(
-            {
-                "Training Total Loss": (
-                    epoch_training_loss["radius"]
-                    + epoch_training_loss["direction"]
-                    + epoch_training_loss["class"]
-                )
-                / len(train_dataloader.dataset),
-                #
-                "Training Vector Loss": (
-                    epoch_training_loss["radius"] + epoch_training_loss["direction"]
-                )
-                / len(train_dataloader.dataset),
-                #
-                "Training Segmentation Loss": epoch_training_loss["class"]
-                / len(train_dataloader.dataset),
-                #
-                "Validation Total Loss": (
-                    epoch_validation_loss["radius"]
-                    + epoch_validation_loss["direction"]
-                    + epoch_validation_loss["class"]
-                )
-                / len(val_dataloader.dataset),
-                #
-                "Validation Vector Loss": (
-                    epoch_validation_loss["radius"] + epoch_validation_loss["direction"]
-                )
-                / len(val_dataloader.dataset),
-                #
-                "Validation Vector Loss": (
-                    epoch_validation_loss["radius"] + epoch_validation_loss["direction"]
-                )
-                / len(val_dataloader.dataset),
-                #
-                "Validation Segmentation Loss": epoch_validation_loss["class"]
-                / len(val_dataloader.dataset),
-                #
-                "Validation F1 Score": f1_score(
-                    val_preds["class"],
-                    val_targets["class"],
-                    average="micro",
-                ),
-                #
-                "Validation Radius MAPE": mean_absolute_percentage_error(
-                    val_targets["radius"][val_targets["class"] == 0],
-                    val_preds["radius"][val_targets["class"] == 0],
-                ),
-            },
-            step=epoch,
-        )
+        # wandb.log(
+        #     {
+        #         "Training Total Loss": (
+        #             epoch_training_loss["radius"]
+        #             + epoch_training_loss["direction"]
+        #             + epoch_training_loss["class"]
+        #         )
+        #         / len(train_dataloader.dataset),
+        #         #
+        #         "Training Vector Loss": (
+        #             epoch_training_loss["radius"] + epoch_training_loss["direction"]
+        #         )
+        #         / len(train_dataloader.dataset),
+        #         #
+        #         "Training Segmentation Loss": epoch_training_loss["class"]
+        #         / len(train_dataloader.dataset),
+        #         #
+        #         "Validation Total Loss": (
+        #             epoch_validation_loss["radius"]
+        #             + epoch_validation_loss["direction"]
+        #             + epoch_validation_loss["class"]
+        #         )
+        #         / len(val_dataloader.dataset),
+        #         #
+        #         "Validation Vector Loss": (
+        #             epoch_validation_loss["radius"] + epoch_validation_loss["direction"]
+        #         )
+        #         / len(val_dataloader.dataset),
+        #         #
+        #         "Validation Vector Loss": (
+        #             epoch_validation_loss["radius"] + epoch_validation_loss["direction"]
+        #         )
+        #         / len(val_dataloader.dataset),
+        #         #
+        #         "Validation Segmentation Loss": epoch_validation_loss["class"]
+        #         / len(val_dataloader.dataset),
+        #         #
+        #         "Validation F1 Score": f1_score(
+        #             val_preds["class"],
+        #             val_targets["class"],
+        #             average="micro",
+        #         ),
+        #         #
+        #         "Validation Radius MAPE": mean_absolute_percentage_error(
+        #             val_targets["radius"][val_targets["class"] == 0],
+        #             val_preds["radius"][val_targets["class"] == 0],
+        #         ),
+        #     },
+        #     step=epoch,
+        # )
 
 
 if __name__ == "__main__":

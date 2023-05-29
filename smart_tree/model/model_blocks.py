@@ -127,19 +127,19 @@ class ResBlock(nn.Module):
                     output_channels,
                     kernel_size=1,
                     padding=1,
-                    bias=False,
+                    bias=bias,
                     algo=algo,
                 )
             )
 
         self.sequence = spconv.SparseSequential(
             spconv.SubMConv3d(
-                input_channels, output_channels, kernel_size, bias=False, algo=algo
+                input_channels, output_channels, kernel_size, bias=bias, algo=algo
             ),
             norm_fn(output_channels),
             activation_fn(),
             spconv.SubMConv3d(
-                output_channels, output_channels, kernel_size, bias=False, algo=algo
+                output_channels, output_channels, kernel_size, bias=bias, algo=algo
             ),
             norm_fn(output_channels),
         )
@@ -244,43 +244,23 @@ class UBlock(nn.Module):
         return output
 
 
-class SparseFC(nn.Module):
+class MLP(nn.Module):
     def __init__(
         self,
         n_planes,
         norm_fn,
         activation_fn=None,
-        kernel_size=1,
-        algo=spconv.ConvAlgo.Native,
-        bias=False,
     ):
         super().__init__()
 
         self.sequence = spconv.SparseSequential()
+
         for i in range(len(n_planes) - 2):
-            self.sequence.add(
-                spconv.SubMConv3d(
-                    n_planes[i],
-                    n_planes[i + 1],
-                    kernel_size=kernel_size,
-                    bias=False,
-                    algo=algo,
-                    padding=0,
-                )
-            )
+            self.sequence.add(nn.Linear(n_planes[i], n_planes[i + 1]))
             self.sequence.add(norm_fn(n_planes[i + 1]))
             self.sequence.add(activation_fn())
 
-        self.sequence.add(
-            spconv.SubMConv3d(
-                n_planes[-2],
-                n_planes[-1],
-                kernel_size=kernel_size,
-                bias=False,
-                algo=algo,
-                padding=0,
-            )
-        )
+        self.sequence.add(nn.Linear(n_planes[-2], n_planes[-1]))
 
     def forward(self, input):
         return self.sequence(input)

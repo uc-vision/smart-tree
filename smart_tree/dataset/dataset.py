@@ -103,7 +103,7 @@ class TreeDataset:
         if self.blocking:
             loss_mask = cube_filter(feats[:, :3], block_center, self.block_size)
 
-        return feats.float(), coords.int(), loss_mask
+        return feats, coords.int(), loss_mask
 
     def __len__(self):
         return len(self.tree_paths)
