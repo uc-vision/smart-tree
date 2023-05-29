@@ -131,6 +131,7 @@ dmypy.json
 
 .vscode/
 
+debug/
 outputs/
 data/
 multirun/
