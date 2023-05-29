@@ -5,7 +5,7 @@ import torch.cuda.amp
 import torch.nn as nn
 import torch.nn.functional as F
 
-from smart_tree.model.model_blocks import SparseFC, UBlock, SubMConvBlock
+from smart_tree.model.model_blocks import MLP, UBlock, SubMConvBlock
 from smart_tree.util.math.maths import torch_normalized
 
 spconv.constants.SPCONV_ALLOW_TF32 = True
@@ -30,9 +30,7 @@ class Smart_Tree(nn.Module):
 
         self.branch_classes = torch.tensor(branch_classes, device=device)
 
-        norm_fn = functools.partial(
-            nn.BatchNorm1d, eps=1e-4, momentum=0.1
-        )  # , momentum=0.99)
+        norm_fn = functools.partial(nn.BatchNorm1d, eps=1e-4)  # , momentum=0.99)
         activation_fn = nn.ReLU
 
         self.radius_loss = nn.L1Loss()
@@ -55,24 +53,9 @@ class Smart_Tree(nn.Module):
             algo=algo,
         )
 
-        self.radius_head = SparseFC(
-            radius_fc_planes,
-            norm_fn,
-            activation_fn,
-            algo=algo,
-        )
-        self.direction_head = SparseFC(
-            direction_fc_planes,
-            norm_fn,
-            activation_fn,
-            algo=algo,
-        )
-        self.class_head = SparseFC(
-            class_fc_planes,
-            norm_fn,
-            activation_fn,
-            algo=algo,
-        )
+        self.radius_head = MLP(radius_fc_planes, norm_fn, activation_fn)
+        self.direction_head = MLP(direction_fc_planes, norm_fn, activation_fn)
+        self.class_head = MLP(class_fc_planes, norm_fn, activation_fn)
 
         self.apply(self.set_bn_init)
 
@@ -87,12 +70,12 @@ class Smart_Tree(nn.Module):
         x = self.input_conv(input)
         unet_out = self.UNet(x)
 
-        radius = self.radius_head(unet_out)
-        direction = self.direction_head(unet_out)
-        class_l = self.class_head(unet_out)
+        radius = self.radius_head(unet_out).features
+        direction = self.direction_head(unet_out).features
+        class_l = self.class_head(unet_out).features
 
         return torch.cat(
-            [radius.features, F.normalize(direction.features), class_l.features],
+            [radius, direction, class_l],
             dim=1,
         )
 
@@ -105,7 +88,7 @@ class Smart_Tree(nn.Module):
             targets = targets[mask]
 
         radius_pred = outputs[:, [0]]
-        direction_pred = outputs[:, 1:4]
+        direction_pred = F.normalize(outputs[:, 1:4])
         class_pred = outputs[:, 4:]
 
         class_target = targets[:, [3]]
@@ -128,26 +111,23 @@ class Smart_Tree(nn.Module):
 
         return losses
 
-    # @force_fp32(apply_to=("outputs", "targets"))
+    @force_fp32(apply_to=("outputs", "targets"))
     def compute_radius_loss(self, outputs, targets):
         return self.radius_loss(outputs, torch.log(targets))
 
-    # @force_fp32(apply_to=("outputs", "targets"))
+    @force_fp32(apply_to=("outputs", "targets"))
     def compute_direction_loss(self, outputs, targets):
         return torch.mean(1 - self.direction_loss(outputs, targets))
 
-    # @force_fp32(apply_to=("outputs", "targets"))
+    @force_fp32(apply_to=("outputs", "targets"))
     def compute_class_loss(self, outputs, targets):
-        return self.focal_loss(outputs, targets.long())
+        return self.dice_loss(outputs, targets.long())
 
     def dice_loss(self, outputs, targets):
         # https://gist.github.com/jeremyjordan/9ea3032a32909f71dd2ab35fe3bacc08
         smooth = 1
         outputs = F.softmax(outputs, dim=1)
-        targets = F.one_hot(targets)
-
-        outputs = outputs.view(-1)
-        targets = targets.view(-1)
+        targets = F.one_hot(targets).reshape(-1, 1)
 
         intersection = (outputs * targets).sum()
 

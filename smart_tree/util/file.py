@@ -30,8 +30,6 @@ def unpackage_data(data: dict) -> Tuple[LabelledCloud, TreeSkeleton]:
         class_l=data["class_l"],
     )
 
-    return cld, None
-
     offsets = np.cumsum(np.append([0], sizes))
 
     branch_idx = [np.arange(size) + offset for size, offset in zip(sizes, offsets)]

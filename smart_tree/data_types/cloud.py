@@ -193,8 +193,8 @@ class LabelledCloud(Cloud):
     @staticmethod
     def from_numpy(xyz, rgb, vector, class_l):
         return LabelledCloud(
-            torch.from_numpy(xyz).float(),  # float64 -> these data types are stupid...
+            torch.from_numpy(xyz).float(),  # -> these data types are stupid...
             torch.from_numpy(rgb).float(),  # float64
             torch.from_numpy(vector).float(),  # float32
-            torch.from_numpy(class_l).float(),  # int64
+            torch.from_numpy(class_l).int(),  # int64
         )

@@ -138,8 +138,10 @@ wandb/
 *.out
 *.sl
 speed-tree-outputs/
+smart_tree/conf/tree-dataset-test.yaml
 smart_tree/conf/tree-split-test.json
 smart_tree/conf/apple-trellis-split-test.json
 smart_tree/conf/apple-trellis.yaml
 smart_tree/conf/apple-trellis-split.json
 FRNN/
+debug/
