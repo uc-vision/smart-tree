@@ -154,7 +154,7 @@ def load_o3d_lineset(path: Path):
 
 
 def load_o3d_mesh(path: Path):
-    return o3d.io.read_triangle_model(path)
+    return o3d.io.read_triangle_mesh(path)
 
 
 def save_skeleton(filename: Path, skeleton: TreeSkeleton):
