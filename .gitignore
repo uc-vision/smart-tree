@@ -138,6 +138,9 @@ multirun/
 wandb/
 *.out
 *.sl
+*.pcd
+*.ply
+
 speed-tree-outputs/
 smart_tree/conf/tree-split-test.json
 smart_tree/conf/apple-trellis-split-test.json

@@ -17,15 +17,18 @@ import time
     config_name="test-dataloader",
 )
 def main(cfg: DictConfig):
-    train_dataloader = instantiate(
-        cfg.data_loader, dataset=instantiate(cfg.dataset, mode="train")
-    )
+    dataset = instantiate(cfg.dataset, mode="train")
+    train_dataloader = instantiate(cfg.data_loader, dataset)
 
     start_time = time.time()
     for data in tqdm(train_dataloader):
         pass
 
-    print(time.time() - start_time)
+        # times = [
+        #     s.elapsed_time(e) for s, e in zip(dataset.start_events, dataset.end_events)
+        # ]
+
+        # print(times)
 
 
 if __name__ == "__main__":

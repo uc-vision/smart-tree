@@ -16,13 +16,6 @@ from smart_tree.util.mesh.geometries import o3d_cloud, o3d_line_set
 
 
 def unpackage_data(data: dict) -> Tuple[LabelledCloud, TreeSkeleton]:
-    tree_id = data["tree_id"]
-    branch_id = data["branch_id"]
-    branch_parent_id = data["branch_parent_id"]
-    skeleton_xyz = data["skeleton_xyz"]
-    skeleton_radii = data["skeleton_radii"]
-    sizes = data["branch_num_elements"]
-
     cld = LabelledCloud.from_numpy(
         xyz=data["xyz"],
         rgb=data["rgb"],
@@ -30,8 +23,12 @@ def unpackage_data(data: dict) -> Tuple[LabelledCloud, TreeSkeleton]:
         class_l=data["class_l"],
     )
 
-    return cld, None
-
+    tree_id = data["tree_id"]
+    branch_id = data["branch_id"]
+    branch_parent_id = data["branch_parent_id"]
+    skeleton_xyz = data["skeleton_xyz"]
+    skeleton_radii = data["skeleton_radii"]
+    sizes = data["branch_num_elements"]
     offsets = np.cumsum(np.append([0], sizes))
 
     branch_idx = [np.arange(size) + offset for size, offset in zip(sizes, offsets)]
