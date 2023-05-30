@@ -1,13 +1,25 @@
+import os
 import random
 
 import numpy as np
 import torch
+import random
+import open3d as o3d
 
+from tqdm import tqdm
+from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import List
 
-from smart_tree.data_types.cloud import Cloud
+from smart_tree.data_types.cloud import Cloud, LabelledCloud
 from smart_tree.util.math.maths import euler_angles_to_rotation
+from smart_tree.util.file import (
+    load_o3d_mesh,
+    save_o3d_mesh,
+    save_o3d_cloud,
+    load_o3d_cloud,
+)
+from smart_tree.util.mesh.geometries import o3d_cloud, o3d_sphere
 from hydra.utils import call, get_original_cwd, instantiate, to_absolute_path
 
 
@@ -73,6 +85,89 @@ class RandomTranslate(Augmentation):
         )
 
 
+class RandomMesh(Augmentation):
+    def __init__(
+        self,
+        mesh_directory: Path,
+        preprocessed_path: Path,
+        voxel_size: float,
+        number_meshes: int,
+        min_size: float,
+        max_size: float,
+        max_pts: int,
+    ):
+        """We want to preprocess the meshes by getting them to the right scale,
+        which is done by first converting them from mm to metres, we then
+        scale them up to the max_size and then do a point sample, based on target voxel_size
+        (ensure we have enough point density at the max size), then revert
+        the scale back normal scale in metres. During inference we randomly scale based on the
+        min_size and max_size and then translate the points and merge with the input cloud
+        """
+
+        self.voxel_size = voxel_size
+        self.number_meshes = number_meshes
+        self.min_size = min_size
+        self.max_size = max_size
+        self.class_number = 2
+        self.preprocessed_path = preprocessed_path
+
+        if not (os.path.exists(preprocessed_path)):
+            os.makedirs(preprocessed_path)
+
+        for mesh_path in tqdm(
+            Path(mesh_directory).glob("*.stl"),
+            desc="Preprocessing Meshes",
+            leave=False,
+        ):
+            if os.path.isfile(f"{preprocessed_path}/{mesh_path.stem}.pcd"):
+                continue
+            try:
+                mesh = load_o3d_mesh(str(mesh_path))
+                pcd = (
+                    mesh.scale(0.001, mesh.get_center())
+                    .translate(-mesh.get_center())
+                    .paint_uniform_color(np.random.rand(3))
+                    .scale(max_size, mesh.get_center())
+                    .sample_points_uniformly(
+                        min(
+                            max(int(mesh.get_surface_area() / (voxel_size**2)), 10),
+                            max_pts,
+                        )
+                    )
+                    .scale(1 / max_size, mesh.get_center())
+                )
+                save_o3d_cloud(f"{preprocessed_path}/{mesh_path.stem}.pcd", pcd)
+            except:
+                print(f"Cloud Generation Failed on {mesh_path}")
+
+    def __call__(self, cloud):
+        centre, dimensions = cloud.bbox
+
+        for i in range(self.number_meshes):
+            random_pcd_path = random.choice(list(self.preprocessed_path.glob("*.pcd")))
+            pcd = load_o3d_cloud(str(random_pcd_path))
+            scaled_pcd = pcd.scale(
+                random.uniform(self.min_size, self.max_size), pcd.get_center()
+            )
+
+            lc = LabelledCloud.from_o3d_cld(
+                pcd,
+                class_l=torch.ones(np.asarray(pcd.points).shape[0]) * self.class_number,
+            )
+
+            lc = lc.rotate(
+                euler_angles_to_rotation(torch.rand(3) * torch.pi * 2).to(
+                    cloud.xyz.device
+                )
+            )
+            lc = lc.translate(cloud.min_xyz - lc.centre)
+            lc = lc.translate(dimensions * torch.rand(3))
+
+            cloud += lc
+
+        return cloud
+
+
 class RandomDropout(Augmentation):
     def __init__(self, max_drop_out):
         self.max_drop_out = max_drop_out
@@ -127,13 +222,36 @@ class AugmentationPipeline:
 
 if __name__ == "__main__":
     from pathlib import Path
-    from smart_tree.util.file import load_cloud
+    from smart_tree.util.file import load_data_npz
     from smart_tree.util.visualizer.view import o3d_viewer
 
-    cld = load_cloud(
-        Path("/media/harry/harry's-data/PhD/training-data/apple/apple_1.npz")
+    mesh_adder = RandomMesh(
+        mesh_directory=Path("/local/Datasets/Thingi10K/raw_meshes/"),
+        preprocessed_path=Path(
+            "/local/uc-vision/smart-tree/data/things10K_sampled_1mm/"
+        ),
+        voxel_size=0.001,
+        number_meshes=20,
+        min_size=0.01,
+        max_size=20,
+        max_pts=50000,
     )
 
+    cld, _ = load_data_npz(Path("/local/_smart-tree/evaluation-data/gt/apple_12.npz"))
+
+    cld = mesh_adder(cld)
+
+    cld.view()
+
+    o3d_viewer(
+        [
+            cld.to_o3d_cld(),
+            o3d_sphere(cld.min_xyz, radius=0.1, colour=(0, 1, 0)),
+            o3d_sphere(cld.max_xyz, radius=0.1),
+        ]
+    )
+
+    quit()
     centre = CentreCloud()
     rotater = FixedRotate(torch.tensor([torch.pi / 2, torch.pi / 2, torch.pi * 2]))
     do = RandomDropout(0.5)

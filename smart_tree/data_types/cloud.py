@@ -76,11 +76,16 @@ class Cloud:
         return torch.min(self.xyz, 0)[0]
 
     @property
+    def centre(self):
+        return self.min_xyz + (self.max_xyz - self.min_xyz) / 2
+
+    @property
+    def dimensions(self):
+        return self.max_xyz - self.min_xyz
+
+    @property
     def bbox(self):
-        # defined by centre coordinate, x/2, y/2, z/2
-        dimensions = (self.max_xyz - self.min_xyz) / 2
-        centre = self.min_xyz + dimensions
-        return centre, dimensions
+        return self.centre, self.dimensions
 
     @staticmethod
     def from_numpy(xyz, rgb, device=torch.device("cpu")):
@@ -99,9 +104,21 @@ class LabelledCloud(Cloud):
     vector: torch.Tensor
     class_l: torch.Tensor
 
-    def __post_init__(self):
-        num_classes = int(torch.max(self.class_l, 0)[0].item())
-        self.cmap = torch.rand(num_classes + 1, 3)
+    @property
+    def number_classes(self):
+        return int(torch.max(self.class_l, 0)[0].item()) + 1
+
+    @property
+    def cmap(self):
+        return torch.rand(self.number_classes, 3)
+
+    def __add__(self, other):
+        xyz = torch.cat((self.xyz, other.xyz))
+        rgb = torch.cat((self.rgb, other.rgb))
+        vector = torch.cat((self.vector, other.vector))
+        class_l = torch.cat((self.class_l, other.class_l))
+
+        return LabelledCloud(xyz, rgb, vector, class_l)
 
     def filter(self, mask):
         return LabelledCloud(
@@ -197,4 +214,13 @@ class LabelledCloud(Cloud):
             torch.from_numpy(rgb).float(),  # float64
             torch.from_numpy(vector).float(),  # float32
             torch.from_numpy(class_l).int(),  # int64
+        )
+
+    @staticmethod
+    def from_o3d_cld(cld, class_l):
+        return LabelledCloud.from_numpy(
+            xyz=np.asarray(cld.points),
+            rgb=np.asarray(cld.colors),
+            vector=np.asarray(cld.points) * 0 - 1,
+            class_l=np.asarray(class_l),
         )

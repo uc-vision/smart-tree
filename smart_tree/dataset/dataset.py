@@ -51,9 +51,6 @@ class TreeDataset:
 
         labelled_cld = labelled_cld.to_device(torch.device("cuda"))
 
-        if self.augmentation != None:
-            labelled_cld = self.augmentation(labelled_cld)
-
         if self.blocking:
             block_center_idx = torch.randint(
                 labelled_cld.xyz.shape[0], size=(1,), device=labelled_cld.xyz.device
@@ -65,6 +62,9 @@ class TreeDataset:
                 self.block_size + (self.buffer_size * 2),
             )
             labelled_cld = labelled_cld.filter(block_filter)
+
+        if self.augmentation != None:
+            labelled_cld = self.augmentation(labelled_cld)
 
         xyzmin, _ = torch.min(labelled_cld.xyz, axis=0)
         xyzmax, _ = torch.max(labelled_cld.xyz, axis=0)

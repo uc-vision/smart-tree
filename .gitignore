@@ -131,12 +131,16 @@ dmypy.json
 
 .vscode/
 
+debug/
 outputs/
 data/
 multirun/
 wandb/
 *.out
 *.sl
+*.pcd
+*.ply
+
 speed-tree-outputs/
 smart_tree/conf/tree-dataset-test.yaml
 smart_tree/conf/tree-split-test.json

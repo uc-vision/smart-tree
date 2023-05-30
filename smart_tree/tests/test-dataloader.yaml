@@ -4,7 +4,6 @@ dataset:
   json_path: /local/uc-vision/smart-tree/smart_tree/conf/tree-split.json
   directory: /local/uc-vision/dataset/branches/
   blocking: True
-  transform: True
   block_size: 4
   buffer_size: 0.4
 
@@ -12,7 +11,7 @@ data_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: 1
   drop_last: True
-  pin_memory: True
+  pin_memory: False
   num_workers: 0
   shuffle: True
   #prefetch_factor: None
