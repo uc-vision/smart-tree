@@ -76,11 +76,16 @@ class Cloud:
         return torch.min(self.xyz, 0)[0]
 
     @property
+    def centre(self):
+        return self.min_xyz + (self.max_xyz - self.min_xyz) / 2
+
+    @property
+    def dimensions(self):
+        return self.max_xyz - self.min_xyz
+
+    @property
     def bbox(self):
-        # defined by centre coordinate, x/2, y/2, z/2
-        dimensions = (self.max_xyz - self.min_xyz) / 2
-        centre = self.min_xyz + dimensions
-        return centre, dimensions
+        return self.centre, self.dimensions
 
     @staticmethod
     def from_numpy(xyz, rgb, device=torch.device("cpu")):
