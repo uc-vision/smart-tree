@@ -27,7 +27,8 @@ class Cloud:
         return LabelledCloud(self.xyz, self.rgb, radii * direction, class_l)
 
     def to_o3d_cld(self):
-        return o3d_cloud(self.xyz, colours=self.rgb)
+        cpu_cld = self.to_device("cpu")
+        return o3d_cloud(cpu_cld.xyz, colours=cpu_cld.rgb)
 
     def filter(self, mask):
         return Cloud(self.xyz[mask], self.rgb[mask])
@@ -50,8 +51,7 @@ class Cloud:
         )
 
     def view(self):
-        cpu_cld = self.to_device("cpu")
-        o3d_viewer([cpu_cld.to_o3d_cld()])
+        o3d_viewer([self.to_o3d_cld()])
 
     def voxel_down_sample(self, voxel_size):
         idx = voxel_downsample(self.xyz, voxel_size)
@@ -193,8 +193,8 @@ class LabelledCloud(Cloud):
     @staticmethod
     def from_numpy(xyz, rgb, vector, class_l):
         return LabelledCloud(
-            torch.from_numpy(xyz).float(),  # float64 -> these data types are stupid...
-            torch.from_numpy(rgb).float(),  # float64
-            torch.from_numpy(vector).float(),  # float32
-            torch.from_numpy(class_l).float(),  # int64
+            torch.from_numpy(xyz),  # float64 -> these data types are stupid...
+            torch.from_numpy(rgb),  # float64
+            torch.from_numpy(vector),  # float32
+            torch.from_numpy(class_l),  # int64
         )

@@ -69,7 +69,7 @@ skeletonizer:
   K: 16
   min_connection_length: 0.02 
   minimum_graph_vertices: 32
-  max_number_components: 100
+  max_number_components: 8
   voxel_downsample: False
   edge_non_linear: None
 
@@ -77,17 +77,17 @@ skeletonizer:
 pipeline:
   
   preprocessing:
-    #  Scale:
-    #      _target_:  smart_tree.dataset.augmentations.Scale
-    #      min_scale: 0.1
-    #      max_scale: 0.1
+    # Scale:
+    #       _target_:  smart_tree.dataset.augmentations.Scale
+    #       min_scale: 0.6
+    #       max_scale: 0.6
     # Scale:
     #   _target_:  smart_tree.dataset.augmentations.Scale
     #   min_scale: 1
     #   max_scale: 1
-    VoxelDownsample:
-       _target_:  smart_tree.dataset.augmentations.VoxelDownsample
-       voxel_size : 0.01
+    # VoxelDownsample:
+    #     _target_:  smart_tree.dataset.augmentations.VoxelDownsample
+    #     voxel_size : 0.01
     #FixedRotate:
     #   _target_:  smart_tree.dataset.augmentations.FixedRotate
     #   xyz: [0, 0, 90]
@@ -108,6 +108,7 @@ pipeline:
 
   repair_skeletons : True
   smooth_skeletons : True
-  prune_skeletons : False # need to fix as some skeletons don't know their start I guess?
+  kernel_size: 10
+  prune_skeletons : False 
   min_skeleton_radius : 0.05 #0.005
   min_skeleton_length : 0.02

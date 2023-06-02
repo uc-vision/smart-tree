@@ -29,7 +29,7 @@ def main(cfg: DictConfig):
             pipeline.process_cloud(Path(f"{cfg.directory}/{p}"))
 
     else:
-        print("Please Supply a path or Directory")
+        print("Please supply a path or directory to point clouds.")
 
 
 if __name__ == "__main__":
