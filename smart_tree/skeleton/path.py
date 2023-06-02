@@ -116,7 +116,7 @@ def sample_tree(
         distances[idx_path] = -1
 
         termination_pts = torch.unique(
-            torch.cat((termination_pts, idx_point, idx_path))
+            torch.cat((termination_pts, idx_points, idx_path))
         )
 
         if len(path_vertices_idx) < 2:
