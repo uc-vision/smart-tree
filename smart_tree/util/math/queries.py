@@ -106,14 +106,14 @@ def projection_to_distance_matrix_gpu(projections, pts):  # N x M x 3
 
 
 def pts_to_nearest_tube_gpu(
-    pts: np.array, tubes: List[Tube], device=torch.device("cuda")
+    pts: torch.tensor, tubes: List[Tube], device=torch.device("cuda")
 ):
     """Vectors from pt to the nearest tube"""
 
-    collated_tube = collate_tubes(tubes)
+    collated_tube_gpu = collate_tubes(tubes)
+    collated_tube_gpu.to_gpu()
 
-    collated_tube_gpu = collated_tube_to_gpu(collated_tube)
-    pts = torch.from_numpy(pts).float().to(device)
+    pts = pts.float().to(device)
 
     projections, t = points_to_collated_tube_projections_gpu(
         pts, collated_tube_gpu, device=torch.device("cuda")
@@ -128,9 +128,9 @@ def pts_to_nearest_tube_gpu(
     assert idx.shape[0] == pts.shape[0]
 
     return (
-        to_numpy(projections[torch.arange(pts.shape[0]), idx] - pts),
-        to_numpy(idx),
-        to_numpy(r[torch.arange(pts.shape[0]), idx]),
+        projections[torch.arange(pts.shape[0]), idx] - pts,
+        idx,
+        r[torch.arange(pts.shape[0]), idx],
     )
 
 

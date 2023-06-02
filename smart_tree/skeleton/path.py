@@ -112,27 +112,34 @@ def sample_tree(
             termination_pts,
         )
 
-        """ Gets the points around that path """
+        """ Gets the points around that path (and which path indexs they are close to) """
         idx_points, idx_path = select_path_points(
             medial_pts,
             medial_pts[path_vertices_idx],
             medial_radii[path_vertices_idx],
         )
 
+        """ Mark this points as allocated and as termination points """
         distances[idx_points] = -1
         distances[path_vertices_idx] = -1
-
         termination_pts = torch.unique(
-            torch.cat((termination_pts, idx_points, path_vertices_idx))
+            torch.cat(
+                (
+                    termination_pts,
+                    idx_points,
+                    path_vertices_idx,
+                )
+            )
         )
 
+        """ If the path has at least two points, save it as a branch """
         if len(path_vertices_idx) < 2:
             continue
 
         branches[branch_id] = BranchSkeleton(
             branch_id,
-            xyz=medial_pts[path_vertices_idx].cpu().numpy(),
-            radii=medial_radii[path_vertices_idx].cpu().numpy(),
+            xyz=medial_pts[path_vertices_idx].cpu(),
+            radii=medial_radii[path_vertices_idx].cpu(),
             parent_id=int(branch_ids[termination_idx].item()),
             child_id=-1,
         )
