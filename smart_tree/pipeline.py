@@ -92,7 +92,7 @@ class Pipeline:
                     skeleton.to_o3d_tube(colour=False),
                     cloud.to_o3d_cld(),
                 ],
-                line_width=5,
+                line_width=10,
             )
 
         if self.save_outputs:
