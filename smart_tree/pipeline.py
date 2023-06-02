@@ -4,7 +4,6 @@ import numpy as np
 import torch
 import time
 
-from copy import deepcopy
 from .data_types.cloud import LabelledCloud, Cloud
 from .data_types.tree import TreeSkeleton, DisjointTreeSkeleton
 from hydra.utils import instantiate
@@ -81,7 +80,6 @@ class Pipeline:
 
         # Run the branch cloud through skeletonization algorithm, then post process
         skeleton: DisjointTreeSkeleton = self.skeletonizer.forward(branch_cloud)
-        original_skeleton = deepcopy(skeleton)
 
         self.post_process(skeleton)
 
@@ -93,7 +91,6 @@ class Pipeline:
                     skeleton.to_o3d_lineset(),
                     skeleton.to_o3d_tube(colour=False),
                     cloud.to_o3d_cld(),
-                    original_skeleton.to_o3d_tube(),
                 ],
                 line_width=5,
             )
