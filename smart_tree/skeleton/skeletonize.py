@@ -39,8 +39,6 @@ class Skeletonizer:
         max_number_components: int,
         device=torch.device("cuda:0"),
     ):
-        print("Initalizing Skeletonizer")
-
         self.K = K
         self.min_connection_length = min_connection_length
         self.minimum_graph_vertices = minimum_graph_vertices
@@ -52,7 +50,7 @@ class Skeletonizer:
         cloud.to_device(self.device)
 
         if self.voxel_downsample != False:
-            cloud = cloud.medial_voxel_down_sample(self.voxel_downsample)
+            cloud = cloud.voxel_down_sample(0.01)
 
         mask = outlier_removal(cloud.medial_pts, cloud.radii.unsqueeze(1))
         cloud = cloud.filter(mask)

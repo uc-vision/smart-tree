@@ -2,7 +2,9 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import time
 
+from copy import deepcopy
 from .data_types.cloud import LabelledCloud, Cloud
 from .data_types.tree import TreeSkeleton, DisjointTreeSkeleton
 from hydra.utils import instantiate
@@ -41,7 +43,6 @@ class Pipeline:
         cmap=[[1, 0, 0], [0, 1, 0]],
         device=torch.device("cuda:0"),
     ):
-        print("Setting up pipeline...")
         self.inferer = inferer
         self.skeletonizer = skeletonizer
 
@@ -67,19 +68,21 @@ class Pipeline:
 
     def process_cloud(self, path: Path):
         # Load point cloud
-        cloud: Cloud = load_cloud(path)
+        cloud: Cloud = load_cloud(path).to_device(self.device)
         cloud = self.preprocessing(cloud)
 
         # Run point cloud through model to predict class, radius, direction
-        lc: LabelledCloud = self.inferer.forward(cloud).to_device("cuda")
+        lc: LabelledCloud = self.inferer.forward(cloud).to_device(self.device)
         if self.view_model_output:
-            lc.view(cmap=self.cmap)
+            lc.view(self.cmap)
 
         # Filter only the branch points for skeletonizaiton
         branch_cloud: LabelledCloud = lc.filter_by_class(self.branch_classes)
 
         # Run the branch cloud through skeletonization algorithm, then post process
         skeleton: DisjointTreeSkeleton = self.skeletonizer.forward(branch_cloud)
+        original_skeleton = deepcopy(skeleton)
+
         self.post_process(skeleton)
 
         # View skeletonization results
@@ -88,16 +91,17 @@ class Pipeline:
                 [
                     skeleton.to_o3d_tube(),
                     skeleton.to_o3d_lineset(),
-                    cloud.to_o3d_cld(),
                     skeleton.to_o3d_tube(colour=False),
+                    cloud.to_o3d_cld(),
+                    original_skeleton.to_o3d_tube(),
                 ],
                 line_width=5,
             )
 
         if self.save_outputs:
-            save_o3d_mesh("skeleton.ply", skeleton.to_o3d_lineset())
-            save_o3d_lineset("mesh.ply", skeleton.to_o3d_tube())
-            save_o3d_cloud("mesh.ply", cloud.to_o3d_cld())
+            save_o3d_lineset("skeleton.ply", skeleton.to_o3d_lineset())
+            save_o3d_mesh("mesh.ply", skeleton.to_o3d_tube())
+            save_o3d_cloud("cloud.ply", cloud.to_o3d_cld())
 
     def post_process(self, skeleton: DisjointTreeSkeleton):
         if self.prune_skeletons:
@@ -110,8 +114,7 @@ class Pipeline:
             skeleton.repair()
 
         if self.smooth_skeletons:
-            print("Smoothing...")
-            skeleton.smooth()
+            skeleton.smooth(kernel_size=30)
 
     @staticmethod
     def from_cfg(inferer, skeletonizer, cfg):

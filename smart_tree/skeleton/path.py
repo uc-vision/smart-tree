@@ -13,18 +13,12 @@ from .graph import nn
 from ..util.visualizer.view import o3d_viewer
 
 
-def trace_route(preds, idx, allocated):
-    cpu_preds = preds.cpu().numpy()
+def trace_route(preds, idx, termination_pts):
     path = []
 
-    if len(allocated) > 0:
-        endpoints = set(torch.cat(allocated).cpu().numpy())
-    else:
-        endpoints = set(allocated)
-
-    while idx >= 0 and idx not in endpoints:
+    while idx >= 0 and idx not in termination_pts:
         path.append(idx)
-        idx = cpu_preds[idx]
+        idx = preds[idx]
 
     return preds.new_tensor(path, dtype=torch.long).flip(0), idx
 
@@ -81,25 +75,23 @@ def sample_tree(
     """
     Medial Points: NN estimated medial points
     Medial Radii: NN estimated radii of points
-    Preds: Predecessor of each medial point (On path to root node)
+    Preds: Predecessor of each medial point (on path to root node)
     Distance: Distance from root node to medial points
     Surface Points: The point the medial pts got projected from..
     """
 
     selection_mask = preds > 0
-    distances[~selection_mask] = -1  # Set their distances to negative 1...
+    distances[~selection_mask] = -1
 
-    allocated_path_points = []
+    termination_pts = torch.tensor([], device=torch.device("cuda"))
 
     branch_id = 0
 
     idx_lookup = {}
     branches = {}
 
-    # tubes = []
-
     while True:
-        farthest = distances.argmax().item()  # Get fartherest away medial point
+        farthest = distances.argmax().item()
 
         if distances[farthest] <= 0:
             break
@@ -108,9 +100,12 @@ def sample_tree(
             pts_sampled = f"{100 * (1.0 - ((distances > 0).sum().item() / medial_pts.shape[0])):.2f}"
             pbar.set_postfix_str(f"Sampling Graph: {pts_sampled} %")
 
-        path_vertices_idx, first_idx = trace_route(
-            preds, farthest, allocated=allocated_path_points
-        )  # Gets IDXs along a path and the first IDX of that path
+        path_vertices_idx, termination_idx = trace_route(
+            preds,
+            farthest,
+            termination_pts,
+        )
+
         idx_points, idx_path = select_path_points(
             medial_pts,
             medial_pts[path_vertices_idx],
@@ -120,30 +115,22 @@ def sample_tree(
         distances[idx_points] = -1
         distances[idx_path] = -1
 
-        # allocated_path_points.append(idx_path)
-        allocated_path_points.append(idx_points)
+        termination_pts = torch.unique(
+            torch.cat((termination_pts, idx_point, idx_path))
+        )
 
-        if len(path_vertices_idx) > 1:
-            branches[branch_id] = BranchSkeleton(
-                branch_id,
-                xyz=medial_pts[path_vertices_idx].cpu().numpy(),
-                radii=medial_radii[path_vertices_idx].cpu().numpy(),
-                parent_id=find_branch_parent(int(first_idx), idx_lookup),
-                child_id=-1,
-            )
+        if len(path_vertices_idx) < 2:
+            continue
 
-            idx_lookup[branch_id] = (
-                path_vertices_idx.cpu().tolist() + idx_points.cpu().tolist()
-            )
-            branch_id += 1
+        branches[branch_id] = BranchSkeleton(
+            branch_id,
+            xyz=medial_pts[path_vertices_idx].cpu().numpy(),
+            radii=medial_radii[path_vertices_idx].cpu().numpy(),
+            parent_id=-1,  # find_branch_parent(termination_idx, idx_lookup),
+            child_id=-1,
+        )
 
-            # tubes.append(
-            #     o3d_tube_mesh(
-            #         medial_pts[path_vertices_idx].cpu().numpy(),
-            #         medial_radii[path_vertices_idx].cpu().numpy(),
-            #     )
-            # )
-
-            # o3d_viewer(tubes)
+        idx_lookup[branch_id] = idx_path.cpu().tolist() + idx_points.cpu().tolist()
+        branch_id += 1
 
     return branches

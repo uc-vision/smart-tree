@@ -93,7 +93,9 @@ class TreeSkeleton:
                 continue
 
             if branch.parent_id in branches_to_keep:
-                if branch.length > min_length and branch.radii[0] > min_radius:
+                if branch.length > min_length and (
+                    (branch.radii[0] > min_radius) or branch.radii[-1] > min_radius
+                ):
                     branches_to_keep[branch_id] = branch
 
         self.branches = branches_to_keep
@@ -107,8 +109,10 @@ class TreeSkeleton:
         for branch in self.branches.values():
             if branch.radii.shape[0] >= kernel_size:
                 branch.radii = np.convolve(
-                    branch.radii.ravel(), kernel, mode="same"
-                ).reshape(-1, 1)
+                    branch.radii.reshape(-1),
+                    kernel,
+                    mode="same",
+                )
 
 
 @dataclass
@@ -123,9 +127,9 @@ class DisjointTreeSkeleton:
         for skeleton in self.skeletons:
             skeleton.repair()
 
-    def smooth(self):
+    def smooth(self, kernel_size=10):
         for skeleton in self.skeletons:
-            skeleton.smooth()
+            skeleton.smooth(kernel_size=kernel_size)
 
     def to_o3d_lineset(self):
         return o3d_merge_linesets(
