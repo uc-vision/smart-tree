@@ -13,15 +13,14 @@ from .graph import nn
 from ..util.visualizer.view import o3d_viewer
 
 
-def trace_route(preds, idx, end_points):
-    # cpu_preds = preds.cpu().numpy()
+def trace_route(preds, idx, termination_pts):
     path = []
 
-    while idx >= 0 and idx not in end_points:
+    while idx >= 0 and idx not in termination_pts:
         path.append(idx)
         idx = preds[idx]
 
-    return preds.new_tensor(path, dtype=torch.long).flip(0)
+    return preds.new_tensor(path, dtype=torch.long).flip(0), idx
 
 
 def select_path_points(
@@ -84,7 +83,7 @@ def sample_tree(
     selection_mask = preds > 0
     distances[~selection_mask] = -1
 
-    end_points = torch.tensor([], device=torch.device("cuda"))
+    termination_pts = torch.tensor([], device=torch.device("cuda"))
 
     branch_id = 0
 
@@ -101,10 +100,10 @@ def sample_tree(
             pts_sampled = f"{100 * (1.0 - ((distances > 0).sum().item() / medial_pts.shape[0])):.2f}"
             pbar.set_postfix_str(f"Sampling Graph: {pts_sampled} %")
 
-        path_vertices_idx = trace_route(
+        path_vertices_idx, termination_idx = trace_route(
             preds,
             farthest,
-            end_points,
+            termination_pts,
         )
 
         idx_points, idx_path = select_path_points(
@@ -116,7 +115,9 @@ def sample_tree(
         distances[idx_points] = -1
         distances[idx_path] = -1
 
-        end_points = torch.unique(torch.cat((end_points, idx_points, idx_path)))
+        termination_pts = torch.unique(
+            torch.cat((termination_pts, idx_point, idx_path))
+        )
 
         if len(path_vertices_idx) < 2:
             continue
@@ -125,7 +126,7 @@ def sample_tree(
             branch_id,
             xyz=medial_pts[path_vertices_idx].cpu().numpy(),
             radii=medial_radii[path_vertices_idx].cpu().numpy(),
-            parent_id=find_branch_parent(int(path_vertices_idx[0]), idx_lookup),
+            parent_id=-1,  # find_branch_parent(termination_idx, idx_lookup),
             child_id=-1,
         )
 

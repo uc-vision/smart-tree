@@ -109,8 +109,10 @@ class TreeSkeleton:
         for branch in self.branches.values():
             if branch.radii.shape[0] >= kernel_size:
                 branch.radii = np.convolve(
-                    branch.radii.ravel(), kernel, mode="same"
-                ).reshape(-1, 1)
+                    branch.radii.reshape(-1),
+                    kernel,
+                    mode="same",
+                )
 
 
 @dataclass
@@ -125,9 +127,9 @@ class DisjointTreeSkeleton:
         for skeleton in self.skeletons:
             skeleton.repair()
 
-    def smooth(self):
+    def smooth(self, kernel_size=10):
         for skeleton in self.skeletons:
-            skeleton.smooth()
+            skeleton.smooth(kernel_size=kernel_size)
 
     def to_o3d_lineset(self):
         return o3d_merge_linesets(
