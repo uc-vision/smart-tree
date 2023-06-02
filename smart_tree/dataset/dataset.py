@@ -155,8 +155,6 @@ class SingleTreeInference:
 
         self.block_centres = self.block_centres.to(torch.device("cpu"))
 
-        print("Blocks Computed")
-
     def __getitem__(self, idx):
         block_centre = self.block_centres[idx]
         cloud: Cloud = self.clouds[idx]

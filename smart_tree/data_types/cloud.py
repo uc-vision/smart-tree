@@ -27,7 +27,8 @@ class Cloud:
         return LabelledCloud(self.xyz, self.rgb, radii * direction, class_l)
 
     def to_o3d_cld(self):
-        return o3d_cloud(self.xyz, colours=self.rgb)
+        cpu_cld = self.to_device("cpu")
+        return o3d_cloud(cpu_cld.xyz, colours=cpu_cld.rgb)
 
     def filter(self, mask):
         return Cloud(self.xyz[mask], self.rgb[mask])
@@ -50,8 +51,7 @@ class Cloud:
         )
 
     def view(self):
-        cpu_cld = self.to_device("cpu")
-        o3d_viewer([cpu_cld.to_o3d_cld()])
+        o3d_viewer([self.to_o3d_cld()])
 
     def voxel_down_sample(self, voxel_size):
         idx = voxel_downsample(self.xyz, voxel_size)
@@ -111,6 +111,7 @@ class LabelledCloud(Cloud):
     @property
     def cmap(self):
         return torch.rand(self.number_classes, 3)
+<<<<<<< HEAD
 
     def __add__(self, other):
         xyz = torch.cat((self.xyz, other.xyz))
@@ -119,6 +120,8 @@ class LabelledCloud(Cloud):
         class_l = torch.cat((self.class_l, other.class_l))
 
         return LabelledCloud(xyz, rgb, vector, class_l)
+=======
+>>>>>>> revert
 
     def filter(self, mask):
         return LabelledCloud(
@@ -137,11 +140,7 @@ class LabelledCloud(Cloud):
         return self.filter(mask)
 
     def view(self, cmap=[]):
-        if len(cmap) != 0:
-            cmap = cmap
-        else:
-            cmap = self.cmap
-
+        cmap = cmap if cmap != [] else self.cmap
         cpu_cld = self.to_device("cpu")
         input_cld = cpu_cld.to_o3d_cld()
         segmented_cld = o3d_cloud(cpu_cld.xyz, colours=cmap[cpu_cld.class_l])
@@ -210,17 +209,8 @@ class LabelledCloud(Cloud):
     @staticmethod
     def from_numpy(xyz, rgb, vector, class_l):
         return LabelledCloud(
-            torch.from_numpy(xyz).float(),  # -> these data types are stupid...
-            torch.from_numpy(rgb).float(),  # float64
-            torch.from_numpy(vector).float(),  # float32
-            torch.from_numpy(class_l).int(),  # int64
-        )
-
-    @staticmethod
-    def from_o3d_cld(cld, class_l):
-        return LabelledCloud.from_numpy(
-            xyz=np.asarray(cld.points),
-            rgb=np.asarray(cld.colors),
-            vector=np.asarray(cld.points) * 0 - 1,
-            class_l=np.asarray(class_l),
+            torch.from_numpy(xyz),  # float64 -> these data types are stupid...
+            torch.from_numpy(rgb),  # float64
+            torch.from_numpy(vector),  # float32
+            torch.from_numpy(class_l),  # int64
         )

@@ -46,11 +46,10 @@ class ModelInference:
         batch_size=4,
         use_colour=False,
         device=torch.device("cuda:0"),
+        verbose=False,
     ):
-        print("Initalizing Model Inference")
         self.device = device
-        self.model = load_model(model_path, weights_path, self.device)
-        print("Model Loaded")
+        self.verbose = verbose
         self.voxel_size = voxel_size
         self.block_size = block_size
         self.buffer_size = buffer_size
@@ -58,7 +57,10 @@ class ModelInference:
         self.num_workers = num_workers
         self.batch_size = batch_size
 
-        self.num_input_feats = 6 if use_colour else 3
+        self.model = load_model(model_path, weights_path, self.device)
+
+        if self.verbose:
+            print("Model Loaded Succesfully")
 
     def forward(self, cloud: Cloud, return_masked=True):
         outputs, inputs, masks = [], [], []
