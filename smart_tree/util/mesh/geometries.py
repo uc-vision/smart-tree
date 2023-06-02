@@ -41,7 +41,7 @@ def o3d_merge_linesets(line_sets, colour=[0, 0, 0]):
 
     return o3d.geometry.LineSet(
         o3d.utility.Vector3dVector(points), o3d.utility.Vector2iVector(idxs)
-    )
+    ).paint_uniform_color(colour)
 
 
 def points_to_edge_idx(points):

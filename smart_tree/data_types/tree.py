@@ -34,7 +34,7 @@ class TreeSkeleton:
         return [b.to_o3d_lineset() for b in self.branches.values()]
 
     def to_o3d_lineset(self, colour=(0, 0, 0)):
-        return o3d_merge_linesets(self.to_o3d_linesets())
+        return o3d_merge_linesets(self.to_o3d_linesets(), colour=colour)
 
     def to_o3d_tubes(self) -> List:
         return [b.to_o3d_tube() for b in self.branches.values()]
@@ -94,7 +94,8 @@ class TreeSkeleton:
 
             if branch.parent_id in branches_to_keep:
                 if branch.length > min_length and (
-                    (branch.radii[0] > min_radius) or branch.radii[-1] > min_radius
+                    max(branch.radii[0], branch.radii[-1])
+                    > min_radius  # We don't know which end of the branch is the start for skeletons that aren't connected...
                 ):
                     branches_to_keep[branch_id] = branch
 
@@ -120,8 +121,10 @@ class DisjointTreeSkeleton:
     skeletons: List[TreeSkeleton]
 
     def prune(self, min_radius, min_length):
-        for skeleton in self.skeletons:
-            skeleton.prune(min_radius=min_radius, min_length=min_length)
+        self.skeletons[0].prune(
+            min_radius=min_radius,
+            min_length=min_length,
+        )  # Can only prune the first skeleton as we don't know the root points for all the other skeletons...
 
     def repair(self):
         for skeleton in self.skeletons:

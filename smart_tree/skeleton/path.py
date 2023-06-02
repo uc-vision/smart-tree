@@ -80,15 +80,20 @@ def sample_tree(
     Surface Points: The point the medial pts got projected from..
     """
 
+    branch_id = 0
+
+    branches = {}
+
     selection_mask = preds > 0
     distances[~selection_mask] = -1
 
     termination_pts = torch.tensor([], device=torch.device("cuda"))
-
-    branch_id = 0
-
-    idx_lookup = {}
-    branches = {}
+    branch_ids = torch.full(
+        (medial_pts.shape[0],),
+        -1,
+        device=torch.device("cuda"),
+        dtype=int,
+    )
 
     while True:
         farthest = distances.argmax().item()
@@ -100,12 +105,14 @@ def sample_tree(
             pts_sampled = f"{100 * (1.0 - ((distances > 0).sum().item() / medial_pts.shape[0])):.2f}"
             pbar.set_postfix_str(f"Sampling Graph: {pts_sampled} %")
 
+        """ Traces the path of the futhrest point until it converges with allocated points """
         path_vertices_idx, termination_idx = trace_route(
             preds,
             farthest,
             termination_pts,
         )
 
+        """ Gets the points around that path """
         idx_points, idx_path = select_path_points(
             medial_pts,
             medial_pts[path_vertices_idx],
@@ -113,10 +120,10 @@ def sample_tree(
         )
 
         distances[idx_points] = -1
-        distances[idx_path] = -1
+        distances[path_vertices_idx] = -1
 
         termination_pts = torch.unique(
-            torch.cat((termination_pts, idx_points, idx_path))
+            torch.cat((termination_pts, idx_points, path_vertices_idx))
         )
 
         if len(path_vertices_idx) < 2:
@@ -126,11 +133,13 @@ def sample_tree(
             branch_id,
             xyz=medial_pts[path_vertices_idx].cpu().numpy(),
             radii=medial_radii[path_vertices_idx].cpu().numpy(),
-            parent_id=-1,  # find_branch_parent(termination_idx, idx_lookup),
+            parent_id=int(branch_ids[termination_idx].item()),
             child_id=-1,
         )
 
-        idx_lookup[branch_id] = idx_path.cpu().tolist() + idx_points.cpu().tolist()
+        branch_ids[path_vertices_idx] = branch_id
+        branch_ids[idx_points] = branch_id
+
         branch_id += 1
 
     return branches
