@@ -111,7 +111,7 @@ class Pipeline:
             skeleton.repair()
 
         if self.smooth_skeletons:
-            skeleton.smooth(kernel_size=30)
+            skeleton.smooth(kernel_size=27)
 
     @staticmethod
     def from_cfg(inferer, skeletonizer, cfg):

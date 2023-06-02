@@ -33,7 +33,7 @@ class BranchSkeleton:
         return o3d_path(self.xyz, colour)
 
     def to_o3d_tube(self):
-        return o3d_tube_mesh(self.xyz, self.radii, self.colour)
+        return o3d_tube_mesh(self.xyz.numpy(), self.radii.numpy(), self.colour)
 
     def to_tubes(self, colour=(1, 0, 0)) -> List[Tube]:
         a_, b_, r1_, r2_ = (

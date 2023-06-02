@@ -27,18 +27,24 @@ class Tube:
 
 @dataclass
 class CollatedTube:
-    a: np.array  # Nx3
-    b: np.array  # Nx3
-    r1: np.array  # N
-    r2: np.array  # N
+    a: torch.tensor  # Nx3
+    b: torch.tensor  # Nx3
+    r1: torch.tensor  # N
+    r2: torch.tensor  # N
+
+    def to_gpu(self, device=torch.device("cuda")):
+        self.a = self.a.to(device)
+        self.b = self.b.to(device)
+        self.r1 = self.r1.to(device)
+        self.r2 = self.r2.to(device)
 
 
 def collate_tubes(tubes: List[Tube]) -> CollatedTube:
-    a = np.concatenate([tube.a for tube in tubes]).reshape(-1, 3)
-    b = np.concatenate([tube.b for tube in tubes]).reshape(-1, 3)
+    a = torch.cat([tube.a for tube in tubes]).reshape(-1, 3)
+    b = torch.cat([tube.b for tube in tubes]).reshape(-1, 3)
 
-    r1 = np.asarray([tube.r1 for tube in tubes]).reshape(1, -1)
-    r2 = np.asarray([tube.r2 for tube in tubes]).reshape(1, -1)
+    r1 = torch.cat([tube.r1 for tube in tubes]).reshape(1, -1)
+    r2 = torch.cat([tube.r2 for tube in tubes]).reshape(1, -1)
 
     return CollatedTube(a, b, r1, r2)
 

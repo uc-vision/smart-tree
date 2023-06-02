@@ -2,10 +2,12 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Dict, List
 
-import numpy as np
 import torch
+import numpy as np
+import torch.nn.functional as F
 
-from ..util.math.queries import pts_to_nearest_tube
+
+from ..util.math.queries import pts_to_nearest_tube_gpu
 from ..util.mesh.geometries import (
     o3d_merge_clouds,
     o3d_merge_linesets,
@@ -72,13 +74,12 @@ class TreeSkeleton:
             parent_branch = self.branches[branch.parent_id]
             tubes = parent_branch.to_tubes()
 
-            v, idx, _ = pts_to_nearest_tube(branch.xyz[0].reshape(-1, 3), tubes)
+            v, idx, _ = pts_to_nearest_tube_gpu(branch.xyz[0].reshape(-1, 3), tubes)
 
-            # connection point...
-            connection_pt = branch.xyz[0].reshape(-1, 3) + v[0]
+            connection_pt = branch.xyz[0].reshape(-1, 3).cpu() + v[0].cpu()
 
-            branch.xyz = np.insert(branch.xyz, 0, connection_pt, axis=0)
-            branch.radii = np.insert(branch.radii, 0, branch.radii[0], axis=0)
+            branch.xyz = torch.cat((connection_pt, branch.xyz))
+            branch.radii = torch.cat((branch.radii[[0]], branch.radii))
 
     def prune(self, min_radius, min_length, root_id=0):
         """If a branch doesn't meet the initial radius threshold or length threshold we want to remove it and all
@@ -101,19 +102,17 @@ class TreeSkeleton:
 
         self.branches = branches_to_keep
 
-    def smooth(self, kernel_size=10):
+    def smooth(self, kernel_size=5):
         """
         Smooths the skeleton radius.
         """
-        kernel = np.ones(kernel_size) / kernel_size
-
         for branch in self.branches.values():
-            if branch.radii.shape[0] >= kernel_size:
-                branch.radii = np.convolve(
-                    branch.radii.reshape(-1),
-                    kernel,
-                    mode="same",
-                )
+            if branch.radii.shape[0] > kernel_size:
+                branch.radii = F.conv1d(
+                    branch.radii.reshape(-1, 1, 1),
+                    torch.ones(1, 1, kernel_size),
+                    padding="same",
+                ).reshape(-1)
 
 
 @dataclass
