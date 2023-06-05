@@ -123,7 +123,7 @@ class Pipeline:
             preprocessing_cfg=cfg.preprocessing,
             repair_skeletons=cfg.repair_skeletons,
             smooth_skeletons=cfg.smooth_skeletons,
-            smooth_kernel_size=cfg.self.smooth_kernel_size,
+            smooth_kernel_size=cfg.smooth_kernel_size,
             prune_skeletons=cfg.prune_skeletons,
             min_skeleton_radius=cfg.min_skeleton_radius,
             min_skeleton_length=cfg.min_skeleton_length,
