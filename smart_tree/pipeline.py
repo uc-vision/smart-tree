@@ -32,6 +32,7 @@ class Pipeline:
         preprocessing_cfg,
         repair_skeletons=False,
         smooth_skeletons=False,
+        smooth_kernel_size=0,
         prune_skeletons=False,
         min_skeleton_radius=0.0,
         min_skeleton_length=1000,
@@ -51,6 +52,7 @@ class Pipeline:
 
         self.repair_skeletons = repair_skeletons
         self.smooth_skeletons = smooth_skeletons
+        self.smooth_kernel_size = smooth_kernel_size
         self.prune_skeletons = prune_skeletons
 
         self.min_skeleton_radius = min_skeleton_radius
@@ -92,7 +94,7 @@ class Pipeline:
                     skeleton.to_o3d_tube(colour=False),
                     cloud.to_o3d_cld(),
                 ],
-                line_width=10,
+                line_width=5,
             )
 
         if self.save_outputs:
@@ -111,7 +113,7 @@ class Pipeline:
             skeleton.repair()
 
         if self.smooth_skeletons:
-            skeleton.smooth(kernel_size=27)
+            skeleton.smooth(self.smooth_kernel_size)
 
     @staticmethod
     def from_cfg(inferer, skeletonizer, cfg):
@@ -121,6 +123,7 @@ class Pipeline:
             preprocessing_cfg=cfg.preprocessing,
             repair_skeletons=cfg.repair_skeletons,
             smooth_skeletons=cfg.smooth_skeletons,
+            smooth_kernel_size=cfg.self.smooth_kernel_size,
             prune_skeletons=cfg.prune_skeletons,
             min_skeleton_radius=cfg.min_skeleton_radius,
             min_skeleton_length=cfg.min_skeleton_length,
