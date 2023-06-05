@@ -53,15 +53,6 @@ def select_path_points(
     return idx_point[order], idx_path[order]
 
 
-def find_branch_parent(idx_pt, idx_lookup):
-    """Finds which branch pt is from ...
-    so we can work out the branch parent..."""
-    for _id, _idxs in idx_lookup.items():
-        if idx_pt in _idxs:
-            return int(_id)
-    return -1
-
-
 def sample_tree(
     medial_pts,
     medial_radii,

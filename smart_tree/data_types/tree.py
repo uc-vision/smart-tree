@@ -106,13 +106,13 @@ class TreeSkeleton:
         """
         Smooths the skeleton radius.
         """
+        kernel = torch.ones(1, 1, kernel_size)
         for branch in self.branches.values():
-            if branch.radii.shape[0] > kernel_size:
-                branch.radii = F.conv1d(
-                    branch.radii.reshape(-1, 1, 1),
-                    torch.ones(1, 1, kernel_size),
-                    padding="same",
-                ).reshape(-1)
+            branch.radii = F.conv1d(
+                branch.radii.unsqueeze(2),
+                kernel,
+                padding=(kernel_size - 1) // 2,
+            ).squeeze(2)
 
 
 @dataclass
