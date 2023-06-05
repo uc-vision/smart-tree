@@ -11,7 +11,7 @@ training:
   dataset:
     _target_: smart_tree.dataset.dataset.TreeDataset
     voxel_size: 0.01
-    json_path: /local/uc-vision/smart-tree/smart_tree/conf/tree-split.json
+    json_path: smart_tree/conf/tree-split.json
     directory: /local/uc-vision/dataset/branches/
     blocking: True
     block_size: 4
@@ -55,10 +55,9 @@ training:
     _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
     mode: "min"
 
-
 model_inference: 
-  model_path: /local/uc-vision/smart-tree/smart_tree/model/weights/noble-elevator-58_model.pt
-  weights_path: /local/uc-vision/smart-tree/smart_tree/model/weights/noble-elevator-58_model_weights.pt
+  model_path: smart_tree/model/weights/noble-elevator-58_model.pt
+  weights_path: smart_tree/model/weights/noble-elevator-58_model_weights.pt
   voxel_size: 0.01
   block_size: 4
   buffer_size: 0.4
@@ -73,18 +72,14 @@ skeletonizer:
   voxel_downsample: False
   edge_non_linear: None
 
-
 pipeline:
   
   preprocessing:
     # Scale:
-    #       _target_:  smart_tree.dataset.augmentations.Scale
-    #       min_scale: 0.6
-    #       max_scale: 0.6
-    # Scale:
-    #   _target_:  smart_tree.dataset.augmentations.Scale
-    #   min_scale: 1
-    #   max_scale: 1
+    #        _target_:  smart_tree.dataset.augmentations.Scale
+    #        min_scale: 1
+    #        max_scale: 1
+
     VoxelDownsample:
          _target_:  smart_tree.dataset.augmentations.VoxelDownsample
          voxel_size : 0.01
@@ -100,14 +95,12 @@ pipeline:
   save_outputs : False
   branch_classes: [0]
   cmap:
-    - [0.325, 0.207, 0.039] # Trunk
-    - [0.290, 0.703, 0.254] # Foliage
-
-
-
+    - [0.450, 0.325, 0.164] # Trunk
+    - [0.541, 0.670, 0.164] # Foliage
 
   repair_skeletons : True
-  smooth_skeletons : False
+  smooth_skeletons : True
+  smooth_kernel_size: 21 # Needs to be odd
   prune_skeletons : True 
   min_skeleton_radius : 0.001 
   min_skeleton_length : 0.002
