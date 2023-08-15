@@ -13,7 +13,7 @@ from .pipeline import Pipeline
 
 @hydra.main(
     version_base=None,
-    config_path=".conf",
+    config_path="conf",
     config_name="tree-dataset",
 )
 def main(cfg: DictConfig):
