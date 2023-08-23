@@ -1,4 +1,5 @@
 import json
+import time
 from pathlib import Path
 from typing import List
 
@@ -9,13 +10,12 @@ import torch.utils.data
 from spconv.pytorch.utils import PointToVoxel
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import time
 
+from ..data_types.cloud import Cloud, LabelledCloud
 from ..model.sparse import batch_collate, sparse_quantize
 from ..util.file import load_data_npz
 from ..util.math.maths import cube_filter, np_normalized, torch_normalized
 from ..util.visualizer.view import o3d_viewer
-from ..data_types.cloud import Cloud, LabelledCloud
 from .augmentations import AugmentationPipeline
 
 

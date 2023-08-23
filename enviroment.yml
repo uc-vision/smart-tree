@@ -7,11 +7,11 @@ channels:
   - nodefaults
   
 dependencies:
-  - python=3.8.*  # or don't specify the version and use the latest stable Python
+  - python=3.10.* 
   - mamba
-  - pip  # pip must be mentioned explicitly, or conda-lock will fail
-  #- poetry=1.*  # or 1.1.*, or no version at all -- as you want
-  - conda-forge:cudatoolkit-dev=11.7 # need NVCC for compiling FRNN
+  - pip  
+  - conda-forge:cudatoolkit-dev=11.7 # NVCC for compiling FRNN
+  - conda-forge:cub
 #  - conda-forge:cudatoolkit=11.7
   - pytorch::pytorch-cuda=11.7
   - pytorch::pytorch

@@ -5,6 +5,9 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 import torch.nn.functional as F
+from torch import Tensor, rand
+from torchtyping import TensorDetail, TensorType
+from typeguard import typechecked
 
 from ..util.math.queries import skeleton_to_points
 from ..util.mesh.geometries import o3d_cloud, o3d_lines_between_clouds
@@ -12,10 +15,11 @@ from ..util.misc import to_torch, voxel_downsample
 from ..util.visualizer.view import o3d_viewer
 
 
+@typechecked
 @dataclass
 class Cloud:
-    xyz: torch.Tensor
-    rgb: torch.Tensor
+    xyz: TensorType["N", 3]
+    rgb: TensorType["N", 3]
 
     def __len__(self):
         return self.xyz.shape[0]
@@ -68,29 +72,18 @@ class Cloud:
         return Cloud(torch.matmul(self.xyz, rot_mat.to(self.xyz.device)), self.rgb)
 
     @property
-    def max_xyz(self):
-        return torch.max(self.xyz, 0)[0]
-
-    @property
-    def min_xyz(self):
-        return torch.min(self.xyz, 0)[0]
-
-    @property
-    def bbox(self):
-        # defined by centre coordinate, x/2, y/2, z/2
-        dimensions = (self.max_xyz - self.min_xyz) / 2
-        centre = self.min_xyz + dimensions
-        return centre, dimensions
+    def root_idx(self) -> int:
+        return torch.argmin(self.xyz[:, 1]).item()
 
     @staticmethod
-    def from_numpy(xyz, rgb, device=torch.device("cpu")):
+    def from_numpy(xyz, rgb, device=torch.device("cpu")) -> Cloud:
         return Cloud(
             torch.from_numpy(xyz),
             torch.from_numpy(rgb),
         ).to_device(device)
 
     @staticmethod
-    def from_o3d_cld(cld):
+    def from_o3d_cld(cld) -> Cloud:
         return Cloud.from_numpy(xyz=np.asarray(cld.points), rgb=np.asarray(cld.colors))
 
 

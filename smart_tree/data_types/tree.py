@@ -2,9 +2,13 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Dict, List
 
-import torch
 import numpy as np
+import open3d as o3d
+import torch
 import torch.nn.functional as F
+from torch import Tensor, rand
+from torchtyping import TensorDetail, TensorType
+from typeguard import typechecked
 
 
 from ..util.math.queries import pts_to_nearest_tube_gpu
@@ -14,6 +18,7 @@ from ..util.mesh.geometries import (
     o3d_merge_meshes,
 )
 from ..util.misc import flatten_list
+from ..util.visualizer.view import o3d_viewer
 from .branch import BranchSkeleton
 from .tube import Tube
 
@@ -26,22 +31,22 @@ class TreeSkeleton:
     def __post_init__(self):
         self.colour = torch.rand(3)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.branches)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Tree Skeleton ({self._id}) has {len(self)} branches..."
 
-    def to_o3d_linesets(self) -> List:
+    def to_o3d_linesets(self) -> List[o3d.geometry.LineSet]:
         return [b.to_o3d_lineset() for b in self.branches.values()]
 
-    def to_o3d_lineset(self, colour=(0, 0, 0)):
+    def to_o3d_lineset(self, colour=(0, 0, 0)) -> o3d.geometry.LineSet:
         return o3d_merge_linesets(self.to_o3d_linesets(), colour=colour)
 
-    def to_o3d_tubes(self) -> List:
+    def to_o3d_tubes(self) -> List[o3d.geometry.TriangleMesh]:
         return [b.to_o3d_tube() for b in self.branches.values()]
 
-    def to_o3d_tube(self):
+    def to_o3d_tube(self) -> o3d.geometry.TriangleMesh:
         return o3d_merge_meshes(self.to_o3d_tubes())
 
     def to_tubes(self) -> List[Tube]:
@@ -130,7 +135,7 @@ class DisjointTreeSkeleton:
         for skeleton in self.skeletons:
             skeleton.repair()
 
-    def smooth(self, kernel_size=10):
+    def smooth(self, kernel_size=7):
         for skeleton in self.skeletons:
             skeleton.smooth(kernel_size=kernel_size)
 
@@ -150,5 +155,6 @@ class DisjointTreeSkeleton:
 
         return o3d_merge_meshes(skeleton_tubes)
 
-    def connect():
-        pass
+    def view(self):
+        self.smooth()
+        o3d_viewer([self.to_o3d_lineset(), self.to_o3d_tube()])

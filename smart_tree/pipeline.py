@@ -27,9 +27,9 @@ from .dataset.augmentations import AugmentationPipeline
 class Pipeline:
     def __init__(
         self,
-        inferer,
+        preprocessing,
+        model_inference,
         skeletonizer,
-        preprocessing_cfg,
         repair_skeletons=False,
         smooth_skeletons=False,
         smooth_kernel_size=0,
@@ -43,12 +43,9 @@ class Pipeline:
         cmap=[[1, 0, 0], [0, 1, 0]],
         device=torch.device("cuda:0"),
     ):
-        self.inferer = inferer
+        self.preprocessing = preprocessing
+        self.model_inference = model_inference
         self.skeletonizer = skeletonizer
-
-        self.preprocessing = AugmentationPipeline.from_cfg(
-            instantiate(preprocessing_cfg)
-        )
 
         self.repair_skeletons = repair_skeletons
         self.smooth_skeletons = smooth_skeletons
@@ -73,7 +70,7 @@ class Pipeline:
         cloud = self.preprocessing(cloud)
 
         # Run point cloud through model to predict class, radius, direction
-        lc: LabelledCloud = self.inferer.forward(cloud).to_device(self.device)
+        lc: LabelledCloud = self.model_inference.forward(cloud).to_device(self.device)
         if self.view_model_output:
             lc.view(self.cmap)
 

@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 import cugraph
 import cupy
 import frnn
@@ -6,6 +9,8 @@ import pandas as pd
 import torch
 from cudf import DataFrame
 from tqdm import tqdm
+
+from ..data_types.graph import Graph
 
 
 def knn(src, dest, K=50, r=1.0, grid=None):
@@ -34,21 +39,9 @@ def nn(src, dest, r=1.0, grid=None):
 
 def nn_graph(points: torch.Tensor, radii, K=40):
     idxs, dists, _ = knn(points, points, K=K, r=radii.max().item())
-    idxs[
-        (dists > radii.unsqueeze(1)) & (dists > 0)
-    ] = -1  # We don't want edges forming to itself...
-    return make_edges(dists, idxs)
-
-
-# NN graph except links that don't exist get weighted super heavily (edge length outside radius)...
-def nn_graph_distance_weighted(points: torch.Tensor, radii, K=40):
-    idxs, dists, _ = knn(points, points, K=K, r=200)
-
-    dists[dists > radii.unsqueeze(1)] = (
-        radii.max().item() + dists[dists > radii.unsqueeze(1)] ** 2
-    )
-
-    return make_edges(dists, idxs)
+    idxs[dists > radii.unsqueeze(1)] = -1
+    edges, edge_weights = make_edges(dists, idxs)
+    return Graph(points, edges, edge_weights)
 
 
 def medial_nn_graph(points: torch.Tensor, radii, medial_dist, K=40):
@@ -88,34 +81,31 @@ def pcd_nn(points, radii, K=20):
     return edges[valid], dists[valid]
 
 
-def cuda_graph(edges, edge_weights, renumber=False):
-    edges = cupy.asarray(edges)
-    edge_weights = cupy.asarray(edge_weights)
-
-    d = DataFrame()
-    d["source"] = edges[:, 0]
-    d["destination"] = edges[:, 1]
-    d["weights"] = edge_weights
-    g = cugraph.Graph(directed=False)
-    g.from_cudf_edgelist(d, edge_attr="weights", renumber=renumber)
-
-    return g
-
-
-def decompose_cuda_graph(cuda_graph, device):
+def decompose_cuda_graph(cuda_graph, renumber_edges=False, device=torch.device("cuda")):
     pdf = cugraph.to_pandas_edgelist(cuda_graph)
 
     edges = torch.stack((torch.tensor(pdf["src"]), torch.tensor(pdf["dst"])), dim=1)
     edge_weights = torch.tensor(pdf["weights"])
 
-    # last_edge = torch.tensor(
-    #    (edges.shape[0]-1, edges.shape[0]-1), device=device).unsqueeze(0)
-    # edges = torch.cat((edges, last_edge), dim=0)
+    edges, edge_weights = edges.long().to(device), edge_weights.to(device)
 
-    # edge_weights = torch.tensor(pdf["weights"])
-    # edge_weights = torch.cat((edge_weights, torch.zeros(1, device=device)), dim=0).float()
+    if renumber_edges:
+        edges = remap_edges(edges)
 
-    return edges.long().to(device), edge_weights.to(device)
+    return edges, edge_weights
+
+
+def remap_edges(edges):
+    # Find unique node IDs and their corresponding indices
+    unique_nodes, node_indices = torch.unique(edges, return_inverse=True)
+
+    # Create a mapping from old node IDs to new node IDs
+    mapping = torch.arange(unique_nodes.size(0), device=edges.device)
+
+    # Map the old node IDs to new node IDs using the indices
+    renumbered_edges = mapping[node_indices].reshape(edges.shape)
+
+    return renumbered_edges
 
 
 def connected_components(edges, edge_weights, minimum_vertices=0, max_components=10):
@@ -138,25 +128,3 @@ def connected_components(edges, edge_weights, minimum_vertices=0, max_components
         )
 
     return graphs
-
-
-def pcd_to_tetra(points):
-    """(Delaunay Triangulation)"""
-    delaunay_tetra = pytetgen.Delaunay(points)
-    simplices = delaunay_tetra.simplices
-    edges = np.vstack(
-        (
-            np.column_stack((simplices[:, 0], simplices[:, 1])),
-            np.column_stack((simplices[:, 1], simplices[:, 2])),
-            np.column_stack((simplices[:, 2], simplices[:, 3])),
-            np.column_stack((simplices[:, 3], simplices[:, 0])),
-        )
-    )
-    edge_weights = np.sqrt(
-        np.sum(
-            (delaunay_tetra.points[edges[:, 0]] - delaunay_tetra.points[edges[:, 1]])
-            ** 2,
-            axis=1,
-        )
-    )
-    return edges, edge_weights
