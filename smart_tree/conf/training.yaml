@@ -1,0 +1,70 @@
+wandb:
+  project: "tree"
+  entity: harry1576
+  mode: "disabled"
+
+
+
+
+
+
+
+
+
+
+name: "tree"
+wblogging: "disabled" 
+entity: harry1576
+fp16: False
+num_epoch: 500
+lr_decay: True
+early_stop_epoch: 20
+early_stop: True
+
+dataset:
+  _target_: smart_tree.dataset.dataset.TreeDataset
+  voxel_size: 0.01
+  json_path: smart_tree/conf/tree-split.json
+  directory: /local/uc-vision/dataset/branches/
+  blocking: True
+  block_size: 4
+  buffer_size: 0.4
+
+  augmentation:
+  Scale:
+      _target_:  smart_tree.dataset.augmentations.Scale
+      min_scale: 100
+      max_scale: 100
+  # Dropout:
+  #     _target_:  smart_tree.dataset.augmentations.RandomDropout
+  #     max_drop_out: 0.1
+
+data_loader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: 16
+  drop_last: True
+  pin_memory: False
+  num_workers: 0
+  #prefetch_factor: 
+  shuffle: True
+  collate_fn:
+    _target_: smart_tree.model.sparse.batch_collate
+    _partial_: True
+
+model:
+  _target_: smart_tree.model.model.Smart_Tree
+  input_channels: 3
+  unet_planes: [8, 16, 32, 64]
+  radius_fc_planes: [8, 8, 4, 1]
+  direction_fc_planes: [8, 8, 4, 3]
+  class_fc_planes: [8, 8, 4, 2] # last one is number of classes..
+  bias: False
+
+optimizer:
+  _target_: torch.optim.Adam # SGD, Adadelta etc
+  lr: 0.1
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  mode: "min"
+

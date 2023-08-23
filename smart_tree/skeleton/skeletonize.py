@@ -3,7 +3,11 @@ import open3d as o3d
 import open3d.visualization.rendering as rendering
 import torch
 from cugraph import sssp
+import cupy
+import cugraph
 from tqdm.auto import tqdm
+
+from typing import Optional
 
 from ..data_types.tree import TreeSkeleton, DisjointTreeSkeleton
 from ..util.mesh.geometries import (
@@ -18,12 +22,11 @@ from .graph import (
     connected_components,
     decompose_cuda_graph,
     nn_graph,
-    nn_graph_distance_weighted,
-    pcd_to_tetra,
 )
 from .path import sample_tree
 from .shortest_path import edge_graph, graph_shortest_paths, pred_graph, shortest_paths
 from ..data_types.tree import TreeSkeleton
+from ..data_types.graph import Graph
 from ..util.visualizer.view import o3d_viewer
 from ..data_types.cloud import LabelledCloud
 
@@ -31,82 +34,76 @@ from ..data_types.cloud import LabelledCloud
 class Skeletonizer:
     def __init__(
         self,
-        K: int,  # how many neighbours to connect to
-        min_connection_length: float,  # connect all points to other points withint (min_edge, r)
-        minimum_graph_vertices: int,  # remove all sub-graphs that have vertices less than this
-        voxel_downsample: float,  # how much to voxel downsample medial points
-        edge_non_linear: float,
-        max_number_components: int,
-        device=torch.device("cuda:0"),
+        K: int,
+        min_connection_length: float,
+        minimum_graph_vertices: int,
+        device: torch.device = torch.device("cuda:0"),
     ):
         self.K = K
         self.min_connection_length = min_connection_length
         self.minimum_graph_vertices = minimum_graph_vertices
-        self.voxel_downsample = voxel_downsample
-        self.max_number_components = max_number_components
         self.device = device
 
-    def forward(self, cloud: LabelledCloud):
+    def forward(self, cloud: LabelledCloud) -> DisjointTreeSkeleton:
         cloud.to_device(self.device)
-
-        if self.voxel_downsample != False:
-            cloud = cloud.voxel_down_sample(0.01)
 
         mask = outlier_removal(cloud.medial_pts, cloud.radii.unsqueeze(1))
         cloud = cloud.filter(mask)
 
-        edges, edge_weights = nn_graph(
+        graph: Graph = nn_graph(
             cloud.medial_pts,
             cloud.radii.clamp(min=self.min_connection_length),
             K=self.K,
         )
-        subgraphs = connected_components(
-            edges,
-            edge_weights,
-            minimum_vertices=self.minimum_graph_vertices,
-            max_components=self.max_number_components,
+
+        subgraphs: List[cugraph.Graph] = graph.connected_cugraph_components(
+            minimum_vertices=self.minimum_graph_vertices
         )
 
         skeletons = []
-        pbar = tqdm(subgraphs, position=0, leave=False)
-
-        for skeleton_id, subgraph in enumerate(pbar):
-            pbar.set_description(f"Processing Subgraph {skeleton_id}")
-            skeletons.append(self.process_subgraph(subgraph, cloud, skeleton_id, pbar))
+        for subgraph_id, subgraph in enumerate(subgraphs):
+            skeletons.append(
+                self.process_subgraph(cloud, subgraph, skeleton_id=subgraph_id)
+            )
 
         return DisjointTreeSkeleton(skeletons)
 
-    def process_subgraph(
-        self,
-        subgraph,
-        cloud,
-        skeleton_id=0,
-        pbar=None,
-    ) -> TreeSkeleton:
-        edges, edge_weights = decompose_cuda_graph(subgraph, self.device)
+    def process_subgraph(self, cloud, subgraph, skeleton_id=0) -> TreeSkeleton:
+        """Extract skeleton for connected component"""
 
-        root_idx = edges[torch.argmin(cloud.medial_pts[edges[:, 0]][:, 1])][0].item()
+        subgraph_vertice_idx = torch.tensor(
+            cupy.unique(subgraph.edges().values),
+            device=self.device,
+        )
+
+        subgraph_cloud = cloud.filter(subgraph_vertice_idx)
+
+        edges, edge_weights = decompose_cuda_graph(
+            subgraph,
+            renumber_edges=True,
+            device=self.device,
+        )
 
         verts, preds, distance = shortest_paths(
-            root_idx,
+            subgraph_cloud.root_idx,
             edges,
             edge_weights,
             renumber=False,
         )
 
-        predecessor_graph = pred_graph(verts, preds, cloud.medial_pts)
+        predecessor_graph = pred_graph(verts, preds, subgraph_cloud.medial_pts)
 
         distances = torch.as_tensor(
-            sssp(predecessor_graph, source=root_idx)["distance"]
-        ).to(self.device)
+            sssp(predecessor_graph, source=subgraph_cloud.root_idx)["distance"],
+            device=self.device,
+        )
 
         branches = sample_tree(
-            cloud.medial_pts,
-            cloud.radii.unsqueeze(1),
+            subgraph_cloud.medial_pts,
+            subgraph_cloud.radii.unsqueeze(1),
             preds,
             distances,
-            cloud.xyz,
-            pbar=pbar,
+            subgraph_cloud.xyz,
         )
 
         return TreeSkeleton(skeleton_id, branches)
@@ -117,9 +114,7 @@ class Skeletonizer:
             K=cfg.K,
             min_connection_length=cfg.min_connection_length,
             minimum_graph_vertices=cfg.minimum_graph_vertices,
-            voxel_downsample=cfg.voxel_downsample,
             edge_non_linear=cfg.edge_non_linear,
-            max_number_components=cfg.max_number_components,
         )
 
 

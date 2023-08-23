@@ -1,74 +1,176 @@
 import contextlib
 import logging
+import math
 import os
-from functools import partial
+from pathlib import Path
+from typing import List
 
 import hydra
-import numpy as np
 import torch
 from hydra.core.hydra_config import HydraConfig
-from hydra.utils import call, get_original_cwd, instantiate, to_absolute_path
+from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
-from py_structs.torch import map_tensors
 from tqdm import tqdm
+from smart_tree.data_types.cloud import LabelledCloud
+from smart_tree.model.render import RenderQueue
+from smart_tree.util.visualizer.camera import Renderer
 
 import wandb
-from smart_tree.dataset.dataset import TreeDataset
-from smart_tree.model.model import Smart_Tree
-from smart_tree.model.sparse import batch_collate, sparse_from_batch
-from smart_tree.util.mesh.geometries import o3d_cloud
-from smart_tree.util.misc import concate_dict_of_tensors
-from smart_tree.util.visualizer.camera import o3d_headless_render
-from smart_tree.util.math.maths import torch_normalized
-from sklearn.metrics import f1_score, mean_absolute_percentage_error
+import taichi as ti
+from smart_tree.util.misc import flatten_list
+
+from smart_tree.model.helper import get_batch, model_output_to_labelled_clds
+from smart_tree.model.tracker import Tracker
+
+
+def train_epoch(
+    train_loader,
+    model,
+    optimizer,
+    fp16=False,
+    scaler=None,
+    device=torch.device("cuda"),
+):
+    tracker = Tracker()
+
+    for sp_input, targets, mask, filenames in tqdm(
+        get_batch(train_loader, device, fp16),
+        desc="Training",
+        leave=False,
+    ):
+        output = model.forward(sp_input)
+        loss = model.compute_loss(output, targets, mask)
+
+        if fp16:
+            assert sum(loss.values()).dtype is torch.float32
+            scaler.scale(sum(loss.values())).backward()
+            scaler.step(optimizer)
+            scaler.update()
+            scale = scaler.get_scale()
+        else:
+            (sum(loss.values())).backward()
+            optimizer.step()
+
+        optimizer.zero_grad()
+        tracker.update(loss)
+
+    return tracker, scaler
+
+
+@torch.no_grad()
+def eval_epoch(
+    data_loader,
+    model,
+    fp16=False,
+    device=torch.device("cuda"),
+):
+    tracker = Tracker()
+    model.eval()
+
+    for sp_input, targets, mask, filenames in tqdm(
+        get_batch(data_loader, device, fp16),
+        desc="Evaluating",
+        leave=False,
+    ):
+        output = model.forward(sp_input)
+        loss = model.compute_loss(output, targets, mask)
+        tracker.update(loss)
+    model.train()
+
+    return tracker
+
+
+@torch.no_grad()
+def capture_clouds(
+    data_loader,
+    model,
+    cmap,
+    fp16=False,
+    device=torch.device("cuda"),
+) -> List[LabelledCloud]:
+    model.eval()
+    clouds = []
+
+    for sp_input, targets, mask, filenames in tqdm(
+        get_batch(data_loader, device, fp16),
+        desc="Capturing Outputs",
+        leave=False,
+        total=math.ceil(len(data_loader) / data_loader.batch_size),
+    ):
+        model_output = model.forward(sp_input)
+        clouds.extend(
+            model_output_to_labelled_clds(sp_input, model_output, cmap, filenames)
+        )
+
+    model.train()
+    return clouds
+
+
+def capture_and_log(loader, model, epoch, wandb_run, cfg):
+    clouds = capture_clouds(
+        loader,
+        model,
+        cfg.cmap,
+        fp16=cfg.fp16,
+    )
+
+    for cloud in clouds:
+        xyz_rgb = torch.cat((cloud.xyz, cloud.cmap[cloud.class_l] * 255), -1)
+        wandb_run.log(
+            {f"{Path(cloud.filename).stem}": wandb.Object3D(xyz_rgb.numpy())},
+            step=epoch,
+        )
 
 
 @hydra.main(
     version_base=None,
     config_path="../conf",
-    config_name="tree-dataset",
+    config_name="training",
 )
 def main(cfg: DictConfig):
     torch.manual_seed(42)
     torch.cuda.manual_seed_all(42)
-
     log = logging.getLogger(__name__)
 
     cfg = cfg.training
 
-    # Init
-    wandb.init(
-        project=cfg.name,
-        entity="harry1576",
-        mode=cfg.wblogging,
+    ti.init(arch=ti.gpu)
+
+    wandb_run = wandb.init(
+        project=cfg.wandb.project,
+        entity=cfg.wandb.entity,
+        mode=cfg.wandb.mode,
         config=OmegaConf.to_container(cfg, resolve=[True | False]),
     )
 
-    log.info(
-        f"Directory : {HydraConfig.get().runtime.output_dir}, Machine: {os.uname()[1]}"
-    )
+    run_dir = HydraConfig.get().runtime.output_dir
+    run_name = wandb.run.name
+
+    log.info(f"Directory : {run_dir}")
+    log.info(f"Machine: {os.uname()[1]}")
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    torch.multiprocessing.set_start_method("spawn")
 
-    # Datasets
-    train_dataloader = instantiate(
-        cfg.data_loader,
-        dataset=instantiate(cfg.dataset, mode="train"),
-    )
-    val_dataloader = instantiate(
-        cfg.data_loader,
-        drop_last=False,
-        dataset=instantiate(cfg.dataset, mode="validation"),
-    )
-    log.info(f"Train Dataset Size: {len(train_dataloader.dataset)}")
-    log.info(f"Validation Dataset Size: {len(val_dataloader.dataset)}")
+    train_loader = instantiate(cfg.train_data_loader)
+    val_loader = instantiate(cfg.validation_data_loader)
+    test_loader = instantiate(cfg.test_data_loader)
+
+    log.info(f"Train Dataset Size: {len(train_loader.dataset)}")
+    log.info(f"Validation Dataset Size: {len(val_loader.dataset)}")
+    log.info(f"Test Dataset Size: {len(test_loader.dataset)}")
 
     # Model
     model = instantiate(cfg.model).to(device).train()
-    torch.save(
-        model,
-        f"{HydraConfig.get().runtime.output_dir}/{wandb.run.name}_model.pt",
-    )
+
+    if cfg.get("weights_path", None) is not None:
+        print(f"Loading weights from {cfg.weights_path}")
+
+        weights = torch.load(cfg.weights_path, map_location=device)
+        model.load_state_dict(weights)
+
+    torch.save(model, f"{run_dir}/{run_name}_model.pt")
+    # render_queue = RenderQueue(image_size=(960, 540), wandb_run=wandb_run)
 
     # Optimizer / Scheduler
     optimizer = instantiate(cfg.optimizer, params=model.parameters())
@@ -76,134 +178,41 @@ def main(cfg: DictConfig):
 
     # FP-16
     amp_ctx = torch.cuda.amp.autocast() if cfg.fp16 else contextlib.nullcontext()
-    scaler = torch.cuda.amp.grad_scaler.GradScaler(
-        growth_factor=1.1, backoff_factor=0.90, growth_interval=1
-    )
-    clip = 1
+    scaler = torch.cuda.amp.grad_scaler.GradScaler()
 
     epochs_no_improve = 0
     best_val_loss = torch.inf
 
-    # Training Epochs
-    for epoch in tqdm(range(0, cfg.num_epoch), leave=False):
-        epoch_training_loss = {"radius": 0.0, "direction": 0.0, "class": 0.0}
+    # Epochs
+    for epoch in tqdm(range(0, cfg.num_epoch), leave=True):
+        with amp_ctx:
+            val_tracker = eval_epoch(
+                val_loader,
+                model,
+                fp16=cfg.fp16,
+            )
 
-        # Training Loop
-        for features, coordinates, loss_mask in tqdm(
-            train_dataloader,
-            leave=False,
-            desc="Training...",
-        ):
-            with amp_ctx:
-                sparse_input = sparse_from_batch(
-                    features[:, :3],
-                    coordinates,
-                    device=device,
-                )
-                targets = map_tensors(
-                    features[:, 6:10],
-                    partial(
-                        torch.Tensor.to,
-                        device=device,
-                    ),
-                )
+            training_tracker, scaler = train_epoch(
+                train_loader,
+                model,
+                optimizer,
+                scaler=scaler,
+                fp16=cfg.fp16,
+            )
 
-                model_output = model.forward(sparse_input)
+            if (epoch + 1) % cfg.capture_output == 0:
+                capture_and_log(test_loader, model, epoch, wandb_run, cfg)
+                # capture_and_log(train_loader, model, epoch, wandb_run, cfg)
 
-                loss = model.compute_loss(model_output, targets, loss_mask)
-                total_loss = loss["radius"] + loss["direction"] + loss["class"]
+        scheduler.step(val_tracker.total_loss) if cfg.lr_decay else None
 
-            if cfg.fp16:
-                scaler.scale(
-                    loss["radius"] + loss["direction"] + loss["class"]
-                ).backward()
-                scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
-                scaler.step(optimizer)
-                scaler.update()
-            else:
-                total_loss.backward()
-                optimizer.step()
-
-            optimizer.zero_grad()
-
-            epoch_training_loss["radius"] += loss["radius"].item()
-            epoch_training_loss["direction"] += loss["direction"].item()
-            epoch_training_loss["class"] += loss["class"].item()
-
-        # Validation Loop
-        with torch.no_grad():
-            epoch_validation_loss = {"radius": 0.0, "direction": 0.0, "class": 0.0}
-            val_preds = {"radius": [], "direction": [], "class": []}
-            val_targets = {"radius": [], "direction": [], "class": []}
-
-            for features, coordinates, loss_mask in tqdm(
-                val_dataloader,
-                leave=False,
-                desc="Validating",
-            ):
-                sparse_input = sparse_from_batch(
-                    features[:, :3],
-                    coordinates,
-                    device=device,
-                )
-                targets = map_tensors(
-                    features[:, 6:10],
-                    partial(torch.Tensor.to, device=device),
-                )
-
-                with amp_ctx:
-                    model_output = model.forward(sparse_input)
-                    loss = model.compute_loss(model_output, targets, loss_mask)
-
-                val_preds["radius"].append(torch.exp(model_output[:, [0]]))
-                val_preds["direction"].append(model_output[:, 1:4])
-                val_preds["class"].append(torch.argmax(model_output[:, 4:], dim=1))
-
-                direction_target, radius_target = torch_normalized(targets[:, :3])
-                val_targets["radius"].append(radius_target.squeeze(1))
-                val_targets["direction"].append(direction_target)
-                val_targets["class"].append(targets[:, 3])
-
-                epoch_validation_loss["radius"] += loss["radius"]
-                epoch_validation_loss["direction"] += loss["direction"]
-                epoch_validation_loss["class"] += loss["class"]
-
-            val_los = sum(epoch_validation_loss.values())
-            val_preds = concate_dict_of_tensors(val_preds)
-            val_targets = concate_dict_of_tensors(val_targets)
-
-            scheduler.step(val_los) if cfg.lr_decay else None
-
-        if val_los < best_val_loss:
+        # Save Best Model
+        if val_tracker.total_loss < best_val_loss:
             epochs_no_improve = 0
-            best_val_loss = val_los
-
+            best_val_loss = val_tracker.total_loss
             wandb.run.summary["Best Test Loss"] = best_val_loss
-
-            torch.save(
-                model.state_dict(),
-                f"{HydraConfig.get().runtime.output_dir}/{wandb.run.name}_model_weights.pt",
-            )
+            torch.save(model.state_dict(), f"{run_dir}/{run_name}_model_weights.pt")
             log.info(f"Weights Saved at epoch: {epoch}")
-
-            batch_filter = coordinates[:, 0] == 0  # First Item ...
-            xyz = features[:, :3][batch_filter].to(torch.device("cpu"))
-            output = model_output[batch_filter].to(torch.device("cpu"))
-
-            vector = torch.exp(output[:, [0]]) * output[:, 1:4]
-
-            rgb_img = o3d_headless_render(
-                [
-                    o3d_cloud(xyz, colour=(1, 0, 0)),
-                    o3d_cloud(xyz + vector, colour=(0, 1, 0)),
-                ],
-                camera_position=[3, 0, 0],
-                camera_up=[0, 1, 0],
-            )
-
-            wandb.log({"Output": wandb.Image(np.asarray(rgb_img))}, step=epoch)
-
         else:
             epochs_no_improve += 1
 
@@ -211,56 +220,9 @@ def main(cfg: DictConfig):
             log.info("Training Ended (Evaluation Test Score Not Improving)")
             break
 
-        wandb.log(
-            {
-                "Training Total Loss": (
-                    epoch_training_loss["radius"]
-                    + epoch_training_loss["direction"]
-                    + epoch_training_loss["class"]
-                )
-                / len(train_dataloader.dataset),
-                #
-                "Training Vector Loss": (
-                    epoch_training_loss["radius"] + epoch_training_loss["direction"]
-                )
-                / len(train_dataloader.dataset),
-                #
-                "Training Segmentation Loss": epoch_training_loss["class"]
-                / len(train_dataloader.dataset),
-                #
-                "Validation Total Loss": (
-                    epoch_validation_loss["radius"]
-                    + epoch_validation_loss["direction"]
-                    + epoch_validation_loss["class"]
-                )
-                / len(val_dataloader.dataset),
-                #
-                "Validation Vector Loss": (
-                    epoch_validation_loss["radius"] + epoch_validation_loss["direction"]
-                )
-                / len(val_dataloader.dataset),
-                #
-                "Validation Vector Loss": (
-                    epoch_validation_loss["radius"] + epoch_validation_loss["direction"]
-                )
-                / len(val_dataloader.dataset),
-                #
-                "Validation Segmentation Loss": epoch_validation_loss["class"]
-                / len(val_dataloader.dataset),
-                #
-                "Validation F1 Score": f1_score(
-                    val_preds["class"],
-                    val_targets["class"],
-                    average="micro",
-                ),
-                #
-                "Validation Radius MAPE": mean_absolute_percentage_error(
-                    val_targets["radius"][val_targets["class"] == 0],
-                    val_preds["radius"][val_targets["class"] == 0],
-                ),
-            },
-            step=epoch,
-        )
+        # log onto wandb...
+        training_tracker.log("Training", epoch)
+        val_tracker.log("Validation", epoch)
 
 
 if __name__ == "__main__":
