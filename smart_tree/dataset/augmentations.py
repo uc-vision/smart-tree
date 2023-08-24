@@ -1,4 +1,3 @@
-import random
 from abc import ABC, abstractmethod
 from typing import List, Mapping, Sequence
 
@@ -8,7 +7,7 @@ from beartype import beartype
 from hydra.utils import call, get_original_cwd, instantiate, to_absolute_path
 
 from smart_tree.data_types.cloud import Cloud
-from smart_tree.util.math.maths import euler_angles_to_rotation
+from smart_tree.util.maths import euler_angles_to_rotation
 
 
 class Augmentation(ABC):

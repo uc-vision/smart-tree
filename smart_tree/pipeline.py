@@ -16,9 +16,9 @@ from .util.file import (
     save_o3d_lineset,
     save_o3d_mesh,
 )
-from .util.mesh.geometries import o3d_lines_between_clouds
+from .o3d_abstractions.geometries import o3d_lines_between_clouds
 from .util.misc import to_numpy
-from .util.visualizer.view import o3d_viewer
+from .o3d_abstractions.visualizer import o3d_viewer
 
 
 class Pipeline:

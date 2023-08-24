@@ -1,16 +1,16 @@
 import os
+import sys
+
 import numpy as np
 import open3d as o3d
 import torch
-import sys
-
 from tqdm import tqdm
 
 from ..data_types.branch import BranchSkeleton
-from ..util.mesh.geometries import o3d_cloud, o3d_path, o3d_sphere, o3d_tube_mesh
+from ..o3d_abstractions.geometries import o3d_cloud, o3d_path, o3d_sphere, o3d_tube_mesh
+from ..o3d_abstractions.visualizer import o3d_viewer
 from ..util.misc import flatten_list
 from .graph import nn
-from ..util.visualizer.view import o3d_viewer
 
 
 def trace_route(preds, idx, termination_pts):

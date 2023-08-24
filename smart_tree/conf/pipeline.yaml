@@ -10,7 +10,7 @@ pipeline:
     _target_: smart_tree.model.model_inference.ModelInference
     model_path: smart_tree/model/weights/noble-elevator-58_model.pt
     weights_path: smart_tree/model/weights/noble-elevator-58_model_weights.pt
-    voxel_size: 0.01
+    voxel_size: 0.001
     block_size: 4
     buffer_size: 0.4
     num_workers : 8
@@ -22,10 +22,10 @@ pipeline:
     min_connection_length: 0.02 
     minimum_graph_vertices: 32
 
-  view_model_output : False
-  view_skeletons : False
+  view_model_output : True
+  view_skeletons : True
   save_path: /local/
-  save_outputs : True
+  save_outputs : False
   
   branch_classes: [0]
   cmap:
@@ -36,5 +36,5 @@ pipeline:
   smooth_skeletons : True
   smooth_kernel_size: 11 # Needs to be odd
   prune_skeletons : True 
-  min_skeleton_radius : 0.001 
-  min_skeleton_length : 0.002
+  min_skeleton_radius : 0.01 
+  min_skeleton_length : 0.02

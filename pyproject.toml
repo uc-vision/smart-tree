@@ -21,7 +21,6 @@ dependencies = [
     'spconv-cu117',
     'wandb',
     'cmapy',
-    'pykeops',
     'plyfile',
     'py_structs',
     'torchtyping',

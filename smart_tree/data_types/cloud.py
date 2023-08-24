@@ -10,10 +10,10 @@ from torch import Tensor, rand
 from torchtyping import TensorDetail, TensorType
 from typeguard import typechecked
 
-from ..util.math.queries import skeleton_to_points
-from ..util.mesh.geometries import o3d_cloud, o3d_lines_between_clouds
+from ..o3d_abstractions.geometries import o3d_cloud, o3d_lines_between_clouds
+from ..o3d_abstractions.visualizer import o3d_viewer
+from ..util.queries import skeleton_to_points
 from ..util.misc import to_torch, voxel_downsample
-from ..util.visualizer.view import o3d_viewer
 
 
 @typechecked

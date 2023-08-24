@@ -10,7 +10,7 @@ from torch import Tensor, rand
 from torchtyping import TensorDetail, TensorType
 from typeguard import typechecked
 
-from smart_tree.util.mesh.geometries import o3d_path, o3d_tube_mesh
+from smart_tree.o3d_abstractions.geometries import o3d_path, o3d_tube_mesh
 
 from .tube import Tube
 

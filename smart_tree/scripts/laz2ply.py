@@ -1,7 +1,6 @@
 import laspy
 import numpy as np
 import open3d as o3d
-
 from plyfile import PlyData, PlyElement
 
 

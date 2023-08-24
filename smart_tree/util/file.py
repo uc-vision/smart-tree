@@ -12,7 +12,7 @@ from tqdm import tqdm
 from smart_tree.data_types.branch import BranchSkeleton
 from smart_tree.data_types.cloud import Cloud
 from smart_tree.data_types.tree import TreeSkeleton
-from smart_tree.util.mesh.geometries import o3d_cloud, o3d_line_set
+from smart_tree.o3d_abstractions.geometries import o3d_cloud, o3d_line_set
 
 
 def unpackage_data(data: dict) -> Tuple[Cloud, TreeSkeleton]:

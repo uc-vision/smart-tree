@@ -1,8 +1,8 @@
+import pickle
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Dict, List
 
-import pickle
 import numpy as np
 import open3d as o3d
 import torch
@@ -12,17 +12,16 @@ from torchtyping import TensorDetail, TensorType
 from tqdm import tqdm
 from typeguard import typechecked
 
-from ..util.math.queries import pts_to_nearest_tube_gpu
-from ..util.mesh.geometries import (
+from ..util.queries import pts_to_nearest_tube_gpu
+from ..o3d_abstractions.geometries import (
     o3d_merge_clouds,
     o3d_merge_linesets,
     o3d_merge_meshes,
 )
-from ..util.misc import flatten_list
-from ..util.visualizer.view import o3d_viewer
+from ..util.misc import flatten_list, merge_dictionaries
+from ..o3d_abstractions.visualizer import o3d_viewer
 from .branch import BranchSkeleton
 from .tube import Tube
-from ..util.misc import merge_dictionaries
 
 
 @dataclass
@@ -205,23 +204,17 @@ class DisjointTreeSkeleton:
     def to_pickle(self, path):
         with open("disjoint_skeleton.pkl", "wb") as pickle_file:
             pickle.dump(self, pickle_file)
-            print("PICKLE")
 
     @staticmethod
     def from_pickle(path):
         with open(f"{path}", "rb") as pickle_file:
             return pickle.load(pickle_file)
 
-    def connect(self):
-        pass
 
-        # sort skeletons by total branch lengths...
-
-
-def connect_skeletons(
+def connect(
     skeleton_1: TreeSkeleton,
-    skeleton_1_parent_branch_key: int,
-    skeleton_1_parent_vert_idx: int,
+    skeleton_1_child_branch_key: int,
+    skeleton_1_child_vert_idx: int,
     skeleton_2: TreeSkeleton,
     skeleton_2_child_branch_key: int,
     skeleton_2_child_vert_idx: int,

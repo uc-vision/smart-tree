@@ -12,14 +12,14 @@ from tqdm import tqdm
 from ..data_types.cloud import Cloud
 from ..data_types.graph import Graph
 from ..data_types.tree import DisjointTreeSkeleton, TreeSkeleton
-from ..util.mesh.geometries import (
+from ..o3d_abstractions.geometries import (
     o3d_cloud,
     o3d_line_set,
     o3d_merge_clouds,
     o3d_merge_linesets,
     o3d_path,
 )
-from ..util.visualizer.view import o3d_viewer
+from ..o3d_abstractions.visualizer import o3d_viewer
 from .filter import outlier_removal
 from .graph import connected_components, decompose_cuda_graph, nn_graph
 from .path import sample_tree
