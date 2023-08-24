@@ -3,7 +3,7 @@ from smart_tree.data_types.tree import (
     TreeSkeleton,
     connect_skeletons,
 )
-from smart_tree.o3d_abstractions.viewimport o3d_viewer
+from smart_tree.o3d_abstractions.visualizer import o3d_viewer
 
 if __name__ == "__main__":
     disjoint_skeleton = DisjointTreeSkeleton.from_pickle(
