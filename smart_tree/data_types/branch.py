@@ -20,8 +20,8 @@ from .tube import Tube
 class BranchSkeleton:
     _id: int
     parent_id: int
-    xyz: TensorType["N", 3]  # N x 3
-    radii: TensorType["N", 1]  # N x 1
+    xyz: TensorType["N", 3]
+    radii: TensorType["N", 1]
     child_id: Optional[int] = None
 
     def __post_init__(self) -> None:

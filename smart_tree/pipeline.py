@@ -9,7 +9,6 @@ from .data_types.cloud import Cloud
 from .data_types.tree import DisjointTreeSkeleton, TreeSkeleton
 from .dataset.augmentations import AugmentationPipeline
 from .util.file import (
-    load_adtree_skeleton,
     load_cloud,
     o3d_cloud,
     save_o3d_cloud,
