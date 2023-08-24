@@ -4,6 +4,7 @@ import click
 import hydra
 import numpy as np
 import torch
+import wandb
 from hydra.core.hydra_config import HydraConfig
 from hydra.utils import call, get_original_cwd, instantiate, to_absolute_path
 from omegaconf import DictConfig, OmegaConf
@@ -11,14 +12,13 @@ from py_structs.torch import map_tensors
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-import wandb
+from smart_tree.data_types.cloud import Cloud
 from smart_tree.dataset.dataset import SingleTreeInference, load_dataloader
 from smart_tree.model.sparse import batch_collate, sparse_from_batch
 from smart_tree.util.file import load_data_npz, load_o3d_cloud
 from smart_tree.util.mesh.geometries import o3d_merge_clouds
 from smart_tree.util.visualizer.camera import o3d_headless_render
 from smart_tree.util.visualizer.view import o3d_cloud, o3d_viewer
-from smart_tree.data_types.cloud import Cloud, LabelledCloud
 
 
 def load_model(model_path, weights_path, device=torch.device("cuda:0")):
@@ -90,13 +90,13 @@ class ModelInference:
         outputs = torch.cat(outputs)
         masks = torch.cat(masks)
 
-        vector = torch.exp(outputs[:, [0]]) * outputs[:, 1:4]
-        class_l = torch.argmax(outputs[:, 4:], dim=1)
+        medial_vector = torch.exp(outputs[:, [0]]) * outputs[:, 1:4]
+        class_l = torch.argmax(outputs[:, 4:], dim=1, keepdim=True)
 
-        lc: LabelledCloud = LabelledCloud(
+        lc = Cloud(
             xyz=inputs[:, :3],
             rgb=inputs[:, 3:6],
-            vector=vector,
+            medial_vector=medial_vector,
             class_l=class_l,
         )
 

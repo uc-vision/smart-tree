@@ -1,15 +1,17 @@
+from typing import Optional
+
+import cugraph
+import cupy
 import numpy as np
 import open3d as o3d
 import open3d.visualization.rendering as rendering
 import torch
 from cugraph import sssp
-import cupy
-import cugraph
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
-from typing import Optional
-
-from ..data_types.tree import TreeSkeleton, DisjointTreeSkeleton
+from ..data_types.cloud import Cloud
+from ..data_types.graph import Graph
+from ..data_types.tree import DisjointTreeSkeleton, TreeSkeleton
 from ..util.mesh.geometries import (
     o3d_cloud,
     o3d_line_set,
@@ -17,18 +19,11 @@ from ..util.mesh.geometries import (
     o3d_merge_linesets,
     o3d_path,
 )
+from ..util.visualizer.view import o3d_viewer
 from .filter import outlier_removal
-from .graph import (
-    connected_components,
-    decompose_cuda_graph,
-    nn_graph,
-)
+from .graph import connected_components, decompose_cuda_graph, nn_graph
 from .path import sample_tree
 from .shortest_path import edge_graph, graph_shortest_paths, pred_graph, shortest_paths
-from ..data_types.tree import TreeSkeleton
-from ..data_types.graph import Graph
-from ..util.visualizer.view import o3d_viewer
-from ..data_types.cloud import LabelledCloud
 
 
 class Skeletonizer:
@@ -44,10 +39,10 @@ class Skeletonizer:
         self.minimum_graph_vertices = minimum_graph_vertices
         self.device = device
 
-    def forward(self, cloud: LabelledCloud) -> DisjointTreeSkeleton:
+    def forward(self, cloud: Cloud) -> DisjointTreeSkeleton:
         cloud.to_device(self.device)
 
-        mask = outlier_removal(cloud.medial_pts, cloud.radii.unsqueeze(1))
+        mask = outlier_removal(cloud.medial_pts, cloud.radii.unsqueeze(1), nb_points=8)
         cloud = cloud.filter(mask)
 
         graph: Graph = nn_graph(
@@ -61,7 +56,9 @@ class Skeletonizer:
         )
 
         skeletons = []
-        for subgraph_id, subgraph in enumerate(subgraphs):
+        for subgraph_id, subgraph in enumerate(
+            tqdm(subgraphs, desc="Processing Subgraphs", leave=True)
+        ):
             skeletons.append(
                 self.process_subgraph(cloud, subgraph, skeleton_id=subgraph_id)
             )
