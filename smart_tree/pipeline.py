@@ -81,8 +81,6 @@ class Pipeline:
 
         self.post_process(skeleton)
 
-        print(skeleton.to_pickle())
-
         # View skeletonization results
         if self.view_skeletons:
             o3d_viewer(
