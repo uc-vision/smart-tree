@@ -12,11 +12,11 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from ..data_types.cloud import Cloud
+from .augmentations import AugmentationPipeline
 from ..model.sparse import batch_collate, sparse_quantize
-from ..util.file import load_data_npz
+from ..util.file import load_cloud
 from ..util.maths import cube_filter, np_normalized, torch_normalized
 from ..o3d_abstractions.visualizer import o3d_viewer
-from .augmentations import AugmentationPipeline
 
 
 class TreeDataset:
@@ -29,48 +29,75 @@ class TreeDataset:
         blocking: bool,
         block_size: float,
         buffer_size: float,
-        augmentation=None,
+        preprocessing=None,
+        cache: bool = True,
+        device=torch.device("cuda:0"),
     ):
         self.voxel_size = voxel_size
         self.mode = mode
         self.blocking = blocking
         self.block_size = block_size
         self.buffer_size = buffer_size
-        self.augmentation = AugmentationPipeline.from_cfg(augmentation)
+        self.augmentation = preprocessing
         self.directory = directory
+        self.device = device
 
+        assert Path(
+            json_path
+        ).is_file(), f"json metadata does not exist at '{json_path}'"
         json_data = json.load(open(json_path))
 
         if self.mode == "train":
             self.tree_paths = json_data["train"]
         elif self.mode == "validation":
             self.tree_paths = json_data["validation"]
+        elif self.mode == "test":
+            self.tree_paths = json_data["test"]
+
+        missing = [
+            path
+            for path in self.tree_paths
+            if not Path(f"{self.directory}/{path}").is_file()
+        ]
+
+        assert len(missing) == 0, f"Missing {len(missing)} files: {missing}"
+
+        self.cache = {} if cache else None
+        self.load_cloud = load_labelled_cloud if self.mode != "test" else load_cloud
+
+    def load(self, filename) -> Cloud:
+        if self.cache is None:
+            return self.load_cloud(filename)
+
+        if filename not in self.cache:
+            self.cache[filename] = self.load_cloud(filename).pin_memory()
+
+        return self.cache[filename]
 
     def __getitem__(self, idx):
-        labelled_cld, _ = load_data_npz(f"{self.directory}/{self.tree_paths[idx]}")
+        filename = Path(f"{self.directory}/{self.tree_paths[idx]}")
+        cld = self.load(filename)
 
-        labelled_cld = labelled_cld.to_device(torch.device("cuda"))
+        try:
+            return self.process_cloud(cld, self.tree_paths[idx])
+        except Exception:
+            print(f"Exception processing {filename} with {len(cld)} points")
+            raise
+
+    def process_cloud(self, cld: Cloud, filename: str):
+        cld = cld.to_device(self.device)
 
         if self.augmentation != None:
-            labelled_cld = self.augmentation(labelled_cld)
+            cld = self.augmentation(cld)
 
-        if self.blocking:
-            block_center_idx = torch.randint(
-                labelled_cld.xyz.shape[0], size=(1,), device=labelled_cld.xyz.device
-            )
-            block_center = labelled_cld.xyz[block_center_idx].reshape(-1)
-            block_filter = cube_filter(
-                labelled_cld.xyz,
-                block_center,
-                self.block_size + (self.buffer_size * 2),
-            )
-            labelled_cld = labelled_cld.filter(block_filter)
+        xyzmin, _ = torch.min(cld.xyz, axis=0)
+        xyzmax, _ = torch.max(cld.xyz, axis=0)
 
-        xyzmin, _ = torch.min(labelled_cld.xyz, axis=0)
-        xyzmax, _ = torch.max(labelled_cld.xyz, axis=0)
-        make_voxel_gen = time.time()
+        data = cld.cat()
 
-        data = labelled_cld.cat()
+        assert (
+            data.shape[0] > 0
+        ), f"Empty cloud after augmentation: {self.tree_paths[idx]}"
 
         surface_voxel_generator = PointToVoxel(
             vsize_xyz=[self.voxel_size] * 3,
@@ -87,11 +114,12 @@ class TreeDataset:
             max_num_points_per_voxel=1,
             device=data.device,
         )
+
         feats, coords, _, _ = surface_voxel_generator.generate_voxel_with_id(data)
 
         indice = torch.zeros(
             (coords.shape[0], 1),
-            dtype=torch.int32,
+            dtype=coords.dtype,
             device=feats.device,
         )
         coords = torch.cat((indice, coords), dim=1)
@@ -100,10 +128,7 @@ class TreeDataset:
         coords = coords.squeeze(1)
         loss_mask = torch.ones(feats.shape[0], dtype=torch.bool, device=feats.device)
 
-        if self.blocking:
-            loss_mask = cube_filter(feats[:, :3], block_center, self.block_size)
-
-        return feats.float(), coords.int(), loss_mask
+        return feats, coords, loss_mask, filename
 
     def __len__(self):
         return len(self.tree_paths)
@@ -117,6 +142,7 @@ class SingleTreeInference:
         block_size: float = 4,
         buffer_size: float = 0.4,
         min_points=20,
+        file_name=None,
         device=torch.device("cuda:0"),
     ):
         self.cloud = cloud
@@ -126,6 +152,7 @@ class SingleTreeInference:
         self.buffer_size = buffer_size
         self.min_points = min_points
         self.device = device
+        self.file_name = file_name
 
         self.compute_blocks()
 
@@ -179,7 +206,7 @@ class SingleTreeInference:
 
         feats, coords, _, voxel_id_tv = surface_voxel_generator.generate_voxel_with_id(
             cloud.cat().contiguous()
-        )  # FEATURES, COORD, _, ID
+        )  #
 
         indice = torch.zeros((coords.shape[0], 1), dtype=torch.int32)
         coords = torch.cat((indice, coords), dim=1)
@@ -189,7 +216,7 @@ class SingleTreeInference:
 
         mask = cube_filter(feats[:, :3], block_centre, self.block_size)
 
-        return feats, coords, mask
+        return feats, coords, mask, self.file_name
 
     def __len__(self):
         return len(self.clouds)

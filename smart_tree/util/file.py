@@ -157,40 +157,9 @@ def load_o3d_mesh(path: Path):
     return o3d.io.read_triangle_model(path)
 
 
-def save_skeleton(filename: Path, skeleton: TreeSkeleton):
-    # if filename.is_file():
-    #  print("File Already Exists")
-    #  return
-
-    cld = o3d_cloud(cld.xyz)
-    R = mesh.get_rotation_matrix_from_xyz((np.pi / 2, 0, 0))
-    cld = cld.rotate(R, center=(0, 0, 0))
-
-    o3d.io.write_point_cloud(str(filename), cld)
-
-
-def load_adtree_skeleton(ply_path):
-    plydata = PlyData.read(ply_path)
-    xyz = np.column_stack(
-        (
-            np.asarray(plydata.elements[0].data["x"]),
-            np.asarray(plydata.elements[0].data["y"]),
-            np.asarray(plydata.elements[0].data["z"]),
-        )
-    ).reshape(-1, 3)
-
-    # radii = np.asarray(plydata.elements[0].data['radius'])
-    edges = np.asarray(plydata.elements[1].data["vertex_indices"])
-
-    return o3d_line_set(xyz, edges)
-
-
 def load_cloud(path: Path):
     if path.suffix == ".npz":
-        np_data = np.load(path)
-        xyz = np_data["xyz"]
-        rgb = np_data["rgb"]
-        return Cloud.from_numpy(xyz=xyz, rgb=rgb)
+        return Cloud.from_numpy(**np.load(path))
 
     data = o3d.io.read_point_cloud(str(path))
     xyz = np.asarray(data.points)

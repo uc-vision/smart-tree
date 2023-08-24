@@ -40,7 +40,7 @@ def split_sparse(sparse_tensor):
 def batch_collate(batch):
     """Custom Batch Collate Function for Sparse Data..."""
 
-    batch_surface_feat, batch_surface_coord, batch_mask = zip(*batch)
+    batch_surface_feat, batch_surface_coord, batch_mask, filenames = zip(*batch)
 
     for i, coords in enumerate(batch_surface_coord):
         coords[:, 0] = torch.tensor([i], dtype=torch.float32)
@@ -49,7 +49,7 @@ def batch_collate(batch):
         torch.cat(x) for x in [batch_surface_feat, batch_surface_coord, batch_mask]
     ]
 
-    return [batch_surface_feat, batch_surface_coord, batch_mask]
+    return (batch_surface_feat, batch_surface_coord, batch_mask, filenames)
 
 
 def ravel_hash(x: np.ndarray) -> np.ndarray:

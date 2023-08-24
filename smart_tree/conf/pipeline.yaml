@@ -10,7 +10,7 @@ pipeline:
     _target_: smart_tree.model.model_inference.ModelInference
     model_path: smart_tree/model/weights/noble-elevator-58_model.pt
     weights_path: smart_tree/model/weights/noble-elevator-58_model_weights.pt
-    voxel_size: 0.001
+    voxel_size: 0.01
     block_size: 4
     buffer_size: 0.4
     num_workers : 8
