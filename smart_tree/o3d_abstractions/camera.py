@@ -66,3 +66,36 @@ def o3d_headless_render(geoms, camera_position, camera_up):
     render.setup_camera(camera.intrinsic, camera.extrinsic)
 
     return render.render_to_image()
+
+
+class Renderer:
+    def __init__(self, width, height):
+        self.camera = create_camera(width, height)
+        self.render = rendering.OffscreenRenderer(width=width, height=height)
+        self.render.scene.set_background([1.0, 1.0, 1.0, 1.0])  # RGBA
+        self.render.setup_camera(self.camera.intrinsic, self.camera.extrinsic)
+
+        self.render.scene.scene.enable_sun_light(True)
+        self.render.scene.scene.enable_indirect_light(True)
+        self.render.scene.scene.set_indirect_light_intensity(0.3)
+        self.mtl = o3d.visualization.rendering.MaterialRecord()
+        self.mtl.shader = "defaultUnlit"
+
+    def capture(self, geoms, camera_position, camera_up):
+        self.render.scene.scene.set_sun_light(
+            geoms[0].get_center() + np.asarray(camera_position), [1.0, 1.0, 1.0], 75000
+        )
+        for i, item in enumerate(geoms):
+            self.render.scene.add_geometry(f"{i}", item, self.mtl)
+
+        camera = update_camera_position(
+            self.camera,
+            geoms[0].get_center() + np.asarray(camera_position),
+            camera_target=geoms[0].get_center(),
+            up=np.asarray(camera_up),
+        )
+        self.render.setup_camera(camera.intrinsic, camera.extrinsic)
+        img = self.render.render_to_image()
+        self.render.scene.clear_geometry()
+
+        return img

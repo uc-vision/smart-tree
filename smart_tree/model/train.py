@@ -22,13 +22,11 @@ from smart_tree.model.sparse import batch_collate, sparse_from_batch
 from smart_tree.util.maths import torch_normalized
 from smart_tree.o3d_abstractions.geometries import o3d_cloud
 from smart_tree.util.misc import concate_dict_of_tensors, flatten_list
-from smart_tree.o3d_abstractions.visualizer.camera import Renderer, o3d_headless_render
-from smart_tree.o3d_abstractions.view import o3d_viewer
+from smart_tree.o3d_abstractions.camera import Renderer, o3d_headless_render
+from smart_tree.o3d_abstractions.visualizer import o3d_viewer
 
 from .helper import (
-    capture_labelled_cloud,
     get_batch,
-    log_images,
     model_output_to_labelled_clds,
 )
 from .tracker import Tracker
@@ -44,12 +42,13 @@ def train_epoch(
 ):
     tracker = Tracker()
 
-    for sp_input, targets, mask in tqdm(
+    for sp_input, targets, mask, fn in tqdm(
         get_batch(train_loader, device, fp16),
         desc="Training",
         leave=False,
     ):
         output = model.forward(sp_input)
+
         loss = model.compute_loss(output, targets, mask)
 
         if fp16:
@@ -78,7 +77,7 @@ def eval_epoch(
     tracker = Tracker()
     model.eval()
 
-    for sp_input, targets, mask in tqdm(
+    for sp_input, targets, mask, fn in tqdm(
         get_batch(data_loader, device, fp16),
         desc="Evaluating",
         leave=False,
@@ -103,7 +102,7 @@ def capture_output(
     model.eval()
     captures = []
 
-    for sp_input, targets, mask in tqdm(
+    for sp_input, targets, mask, fn in tqdm(
         get_batch(data_loader, device, fp16),
         desc="Capturing Outputs",
         leave=False,
@@ -129,8 +128,6 @@ def main(cfg: DictConfig):
     torch.manual_seed(42)
     torch.cuda.manual_seed_all(42)
     log = logging.getLogger(__name__)
-
-    cfg = cfg.training
 
     wandb.init(
         project=cfg.wandb.project,
