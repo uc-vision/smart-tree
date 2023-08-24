@@ -1,27 +1,24 @@
+import time
 from pathlib import Path
 
 import numpy as np
 import torch
-import time
-
-from .data_types.cloud import LabelledCloud, Cloud
-from .data_types.tree import TreeSkeleton, DisjointTreeSkeleton
 from hydra.utils import instantiate
 
-from .util.visualizer.view import o3d_viewer
-from .util.misc import to_numpy
-
+from .data_types.cloud import Cloud
+from .data_types.tree import DisjointTreeSkeleton, TreeSkeleton
+from .dataset.augmentations import AugmentationPipeline
 from .util.file import (
     load_adtree_skeleton,
     load_cloud,
+    o3d_cloud,
     save_o3d_cloud,
     save_o3d_lineset,
     save_o3d_mesh,
-    o3d_cloud,
 )
-
 from .util.mesh.geometries import o3d_lines_between_clouds
-from .dataset.augmentations import AugmentationPipeline
+from .util.misc import to_numpy
+from .util.visualizer.view import o3d_viewer
 
 
 class Pipeline:
@@ -39,6 +36,7 @@ class Pipeline:
         view_model_output=False,
         view_skeletons=False,
         save_outputs=False,
+        save_path="/",
         branch_classes=[0],
         cmap=[[1, 0, 0], [0, 1, 0]],
         device=torch.device("cuda:0"),
@@ -59,6 +57,7 @@ class Pipeline:
         self.view_skeletons = view_skeletons
 
         self.save_outputs = save_outputs
+        self.save_path = save_path
 
         self.branch_classes = branch_classes
         self.cmap = np.asarray(cmap)
@@ -70,17 +69,19 @@ class Pipeline:
         cloud = self.preprocessing(cloud)
 
         # Run point cloud through model to predict class, radius, direction
-        lc: LabelledCloud = self.model_inference.forward(cloud).to_device(self.device)
+        lc: Cloud = self.model_inference.forward(cloud).to_device(self.device)
         if self.view_model_output:
             lc.view(self.cmap)
 
         # Filter only the branch points for skeletonizaiton
-        branch_cloud: LabelledCloud = lc.filter_by_class(self.branch_classes)
+        branch_cloud: Cloud = lc.filter_by_class(self.branch_classes)
 
         # Run the branch cloud through skeletonization algorithm, then post process
         skeleton: DisjointTreeSkeleton = self.skeletonizer.forward(branch_cloud)
 
         self.post_process(skeleton)
+
+        print(skeleton.to_pickle())
 
         # View skeletonization results
         if self.view_skeletons:
@@ -95,9 +96,12 @@ class Pipeline:
             )
 
         if self.save_outputs:
-            save_o3d_lineset("skeleton.ply", skeleton.to_o3d_lineset())
-            save_o3d_mesh("mesh.ply", skeleton.to_o3d_tube())
-            save_o3d_cloud("cloud.ply", cloud.to_o3d_cld())
+            print("Saving Outputs")
+            sp = self.save_path
+            save_o3d_lineset(f"{sp}/skeleton.ply", skeleton.to_o3d_lineset())
+            save_o3d_mesh(f"{sp}/mesh.ply", skeleton.to_o3d_tube())
+            save_o3d_cloud(f"{sp}/cloud.ply", lc.to_o3d_cld())
+            save_o3d_cloud(f"{sp}/seg_cld.ply", lc.to_o3d_seg_cld(self.cmap))
 
     def post_process(self, skeleton: DisjointTreeSkeleton):
         if self.prune_skeletons:

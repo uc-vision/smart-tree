@@ -143,3 +143,14 @@ smart_tree/conf/apple-trellis-split-test.json
 smart_tree/conf/apple-trellis.yaml
 smart_tree/conf/apple-trellis-split.json
 FRNN/
+
+
+smart_tree/conf
+test_data/
+
+!smart_tree/conf/pipeline.yaml
+!smart_tree/conf/training.yaml
+!smart_tree/conf/training-split.json
+
+*.ply
+*.obj

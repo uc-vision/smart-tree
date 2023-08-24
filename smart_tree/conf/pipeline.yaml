@@ -3,9 +3,8 @@ pipeline:
   
   preprocessing:
     _target_: smart_tree.dataset.augmentations.AugmentationPipeline
-      # _target_:  smart_tree.dataset.augmentations.Scale
-      # min_scale: 1
-      # max_scale: 1
+    augmentations: 
+      - _target_:  smart_tree.dataset.augmentations.CentreCloud
 
   model_inference: 
     _target_: smart_tree.model.model_inference.ModelInference
@@ -24,8 +23,9 @@ pipeline:
     minimum_graph_vertices: 32
 
   view_model_output : False
-  view_skeletons : True
-  save_outputs : False
+  view_skeletons : False
+  save_path: /local/
+  save_outputs : True
   
   branch_classes: [0]
   cmap:

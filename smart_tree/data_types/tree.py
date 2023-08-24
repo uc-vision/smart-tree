@@ -2,14 +2,15 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Dict, List
 
+import pickle
 import numpy as np
 import open3d as o3d
 import torch
 import torch.nn.functional as F
 from torch import Tensor, rand
 from torchtyping import TensorDetail, TensorType
+from tqdm import tqdm
 from typeguard import typechecked
-
 
 from ..util.math.queries import pts_to_nearest_tube_gpu
 from ..util.mesh.geometries import (
@@ -21,6 +22,7 @@ from ..util.misc import flatten_list
 from ..util.visualizer.view import o3d_viewer
 from .branch import BranchSkeleton
 from .tube import Tube
+from ..util.misc import merge_dictionaries
 
 
 @dataclass
@@ -49,6 +51,9 @@ class TreeSkeleton:
     def to_o3d_tube(self) -> o3d.geometry.TriangleMesh:
         return o3d_merge_meshes(self.to_o3d_tubes())
 
+    def view(self):
+        o3d_viewer([self.to_o3d_lineset(), self.to_o3d_tube()])
+
     def to_tubes(self) -> List[Tube]:
         return flatten_list([b.to_tubes() for b in self.branches.values()])
 
@@ -64,6 +69,14 @@ class TreeSkeleton:
                 self.radii.to(device),
                 child_id,
             )
+
+    def point_to_skeleton(self):
+        tubes = self.to_tubes()
+
+        def point_to_tube(pt):
+            return pts_to_nearest_tube_gpu(pt.reshape(-1, 3), tubes)
+
+        return point_to_tube  # v, idx, _
 
     def repair(self):
         """skeletons are not connected between branches.
@@ -86,26 +99,34 @@ class TreeSkeleton:
             branch.xyz = torch.cat((connection_pt, branch.xyz))
             branch.radii = torch.cat((branch.radii[[0]], branch.radii))
 
-    def prune(self, min_radius, min_length, root_id=0):
-        """If a branch doesn't meet the initial radius threshold or length threshold we want to remove it and all
+    def prune(self, min_radius: float, min_length: float, root_id=None):
+        """
+        If a branch doesn't meet the initial radius threshold or length threshold we want to remove it and all
         it's predecessors...
         minimum_radius: some point of the branch must be above this to not remove the branch
         length: the total lenght of the branch must be greater than this point
         """
-        branches_to_keep = {root_id: self.branches[root_id]}
+        root_id = min(self.branches.keys()) if root_id == None else root_id
 
-        for branch_id, branch in self.branches.items():
-            if branch.parent_id == -1:
-                continue
+        keep = {root_id: self.branches[root_id]}
+        remove = {}
 
-            if branch.parent_id in branches_to_keep:
-                if branch.length > min_length and (
-                    max(branch.radii[0], branch.radii[-1])
-                    > min_radius  # We don't know which end of the branch is the start for skeletons that aren't connected...
-                ):
-                    branches_to_keep[branch_id] = branch
+        for branch_id, branch in tqdm(
+            self.branches.items(),
+            leave=False,
+            desc="Pruning Branches",
+        ):
+            if branch.parent_id not in keep and branch._id != root_id:
+                remove[branch_id] = branch
+            elif branch.length < min_length:
+                remove[branch_id] = branch
+            elif branch.initial_radius < min_radius:
+                remove[branch_id] = branch
+            else:
+                keep[branch_id] = branch
 
-        self.branches = branches_to_keep
+        self.branches = keep
+        return TreeSkeleton(0, remove)
 
     def smooth(self, kernel_size=5):
         """
@@ -119,6 +140,29 @@ class TreeSkeleton:
                     kernel,
                     padding="same",
                 ).reshape(-1)
+
+    @property
+    def length(self) -> TensorType[1]:
+        return torch.sum(torch.tensor([b.length for b in self.branches.values()]))
+
+    @property
+    def biggest_radius_idx(self) -> TensorType[1]:
+        return torch.argmax(self.radii)
+
+    @property
+    def key_branch_with_biggest_radius(self) -> TensorType[1]:
+        """Returns the key of the branch with the biggest radius"""
+        biggest_branch_radius = 0
+        for key, branch in self.branches.items():
+            if branch.biggest_radius > biggest_branch_radius:
+                biggest_branch_radius = branch.biggest_radius
+                biggest_branch_radius_key = key
+
+        return biggest_branch_radius_key
+
+    @property
+    def max_branch_id(self):
+        return max(self.branches.keys())
 
 
 @dataclass
@@ -156,5 +200,48 @@ class DisjointTreeSkeleton:
         return o3d_merge_meshes(skeleton_tubes)
 
     def view(self):
-        self.smooth()
         o3d_viewer([self.to_o3d_lineset(), self.to_o3d_tube()])
+
+    def to_pickle(self, path):
+        with open("disjoint_skeleton.pkl", "wb") as pickle_file:
+            pickle.dump(self, pickle_file)
+            print("PICKLE")
+
+    @staticmethod
+    def from_pickle(path):
+        with open(f"{path}", "rb") as pickle_file:
+            return pickle.load(pickle_file)
+
+    def connect(self):
+        pass
+
+        # sort skeletons by total branch lengths...
+
+
+def connect_skeletons(
+    skeleton_1: TreeSkeleton,
+    skeleton_1_parent_branch_key: int,
+    skeleton_1_parent_vert_idx: int,
+    skeleton_2: TreeSkeleton,
+    skeleton_2_child_branch_key: int,
+    skeleton_2_child_vert_idx: int,
+) -> TreeSkeleton:
+    # This is bundy, only visually gives appearance of connection...
+    # Need to do some more processing to actually connect the skeletons...
+
+    parent_branch = skeleton_1.branches[skeleton_1_parent_branch_key]
+    child_branch = skeleton_2.branches[skeleton_2_child_branch_key]
+
+    child_branch.parent_id = skeleton_1_parent_branch_key
+    connection_pt = parent_branch.xyz[skeleton_1_parent_vert_idx]
+
+    child_branch.xyz = torch.cat((connection_pt.unsqueeze(0), child_branch.xyz))
+    child_branch.radii = torch.cat((child_branch.radii[[0]], child_branch.radii))
+
+    for key, branch in skeleton_2.branches.items():
+        branch._id += skeleton_1.max_branch_id
+
+        if branch.parent_id != -1:
+            branch.parent_id += skeleton_1.max_branch_id
+
+    return TreeSkeleton(0, merge_dictionaries(skeleton_1.branches, skeleton_2.branches))

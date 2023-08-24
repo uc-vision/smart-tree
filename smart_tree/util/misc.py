@@ -72,3 +72,20 @@ def voxel_downsample(xyz, voxel_size):
     first_indicies = ind_sorted[cum_sum[1:]]
 
     return first_indicies
+
+
+def merge_dictionaries(dict1, dict2):
+    merged_dict = {}
+
+    for key, value in dict1.items():
+        merged_dict[key] = value
+
+    i = 1
+    for key, value in dict2.items():
+        new_key = key
+        while new_key in merged_dict:
+            new_key = i
+            i += 1
+        merged_dict[new_key] = value
+
+    return merged_dict

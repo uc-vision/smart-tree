@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -33,7 +35,7 @@ class BranchSkeleton:
                   Points: {self.xyz} \
                   Radii {self.radii}"
 
-    def to_o3d_lineset(self, colour=(0, 0, 0)) -> o3d.geometry.Lineset:
+    def to_o3d_lineset(self, colour=(0, 0, 0)) -> o3d.geometry.LineSet:
         return o3d_path(self.xyz, colour)
 
     def to_o3d_tube(self) -> o3d.geometry.TriangleMesh:
@@ -60,3 +62,15 @@ class BranchSkeleton:
     @property
     def length(self) -> TensorType[1]:
         return (self.xyz[1:] - self.xyz[:-1]).norm(dim=1).sum()
+
+    @property
+    def initial_radius(self) -> TensorType[1]:
+        return torch.max(self.radii[0], self.radii[-1])
+
+    @property
+    def biggest_radius_idx(self) -> TensorType[1]:
+        return torch.argmax(self.radii)
+
+    @property
+    def biggest_radius(self) -> TensorType[1]:
+        return torch.max(self.radii)

@@ -1,9 +1,10 @@
 import random
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Mapping, Sequence
 
 import numpy as np
 import torch
+from beartype import beartype
 from hydra.utils import call, get_original_cwd, instantiate, to_absolute_path
 
 from smart_tree.data_types.cloud import Cloud
@@ -22,7 +23,7 @@ class Scale(Augmentation):
         self.max_scale = max_scale
 
     def __call__(self, cloud: Cloud) -> Cloud:
-        t = torch.randn(1, device=cloud.xyz.device) * (self.max_scale - self.min_scale)
+        t = torch.rand(1, device=cloud.xyz.device) * (self.max_scale - self.min_scale)
         return cloud.scale(t + self.min_scale)
 
 
@@ -32,7 +33,7 @@ class FixedRotate(Augmentation):
 
     def __call__(self, cloud: Cloud) -> Cloud:
         self.rot_mat = euler_angles_to_rotation(
-            torch.tensor(self.xyz), device=cloud.device
+            torch.tensor(self.xyz, device=cloud.xyz.device)
         ).float()
         return cloud.rotate(self.rot_mat)
 
@@ -40,7 +41,7 @@ class FixedRotate(Augmentation):
 class CentreCloud(Augmentation):
     def __call__(self, cloud: Cloud) -> Cloud:
         centre, (x, y, z) = cloud.bbox
-        return cloud.translate(-centre + torch.tensor([0, y, 0]))
+        return cloud.translate(-centre + torch.tensor([0, y, 0], device=centre.device))
 
 
 class VoxelDownsample(Augmentation):
@@ -75,17 +76,12 @@ class RandomDropout(Augmentation):
         return cloud.filter(indices)
 
 
-class AugmentationPipeline:
-    def __init__(self, augmentation_fns: List[Augmentation] = []):
-        self.pipeline = augmentation_fns
+class AugmentationPipeline(Augmentation):
+    @beartype
+    def __init__(self, augmentations: Sequence[Augmentation]):
+        self.augmentations = augmentations
 
-    def __call__(self, cloud: Cloud) -> Cloud:
-        for augmentation in self.pipeline:
+    def __call__(self, cloud):
+        for augmentation in self.augmentations:
             cloud = augmentation(cloud)
         return cloud
-
-    @staticmethod
-    def from_cfg(cfg):
-        if cfg == None:
-            return AugmentationPipeline([])
-        return AugmentationPipeline([(cfg[key]) for key in cfg.keys()])
