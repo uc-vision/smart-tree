@@ -8,8 +8,7 @@ import open3d as o3d
 import plotly.figure_factory as ff
 import torch
 import torch.nn.functional as F
-from pykeops.numpy import LazyTensor as LazyTensor_np
-from pykeops.torch import LazyTensor
+
 from tqdm import tqdm
 
 from smart_tree.data_types.tube import CollatedTube, Tube, collate_tubes
@@ -52,9 +51,13 @@ def pts_to_nearest_tube(pts: np.array, tubes: List[Tube]):
         pts, collated_tube
     )  # N x M x 3
 
-    r = (1 - t) * collated_tube.r1 + t * collated_tube.r2
 
-    distances = projection_to_distance_matrix(projections, pts)  # N x M
+def pts_to_nearest_tube_keops(pts: np.array, tubes: List[Tube]):
+    """Vectors from pt to the nearest tube"""
+
+    distances, idx, r = points_to_tube_distance_keops(pts, tubes)  # N x M x 3
+
+    return distances.reshape(-1), idx, rce_matrix(projections, pts)  # N x M
 
     distances = distances - r
     idx = np.argmin(distances, 1)  # N
@@ -72,12 +75,14 @@ def pairwise_pts_to_nearest_tube(pts: np.array, tubes: List[Tube]):
     collated_tube = collate_tubes(tubes)
 
     ab = collated_tube.b - collated_tube.a  # M x 3
-    ap = pts - collated_tube.a  # N x 3
+    ap = (
+        pts - collated_tube.a
+    )  # N def pts_to_nearest_tube_keops(pts: np.array, tubes: List[Tube]):
+    """Vectors from pt to the nearest tube"""
 
-    t = ((ap * ab).sum(1) ** 0.5) / ((ab**2).sum(1) ** 0.5)
-    proj = collated_tube.a + ab * t.reshape(-1, 1)
+    distances, idx, r = points_to_tube_distance_keops(pts, tubes)  # N x M x 3
 
-    r = (1 - t) * collated_tube.r1 + t * collated_tube.r2
+    return distances.reshape(-1), idx, r + t * collated_tube.r2
 
     distances = np.sqrt(np.sum(np.square(proj - pts), 1))
 
@@ -134,72 +139,8 @@ def pts_to_nearest_tube_gpu(
     )
 
 
-"""
-  KeOps
-"""
-
-
-def distance_matrix_keops(pts1, pts2):
-    x_i = LazyTensor(pts1.reshape(-1, 1, 3))
-    y_j = LazyTensor(pts2.view(1, -1, 3))
-
-    return (x_i - y_j).square().sum(dim=2).sqrt()
-
-
-def nn_keops(pts1, pts2):
-    D_ij = distance_matrix_keops(pts1, pts2)
-
-    return D_ij.min(1), D_ij.argmin(1).flatten()  # distance, idx
-
-
-def points_to_tube_distance_keops(
-    pts: np.array, tubes: List[Tube], eps=1e-12
-):  # N x 3, M x 2
-    collated_tube = collate_tubes(tubes)
-
-    # M number of lines
-    ab = (collated_tube.b - collated_tube.a)[np.newaxis, ...]  # 1 x M x 3
-    ap = (pts[:, np.newaxis] - collated_tube.a[np.newaxis, ...])[
-        :, np.newaxis, ...
-    ]  # 1 x N x M x 3
-
-    a_lzy = LazyTensor_np(collated_tube.a[np.newaxis, ...])
-    ab_lzy = LazyTensor_np(ab)
-    ap_lzy = LazyTensor_np(ap)
-
-    t_lzy = ((ab_lzy * ap_lzy).sum(3) / (ab_lzy * ab_lzy).sum(2)).clamp(0.0, 1.0)
-    proj_lzy = a_lzy + (t_lzy * ab_lzy)
-
-    r1_lzy = LazyTensor_np(collated_tube.r1[..., np.newaxis])
-    r2_lzy = LazyTensor_np(collated_tube.r2[..., np.newaxis])
-
-    r_lzy = (1 - t_lzy) * r1_lzy + t_lzy * r2_lzy
-
-    pts_lzy = LazyTensor_np(pts.reshape(-1, 1, 1, 3))
-
-    dist_lzy = (proj_lzy - pts_lzy).square().sum(3).sqrt()  # .square().sum(2).sqrt())
-
-    dist_lzy = dist_lzy - r_lzy
-
-    idxs = dist_lzy.argmin(2)  # idx of the closest line segment for each point
-
-    tubes = [tubes[idx[0]] for idx in idxs[:, :, 0]]
-
-    distances, r = pairwise_pts_to_nearest_tube(pts, tubes)
-
-    return distances, idxs, r
-
-
 def projection_to_distance_matrix_keops(projections, pts):  # N x M x 3
     return np.sqrt(np.sum(np.square(projections - pts[:, np.newaxis, :]), 2))  # N x M
-
-
-def pts_to_nearest_tube_keops(pts: np.array, tubes: List[Tube]):
-    """Vectors from pt to the nearest tube"""
-
-    distances, idx, r = points_to_tube_distance_keops(pts, tubes)  # N x M x 3
-
-    return distances.reshape(-1), idx, r
 
 
 def skeleton_to_points(pcd, skeleton, chunk_size=4096, device="gpu"):

@@ -14,8 +14,8 @@ from tqdm import tqdm
 from ..data_types.cloud import Cloud
 from ..model.sparse import batch_collate, sparse_quantize
 from ..util.file import load_data_npz
-from ..util.math.maths import cube_filter, np_normalized, torch_normalized
-from ..util.visualizer.view import o3d_viewer
+from ..util.maths import cube_filter, np_normalized, torch_normalized
+from ..o3d_abstractions.visualizer import o3d_viewer
 from .augmentations import AugmentationPipeline
 
 

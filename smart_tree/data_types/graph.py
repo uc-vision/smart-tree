@@ -11,7 +11,7 @@ from torchtyping import TensorDetail, TensorType
 from tqdm import tqdm
 from typeguard import typechecked
 
-from ..util.mesh.geometries import o3d_line_set, o3d_merge_linesets
+from ..o3d_abstractions.geometries import o3d_line_set, o3d_merge_linesets
 
 
 @dataclass

@@ -4,8 +4,8 @@ import torch
 import torch.nn.functional as F
 
 
-# from util.visualizer.view import o3d_view_geometries
-from smart_tree.util.math.maths import (
+# from o3d_abstractions.viewimport o3d_view_geometries
+from smart_tree.util.maths import (
     gen_tangents,
     make_transformation_matrix,
     random_unit,
