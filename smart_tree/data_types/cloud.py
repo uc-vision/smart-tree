@@ -102,6 +102,31 @@ class Cloud:
         mask = distances < radii * threshold
         return filter(cloud, mask)
 
+    def pin_memory(self):
+        xyz = self.xyz.pin_memory()
+        rgb = self.rgb.pin_memory() if self.rgb is not None else None
+        medial_vector = (
+            self.medial_vector.pin_memory() if self.medial_vector is not None else None
+        )
+        branch_direction = (
+            self.branch_direction.pin_memory()
+            if self.branch_direction is not None
+            else None
+        )
+        class_l = self.class_l.pin_memory() if self.class_l is not None else None
+        branch_ids = (
+            self.branch_ids.pin_memory() if self.branch_ids is not None else None
+        )
+
+        return Cloud(
+            xyz=xyz,
+            rgb=rgb,
+            medial_vector=medial_vector,
+            branch_direction=branch_direction,
+            class_l=class_l,
+            branch_ids=branch_ids,
+        )
+
     def cpu(self):
         return self.to_device(torch.device("cpu"))
 
@@ -211,7 +236,7 @@ class Cloud:
                 "branch_ids",
                 "class_l",
             ]:
-                torch_kwargs[key] = torch.tensor(value)
+                torch_kwargs[key] = torch.tensor(value).float()
 
             """ SUPPORT LEGACY NPZ -> Remove in Future..."""
             if key in ["vector"]:

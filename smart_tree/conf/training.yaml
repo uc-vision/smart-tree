@@ -1,70 +1,118 @@
+# @package: _global_
+
+run:
+  dir: ./outputs
+
 wandb:
-  project: "tree"
+  project: tree
   entity: harry1576
-  mode: "disabled"
+  mode: disabled 
 
-
-
-
-
-
-
-
-
-
-name: "tree"
-wblogging: "disabled" 
-entity: harry1576
-fp16: False
-num_epoch: 500
+fp16: True
+num_epoch: 5000
 lr_decay: True
+lr: 0.001
 early_stop_epoch: 20
 early_stop: True
 
-dataset:
+batch_size: 8
+directory: /mnt/harry/PhD/smart-tree/data/branches/
+json_path: smart_tree/conf/training-split.json
+blocking: True
+block_size: 4
+buffer_size: 0.4
+voxel_size: 0.1
+
+
+capture_output: 1
+
+
+train_dataset:
   _target_: smart_tree.dataset.dataset.TreeDataset
-  voxel_size: 0.01
-  json_path: smart_tree/conf/tree-split.json
-  directory: /local/uc-vision/dataset/branches/
-  blocking: True
-  block_size: 4
-  buffer_size: 0.4
+  mode: train
+  voxel_size: ${voxel_size}
+  directory: ${directory}
+  json_path: ${json_path}
+  blocking: ${blocking}
+  block_size: ${block_size}
+  buffer_size: ${buffer_size}
 
-  augmentation:
-  Scale:
-      _target_:  smart_tree.dataset.augmentations.Scale
-      min_scale: 100
-      max_scale: 100
-  # Dropout:
-  #     _target_:  smart_tree.dataset.augmentations.RandomDropout
-  #     max_drop_out: 0.1
+test_dataset:
+  _target_: smart_tree.dataset.dataset.TreeDataset
+  mode: test
+  voxel_size: ${voxel_size}
+  directory: ${directory}
+  json_path: ${json_path}
+  blocking: ${blocking}
+  block_size: ${block_size}
+  buffer_size: ${buffer_size}
 
-data_loader:
+validation_dataset:
+  _target_: smart_tree.dataset.dataset.TreeDataset
+  mode: validation
+  voxel_size: ${voxel_size}
+  directory: ${directory}
+  json_path: ${json_path}
+  blocking: ${blocking}
+  block_size: ${block_size}
+  buffer_size: ${buffer_size}
+
+
+train_data_loader:
   _target_: torch.utils.data.DataLoader
-  batch_size: 16
-  drop_last: True
+  batch_size: ${batch_size}
+  drop_last: False
   pin_memory: False
   num_workers: 0
-  #prefetch_factor: 
-  shuffle: True
+  # sampler:
+  #   _target_: torch.utils.data.RandomSampler
+  #   replacement: True
+  #   num_samples: 1024
+  #   data_source: ${train_dataset}
   collate_fn:
     _target_: smart_tree.model.sparse.batch_collate
     _partial_: True
+  dataset: ${train_dataset}
+
+validation_data_loader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: ${batch_size}
+  drop_last: False
+  pin_memory: False
+  num_workers: 0
+  shuffle: False
+  collate_fn:
+    _target_: smart_tree.model.sparse.batch_collate
+    _partial_: True
+  dataset: ${validation_dataset}
+
+
+test_data_loader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: ${batch_size}
+  drop_last: False
+  pin_memory: False
+  num_workers: 0
+  shuffle: False
+  collate_fn:
+    _target_: smart_tree.model.sparse.batch_collate
+    _partial_: True
+  dataset: ${test_dataset}
+
 
 model:
   _target_: smart_tree.model.model.Smart_Tree
   input_channels: 3
-  unet_planes: [8, 16, 32, 64]
-  radius_fc_planes: [8, 8, 4, 1]
-  direction_fc_planes: [8, 8, 4, 3]
-  class_fc_planes: [8, 8, 4, 2] # last one is number of classes..
-  bias: False
+  unet_planes: [32, 64, 128, 192, 256, 384, 512, 512]
+  radius_fc_planes: [32, 16, 16, 1]
+  direction_fc_planes: [32, 16, 16, 3]
+  class_fc_planes: [32, 32, 32, 5] # last one is number of classes..
 
 optimizer:
-  _target_: torch.optim.Adam # SGD, Adadelta etc
-  lr: 0.1
+  _target_: torch.optim.Adam 
+  lr: ${lr}
+
 
 scheduler:
   _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
   mode: "min"
-

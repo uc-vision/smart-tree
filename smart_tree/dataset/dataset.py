@@ -63,7 +63,7 @@ class TreeDataset:
         assert len(missing) == 0, f"Missing {len(missing)} files: {missing}"
 
         self.cache = {} if cache else None
-        self.load_cloud = load_labelled_cloud if self.mode != "test" else load_cloud
+        self.load_cloud = load_cloud if self.mode != "test" else load_cloud
 
     def load(self, filename) -> Cloud:
         if self.cache is None:
