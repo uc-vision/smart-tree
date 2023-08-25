@@ -80,8 +80,6 @@ def dice_loss(outputs, targets):
 
 def focal_loss(outputs, targets):
     # https://github.com/torrvision/focal_calibration/blob/main/Losses/focal_loss.py
-    targets = targets.long()
-
     gamma = 2
     input = outputs
 
@@ -101,5 +99,6 @@ def focal_loss(outputs, targets):
 
 
 def nll_loss(outputs, targets):
+    return torch.tensor([0]).cuda()
     weights = targets.shape[0] / (torch.bincount(targets))  # Balance class weights
     return F.nll_loss(F.log_softmax(outputs, dim=1), targets, weight=weights)

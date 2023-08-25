@@ -116,11 +116,11 @@ def capture_output(
             cmap,
             fn,
         )
-        captures.append(
-            flatten_list(
-                [capture_labelled_cloud(renderer, cld) for cld in labelled_clouds]
-            )
-        )
+        # captures.append(
+        #     flatten_list(
+        #         [capture_labelled_cloud(renderer, cld) for cld in labelled_clouds]
+        #     )
+        # )
     model.train()
     return captures
 
@@ -177,35 +177,36 @@ def main(cfg: DictConfig):
     # Epochs
     for epoch in tqdm(range(0, cfg.num_epoch), leave=True, desc="Epoch"):
         with amp_ctx:
-            # training_tracker, scaler = train_epoch(
-            #     train_loader,
-            #     model,
-            #     optimizer,
-            #     loss_fn,
-            #     scaler=scaler,
-            #     fp16=cfg.fp16,
-            # )
+            training_tracker, scaler = train_epoch(
+                train_loader,
+                model,
+                optimizer,
+                loss_fn,
+                scaler=scaler,
+                fp16=cfg.fp16,
+            )
 
-            # val_tracker = eval_epoch(
-            #     val_loader,
-            #     model,
-            #     loss_fn,
-            #     fp16=cfg.fp16,
-            # )
+            val_tracker = eval_epoch(
+                val_loader,
+                model,
+                loss_fn,
+                fp16=cfg.fp16,
+            )
 
-            if (epoch + 1) % cfg.capture_output == 0:
-                batch_images = capture_output(
-                    renderer,
-                    test_loader,
-                    model,
-                    cfg.cmap,
-                    fp16=cfg.fp16,
-                )
-                log_images("Test Output", flatten_list(batch_images), epoch)
+            # if (epoch + 1) % cfg.capture_output == 0:
+            #     batch_images = capture_output(
+            #         renderer,
+            #         test_loader,
+            #         model,
+            #         cfg.cmap,
+            #         fp16=cfg.fp16,
+            #     )
+            #     log_images("Test Output", flatten_list(batch_images), epoch)
 
         scheduler.step(val_tracker.total_loss) if cfg.lr_decay else None
 
         # Save Best Model
+        print(val_tracker.total_loss)
         if val_tracker.total_loss < best_val_loss:
             epochs_no_improve = 0
             best_val_loss = val_tracker.total_loss
