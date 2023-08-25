@@ -13,18 +13,19 @@ from smart_tree.data_types.cloud import Cloud
 
 
 def get_batch(dataloader, device, fp_16=False):
-    for feats, coords, mask, filenames in dataloader:
+    for feats, target_feats, coords, mask, filenames in dataloader:
         if fp_16:
             feats = feats.half()
+            target_feats = feats.half()
             coords = coords.half()
 
         sparse_input = sparse_from_batch(
-            feats[:, :3],
+            feats,
             coords,
             device=device,
         )
         targets = map_tensors(
-            feats[:, 6:10],
+            target_feats,
             partial(
                 torch.Tensor.to,
                 device=device,

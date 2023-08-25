@@ -15,6 +15,16 @@ def flatten_list(l):
     return [item for sublist in l for item in sublist]
 
 
+def at_least_2d(tensors: Union[List[torch.tensor], torch.tensor], expand_dim=1):
+    if type(tensors) is list:
+        return [at_least_2d(tensor) for tensor in tensors]
+    else:
+        if len(tensors.shape) == 1:
+            return tensors.unsqueeze(expand_dim)
+        else:
+            return tensors
+
+
 def to_torch(numpy_arrays: List[np.array], device=torch.device("cpu")):
     return [torch.from_numpy(np_arr).float().to(device) for np_arr in numpy_arrays]
 

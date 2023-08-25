@@ -86,15 +86,15 @@ def sample_tree(
         dtype=int,
     )
 
+    pbar = tqdm(total=distances.shape[0], leave=False, desc="Allocating Points")
+
     while True:
+        pbar.update((distances > 0).sum().item() - pbar.n)
+
         farthest = distances.argmax().item()
 
         if distances[farthest] <= 0:
             break
-
-        if pbar:
-            pts_sampled = f"{100 * (1.0 - ((distances > 0).sum().item() / medial_pts.shape[0])):.2f}"
-            pbar.set_postfix_str(f"Sampling Graph: {pts_sampled} %")
 
         """ Traces the path of the futhrest point until it converges with allocated points """
         path_vertices_idx, termination_idx = trace_route(
@@ -132,7 +132,6 @@ def sample_tree(
             xyz=medial_pts[path_vertices_idx].cpu(),
             radii=medial_radii[path_vertices_idx].cpu(),
             parent_id=int(branch_ids[termination_idx].item()),
-            child_id=-1,
         )
 
         branch_ids[path_vertices_idx] = branch_id
