@@ -15,8 +15,10 @@ from ..data_types.cloud import Cloud
 from .augmentations import AugmentationPipeline
 from ..model.sparse import batch_collate, sparse_quantize
 from ..util.file import load_cloud
+from ..util.misc import at_least_2d
 from ..util.maths import cube_filter, np_normalized, torch_normalized
 from ..o3d_abstractions.visualizer import o3d_viewer
+from ..o3d_abstractions.geometries import o3d_cloud
 
 
 class TreeDataset:
@@ -29,6 +31,8 @@ class TreeDataset:
         blocking: bool,
         block_size: float,
         buffer_size: float,
+        input_features: List[str],
+        target_features: List[str],
         preprocessing=None,
         cache: bool = True,
         device=torch.device("cuda:0"),
@@ -41,6 +45,9 @@ class TreeDataset:
         self.augmentation = preprocessing
         self.directory = directory
         self.device = device
+
+        self.input_features = input_features
+        self.target_features = target_features
 
         assert Path(
             json_path
@@ -76,6 +83,7 @@ class TreeDataset:
 
     def __getitem__(self, idx):
         filename = Path(f"{self.directory}/{self.tree_paths[idx]}")
+        print(filename)
         cld = self.load(filename)
 
         try:
@@ -93,7 +101,18 @@ class TreeDataset:
         xyzmin, _ = torch.min(cld.xyz, axis=0)
         xyzmax, _ = torch.max(cld.xyz, axis=0)
 
-        data = cld.cat()
+        # data = cld.cat()
+        input_features = torch.cat(
+            [at_least_2d(getattr(cld, attr)) for attr in self.input_features], dim=1
+        )
+
+        o3d_viewer([o3d_cloud(input_features.cpu()), o3d_cloud(cld.xyz.cpu())])
+
+        target_features = torch.cat(
+            [at_least_2d(getattr(cld, attr)) for attr in self.target_features], dim=1
+        )
+
+        data = torch.cat([input_features, target_features], dim=1)
 
         assert (
             data.shape[0] > 0
@@ -128,7 +147,10 @@ class TreeDataset:
         coords = coords.squeeze(1)
         loss_mask = torch.ones(feats.shape[0], dtype=torch.bool, device=feats.device)
 
-        return feats, coords, loss_mask, filename
+        input_feats = data[:, : input_features.shape[1]]
+        target_feats = data[:, input_features.shape[1] :]
+
+        return (input_feats, target_feats, coords, loss_mask, filename)
 
     def __len__(self):
         return len(self.tree_paths)

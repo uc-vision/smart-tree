@@ -57,7 +57,7 @@ class Skeletonizer:
 
         skeletons = []
         for subgraph_id, subgraph in enumerate(
-            tqdm(subgraphs, desc="Processing Subgraphs", leave=True)
+            tqdm(subgraphs, desc="Processing Connected Components", leave=False)
         ):
             skeletons.append(
                 self.process_subgraph(cloud, subgraph, skeleton_id=subgraph_id)

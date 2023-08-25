@@ -38,7 +38,7 @@ class Graph:
         components = []
         for label in tqdm(
             df["labels"].unique().to_pandas(),
-            desc="Connected Components",
+            desc="Finding Connected Components",
             leave=False,
         ):
             subgraph_vertices = df[df["labels"] == label]["vertex"]

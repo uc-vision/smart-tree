@@ -245,7 +245,7 @@ class Cloud:
         return Cloud(**torch_kwargs)
 
     @property
-    def radii(self) -> torch.Tensor:
+    def radius(self) -> torch.Tensor:
         return self.medial_vector.pow(2).sum(1).sqrt()
 
     @property
