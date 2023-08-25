@@ -15,6 +15,16 @@ def flatten_list(l):
     return [item for sublist in l for item in sublist]
 
 
+def at_least_2d(tensors: Union[List[torch.tensor], torch.tensor], expand_dim=1):
+    if type(tensors) is list:
+        return [at_least_2d(tensor) for tensor in tensors]
+    else:
+        if len(tensors.shape) == 1:
+            return tensors.unsqueeze(expand_dim)
+        else:
+            return tensors
+
+
 def to_torch(numpy_arrays: List[np.array], device=torch.device("cpu")):
     return [torch.from_numpy(np_arr).float().to(device) for np_arr in numpy_arrays]
 
@@ -72,3 +82,20 @@ def voxel_downsample(xyz, voxel_size):
     first_indicies = ind_sorted[cum_sum[1:]]
 
     return first_indicies
+
+
+def merge_dictionaries(dict1, dict2):
+    merged_dict = {}
+
+    for key, value in dict1.items():
+        merged_dict[key] = value
+
+    i = 1
+    for key, value in dict2.items():
+        new_key = key
+        while new_key in merged_dict:
+            new_key = i
+            i += 1
+        merged_dict[new_key] = value
+
+    return merged_dict

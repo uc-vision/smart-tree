@@ -3,12 +3,15 @@ from typing import List
 
 import numpy as np
 import torch
+from torch import Tensor, rand
+from torchtyping import TensorDetail, TensorType
+from typeguard import typechecked
 
 
 @dataclass
 class Tube:
-    a: np.array  # Start Point 3
-    b: np.array  # End Point 3
+    a: TensorType["N", 3]  # Start Point 3
+    b: TensorType["N", 3]  # End Point 3
     r1: float  # Start Radius
     r2: float  # End Radius
 
@@ -27,10 +30,10 @@ class Tube:
 
 @dataclass
 class CollatedTube:
-    a: torch.tensor  # Nx3
-    b: torch.tensor  # Nx3
-    r1: torch.tensor  # N
-    r2: torch.tensor  # N
+    a: TensorType["N", 3]  # Nx3
+    b: TensorType["N", 3]  # Nx3
+    r1: TensorType["N", 1]  # N
+    r2: TensorType["N", 1]  # N
 
     def to_gpu(self, device=torch.device("cuda")):
         self.a = self.a.to(device)

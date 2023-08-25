@@ -1,24 +1,30 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
-import torch
 import numpy as np
-import pandas as pd
+import open3d as o3d
+import torch
+from torch import Tensor, rand
+from torchtyping import TensorDetail, TensorType
+from typeguard import typechecked
 
-from smart_tree.util.mesh.geometries import o3d_path, o3d_tube_mesh
+from smart_tree.o3d_abstractions.geometries import o3d_path, o3d_tube_mesh
 
 from .tube import Tube
 
 
+@typechecked
 @dataclass
 class BranchSkeleton:
     _id: int
     parent_id: int
-    xyz: torch.Tensor  # N x 3
-    radii: torch.Tensor  # N x 1
-    child_id: int = -1
+    xyz: TensorType["N", 3]
+    radii: TensorType["N", 1]
+    child_id: Optional[int] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.colour = np.random.rand(3)
 
     def __len__(self) -> np.array:
@@ -29,10 +35,10 @@ class BranchSkeleton:
                   Points: {self.xyz} \
                   Radii {self.radii}"
 
-    def to_o3d_lineset(self, colour=(0, 0, 0)):
+    def to_o3d_lineset(self, colour=(0, 0, 0)) -> o3d.geometry.LineSet:
         return o3d_path(self.xyz, colour)
 
-    def to_o3d_tube(self):
+    def to_o3d_tube(self) -> o3d.geometry.TriangleMesh:
         return o3d_tube_mesh(self.xyz.numpy(), self.radii.numpy(), self.colour)
 
     def to_tubes(self, colour=(1, 0, 0)) -> List[Tube]:
@@ -44,7 +50,7 @@ class BranchSkeleton:
         )
         return [Tube(a, b, r1, r2) for a, b, r1, r2 in zip(a_, b_, r1_, r2_)]
 
-    def filter(self, mask):
+    def filter(self, mask) -> BranchSkeleton:
         return BranchSkeleton(
             self._id,
             self.parent_id,
@@ -54,5 +60,17 @@ class BranchSkeleton:
         )
 
     @property
-    def length(self) -> float:
-        return np.sum(np.sqrt(np.sum(np.diff(self.xyz, axis=0) ** 2, axis=1)))
+    def length(self) -> TensorType[1]:
+        return (self.xyz[1:] - self.xyz[:-1]).norm(dim=1).sum()
+
+    @property
+    def initial_radius(self) -> TensorType[1]:
+        return torch.max(self.radii[0], self.radii[-1])
+
+    @property
+    def biggest_radius_idx(self) -> TensorType[1]:
+        return torch.argmax(self.radii)
+
+    @property
+    def biggest_radius(self) -> TensorType[1]:
+        return torch.max(self.radii)

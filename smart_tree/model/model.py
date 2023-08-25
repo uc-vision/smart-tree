@@ -5,10 +5,9 @@ import torch.cuda.amp
 import torch.nn as nn
 import torch.nn.functional as F
 
-from smart_tree.model.model_blocks import SparseFC, UBlock, SubMConvBlock
-from smart_tree.util.math.maths import torch_normalized
+from smart_tree.model.model_blocks import SparseFC, UBlock, SubMConvBlock, MLP
+from smart_tree.util.maths import torch_normalized
 
-spconv.constants.SPCONV_ALLOW_TF32 = True
 
 from .fp16 import force_fp32
 
@@ -26,13 +25,13 @@ class Smart_Tree(nn.Module):
     ):
         super().__init__()
 
-        norm_fn = functools.partial(
-            nn.BatchNorm1d, eps=1e-4, momentum=0.1
-        )  # , momentum=0.99)
+        norm_fn = nn.BatchNorm1d
+        # functools.partial(
+        #     nn.BatchNorm1d,
+        #     eps=1e-4,
+        #     momentum=0.1,
+        # )
         activation_fn = nn.ReLU
-
-        self.radius_loss = nn.L1Loss()
-        self.direction_loss = nn.CosineSimilarity()
 
         self.input_conv = SubMConvBlock(
             input_channels=input_channels,
@@ -52,23 +51,23 @@ class Smart_Tree(nn.Module):
         )
 
         # Three Heads...
-        self.radius_head = SparseFC(
+        self.radius_head = MLP(
             radius_fc_planes,
             norm_fn,
             activation_fn,
-            algo=algo,
+            bias=True,
         )
-        self.direction_head = SparseFC(
+        self.direction_head = MLP(
             direction_fc_planes,
             norm_fn,
             activation_fn,
-            algo=algo,
+            bias=True,
         )
-        self.class_head = SparseFC(
+        self.class_head = MLP(
             class_fc_planes,
             norm_fn,
             activation_fn,
-            algo=algo,
+            bias=True,
         )
 
         self.apply(self.set_bn_init)
@@ -81,106 +80,13 @@ class Smart_Tree(nn.Module):
             m.bias.data.fill_(0.0)
 
     def forward(self, input):
+        predictions = {}
+
         x = self.input_conv(input)
         unet_out = self.UNet(x)
 
-        radius = self.radius_head(unet_out)
-        direction = self.direction_head(unet_out)
-        class_l = self.class_head(unet_out)
+        predictions["radius"] = self.radius_head(unet_out).features
+        predictions["direction"] = F.normalize(self.direction_head(unet_out).features)
+        predictions["class_l"] = self.class_head(unet_out).features
 
-        return torch.cat(
-            [radius.features, F.normalize(direction.features), class_l.features],
-            dim=1,
-        )
-
-    # @force_fp32(apply_to=("outputs", "targets"))
-    def compute_loss(self, outputs, targets, mask=None):
-        losses = {}
-
-        if mask is not None:
-            outputs = outputs[mask]
-            targets = targets[mask]
-
-        radius_pred = outputs[:, [0]]
-        direction_pred = outputs[:, 1:4]
-        class_pred = outputs[:, 4:]
-
-        class_target = targets[:, [3]]
-        direction_target, radius_target = torch_normalized(targets[:, :3])
-
-        vector_mask = (
-            class_target == 0
-        )  # only compute vector loss on points that are meant to be branches
-        vector_mask = vector_mask.reshape(-1)
-
-        losses["radius"] = self.compute_radius_loss(
-            radius_pred[vector_mask], radius_target[vector_mask]
-        )
-        losses["direction"] = self.compute_direction_loss(
-            direction_pred[vector_mask], direction_target[vector_mask]
-        )
-        losses["class"] = self.compute_class_loss(class_pred, class_target)
-
-        return losses
-
-    # @force_fp32(apply_to=("outputs", "targets"))
-    def compute_radius_loss(self, outputs, targets):
-        return self.radius_loss(outputs, torch.log(targets))
-
-    # @force_fp32(apply_to=("outputs", "targets"))
-    def compute_direction_loss(self, outputs, targets):
-        return torch.mean(1 - self.direction_loss(outputs, targets))
-
-    # @force_fp32(apply_to=("outputs", "targets"))
-    def compute_class_loss(self, outputs, targets):
-        return self.focal_loss(outputs, targets.long())
-
-    def dice_loss(self, outputs, targets):
-        # https://gist.github.com/jeremyjordan/9ea3032a32909f71dd2ab35fe3bacc08
-        smooth = 1
-        outputs = F.softmax(outputs, dim=1)
-        targets = F.one_hot(targets)
-
-        outputs = outputs.view(-1)
-        targets = targets.view(-1)
-
-        intersection = (outputs * targets).sum()
-
-        return 1 - (
-            (2.0 * intersection + smooth) / (outputs.sum() + targets.sum() + smooth)
-        )
-
-    def focal_loss(self, outputs, targets):
-        # https://github.com/torrvision/focal_calibration/blob/main/Losses/focal_loss.py
-
-        gamma = 2
-        input = outputs
-
-        if input.dim() > 2:
-            input = input.view(input.size(0), input.size(1), -1)  # N,C,H,W => N,C,H*W
-            input = input.transpose(1, 2)  # N,C,H*W => N,H*W,C
-            input = input.contiguous().view(-1, input.size(2))  # N,H*W,C => N*H*W,C
-        targets = targets.view(-1, 1)
-
-        logpt = F.log_softmax(input, dim=1)
-        logpt = logpt.gather(1, targets)
-        logpt = logpt.view(-1)
-        pt = logpt.exp()
-        loss = -1 * (1 - pt) ** gamma * logpt
-        # return loss.sum()
-        return loss.mean()
-
-    def nll_loss(self, outputs, targets):
-        weights = targets.shape[0] / (torch.bincount(targets))  # Balance class weights
-        return F.nll_loss(F.log_softmax(outputs, dim=1), targets, weight=weights)
-
-    def dice_and_focal_loss(self, outputs, targets):
-        return self.focal_loss(outputs, targets) + self.dice_loss(outputs, targets)
-
-    # add smoothing loss: https://github.com/guochengqian/openpoints/blob/ee100c81b1d9603c0fc76a3ee4e37d10b2af60ba/loss/cross_entropy.py
-
-    def print_gradients(self):
-        for m in self.modules():
-            if isinstance(m, nn.BatchNorm1d):
-                print(m.weight)
-                print(m.bias)
+        return predictions
