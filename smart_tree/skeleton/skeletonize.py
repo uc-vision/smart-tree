@@ -42,12 +42,12 @@ class Skeletonizer:
     def forward(self, cloud: Cloud) -> DisjointTreeSkeleton:
         cloud.to_device(self.device)
 
-        mask = outlier_removal(cloud.medial_pts, cloud.radii.unsqueeze(1), nb_points=8)
+        mask = outlier_removal(cloud.medial_pts, cloud.radius.unsqueeze(1), nb_points=8)
         cloud = cloud.filter(mask)
 
         graph: Graph = nn_graph(
             cloud.medial_pts,
-            cloud.radii.clamp(min=self.min_connection_length),
+            cloud.radius.clamp(min=self.min_connection_length),
             K=self.K,
         )
 
@@ -97,7 +97,7 @@ class Skeletonizer:
 
         branches = sample_tree(
             subgraph_cloud.medial_pts,
-            subgraph_cloud.radii.unsqueeze(1),
+            subgraph_cloud.radius.unsqueeze(1),
             preds,
             distances,
             subgraph_cloud.xyz,

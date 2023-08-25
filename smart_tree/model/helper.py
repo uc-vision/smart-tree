@@ -13,10 +13,10 @@ from smart_tree.data_types.cloud import Cloud
 
 
 def get_batch(dataloader, device, fp_16=False):
-    for feats, target_feats, coords, mask, filenames in dataloader:
+    for (feats, target_feats), coords, mask, filenames in dataloader:
         if fp_16:
             feats = feats.half()
-            target_feats = feats.half()
+            target_feats = target_feats.half()
             coords = coords.half()
 
         sparse_input = sparse_from_batch(

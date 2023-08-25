@@ -8,10 +8,10 @@ wandb:
   entity: harry1576
   mode: disabled 
 
-fp16: True
+fp16: False
 num_epoch: 5000
 lr_decay: True
-lr: 0.001
+lr: 0.01
 early_stop_epoch: 20
 early_stop: True
 
@@ -125,7 +125,24 @@ optimizer:
   _target_: torch.optim.Adam 
   lr: ${lr}
 
-
 scheduler:
   _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
   mode: "min"
+
+loss_fn:
+  _target_: smart_tree.model.loss.compute_loss
+  _partial_: True
+  vector_class: 0
+  target_radius_log: True
+ 
+  radius_loss_fn:
+    _target_ : smart_tree.model.loss.L1Loss
+    _partial_: True
+
+  direction_loss_fn:
+    _target_: smart_tree.model.loss.cosine_similarity_loss
+    _partial_: True
+
+  class_loss_fn:
+    _target_: smart_tree.model.loss.focal_loss
+    _partial_: True

@@ -41,9 +41,9 @@ class Cloud:
             cpu_cld.paint()
         return o3d_cloud(cpu_cld.xyz, colours=cpu_cld.rgb)
 
-    def to_o3d_seg_cld(self, cmap: np.ndarray = None):
+    def to_o3d_seg_cld(self, cmap: np.ndarray = np.array([[1, 0, 0], [0, 1, 0]])):
         cpu_cld = self.cpu()
-        colours = cmap[cpu_cld.class_l.view(-1)]
+        colours = cmap[cpu_cld.class_l.view(-1).int()]
         return o3d_cloud(cpu_cld.xyz, colours=colours)
 
     def to_o3d_trunk_cld(self):
