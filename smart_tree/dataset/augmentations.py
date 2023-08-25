@@ -79,28 +79,14 @@ class RandomCubicCrop(Augmentation):
         self.size = size
 
     def __call__(self, cloud):
-        max_translation = cloud.max_xyz - self.size
-        offset = cloud.min_xyz + (
-            torch.rand(3, device=cloud.xyz.device) * max_translation
-        )
-
-        min_corner = offset - self.size
-        max_corner = offset + self.size
+        random_pt = cloud.xyz[torch.randint(0, cloud.xyz.shape[0], (1,))]
+        min_corner = random_pt - self.size / 2
+        max_corner = random_pt + self.size / 2
 
         mask = torch.logical_and(
             cloud.xyz >= min_corner,
             cloud.xyz <= max_corner,
         ).all(dim=1)
-
-        if mask.sum() == 0:
-            offset = cloud.xyz[torch.randint(0, cloud.xyz.shape[0], (1,))]
-            min_corner = offset - self.size
-            max_corner = offset + self.size
-
-            mask = torch.logical_and(
-                cloud.xyz >= min_corner,
-                cloud.xyz <= max_corner,
-            ).all(dim=1)
 
         return cloud.filter(mask)
 

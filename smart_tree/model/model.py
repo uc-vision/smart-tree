@@ -5,7 +5,7 @@ import torch.cuda.amp
 import torch.nn as nn
 import torch.nn.functional as F
 
-from smart_tree.model.model_blocks import SparseFC, UBlock, SubMConvBlock
+from smart_tree.model.model_blocks import SparseFC, UBlock, SubMConvBlock, MLP
 from smart_tree.util.maths import torch_normalized
 
 
@@ -25,11 +25,12 @@ class Smart_Tree(nn.Module):
     ):
         super().__init__()
 
-        norm_fn = functools.partial(
-            nn.BatchNorm1d,
-            eps=1e-4,
-            momentum=0.1,
-        )
+        norm_fn = nn.BatchNorm1d
+        # functools.partial(
+        #     nn.BatchNorm1d,
+        #     eps=1e-4,
+        #     momentum=0.1,
+        # )
         activation_fn = nn.ReLU
 
         self.input_conv = SubMConvBlock(
@@ -50,23 +51,23 @@ class Smart_Tree(nn.Module):
         )
 
         # Three Heads...
-        self.radius_head = SparseFC(
+        self.radius_head = MLP(
             radius_fc_planes,
             norm_fn,
             activation_fn,
-            algo=algo,
+            bias=True,
         )
-        self.direction_head = SparseFC(
+        self.direction_head = MLP(
             direction_fc_planes,
             norm_fn,
             activation_fn,
-            algo=algo,
+            bias=True,
         )
-        self.class_head = SparseFC(
+        self.class_head = MLP(
             class_fc_planes,
             norm_fn,
             activation_fn,
-            algo=algo,
+            bias=True,
         )
 
         self.apply(self.set_bn_init)

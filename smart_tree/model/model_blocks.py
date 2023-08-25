@@ -284,3 +284,38 @@ class SparseFC(nn.Module):
 
     def forward(self, input):
         return self.sequence(input)
+
+
+class MLP(nn.Module):
+    def __init__(
+        self,
+        n_planes,
+        norm_fn,
+        activation_fn=None,
+        bias=False,
+    ):
+        super().__init__()
+
+        self.sequence = spconv.SparseSequential()
+
+        for i in range(len(n_planes) - 2):
+            self.sequence.add(
+                nn.Linear(
+                    n_planes[i],
+                    n_planes[i + 1],
+                    bias=bias,
+                )
+            )
+            self.sequence.add(norm_fn(n_planes[i + 1]))
+            self.sequence.add(activation_fn())
+
+        self.sequence.add(
+            nn.Linear(
+                n_planes[-2],
+                n_planes[-1],
+                bias=bias,
+            )
+        )
+
+    def forward(self, input):
+        return self.sequence(input)

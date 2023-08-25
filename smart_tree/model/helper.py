@@ -36,7 +36,10 @@ def get_batch(dataloader, device, fp_16=False):
 
 
 def model_output_to_labelled_clds(
-    sparse_input, model_output, cmap, filenames
+    sparse_input,
+    model_output,
+    cmap,
+    filenames,
 ) -> List[Cloud]:
     return to_labelled_clds(
         sparse_input.indices[:, 0],
@@ -49,9 +52,9 @@ def model_output_to_labelled_clds(
 
 
 def split_outputs(features, mask):
-    radii = torch.exp(features[:, [0]][mask])
-    direction = features[:, 1:4][mask]
-    class_l = torch.argmax(features[:, 4:], dim=1)[mask]
+    radii = torch.exp(features["radius"][mask])
+    direction = features["direction"][mask]
+    class_l = torch.argmax(features["class_l"], dim=1)[mask]
 
     return radii, direction, class_l
 
@@ -74,15 +77,13 @@ def to_labelled_clds(
         xyz = coords[mask]
         rgb = torch.rand(xyz.shape)  # rgb[mask]
 
-        radii, direction, class_l = split_outputs(model_output.features, mask)
+        radii, direction, class_l = split_outputs(model_output, mask)
 
         labelled_cloud = Cloud(
             xyz=xyz,
             rgb=rgb,
-            branch_vector=radii * direction,
+            medial_vector=radii * direction,
             class_l=class_l,
-            _cmap=torch.tensor(cmap),
-            filename=filenames[i],
         )
 
         clouds.append(labelled_cloud.to_device(torch.device("cpu")))
