@@ -59,6 +59,52 @@ class FixedTranslate(Augmentation):
         return cloud.translate(self.xyz)
 
 
+class RandomCrop(Augmentation):
+    def __init__(self, max_x, max_y, max_z):
+        self.max_translation = torch.tensor([max_x, max_y, max_z])
+
+    def __call__(self, cloud):
+        offset = (
+            torch.rand(3, device=cloud.xyz.device) - 0.5
+        ) * self.max_translation.to(device=cloud.xyz.device)
+
+        p = cloud.xyz + offset
+        mask = torch.logical_and(p >= cloud.min_xyz, p <= cloud.max_xyz).all(dim=1)
+
+        return cloud.filter(mask)
+
+
+class RandomCubicCrop(Augmentation):
+    def __init__(self, size):
+        self.size = size
+
+    def __call__(self, cloud):
+        max_translation = cloud.max_xyz - self.size
+        offset = cloud.min_xyz + (
+            torch.rand(3, device=cloud.xyz.device) * max_translation
+        )
+
+        min_corner = offset - self.size
+        max_corner = offset + self.size
+
+        mask = torch.logical_and(
+            cloud.xyz >= min_corner,
+            cloud.xyz <= max_corner,
+        ).all(dim=1)
+
+        if mask.sum() == 0:
+            offset = cloud.xyz[torch.randint(0, cloud.xyz.shape[0], (1,))]
+            min_corner = offset - self.size
+            max_corner = offset + self.size
+
+            mask = torch.logical_and(
+                cloud.xyz >= min_corner,
+                cloud.xyz <= max_corner,
+            ).all(dim=1)
+
+        return cloud.filter(mask)
+
+
 class RandomDropout(Augmentation):
     def __init__(self, max_drop_out):
         self.max_drop_out = max_drop_out

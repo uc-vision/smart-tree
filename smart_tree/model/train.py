@@ -45,7 +45,6 @@ def train_epoch(
 
     for sp_input, targets, mask, fn in tqdm(
         get_batch(train_loader, device, fp16),
-        desc="Training",
         leave=False,
     ):
         preds = model.forward(sp_input)
@@ -111,7 +110,12 @@ def capture_output(
     ):
         model_output = model.forward(sp_input)
 
-        labelled_clouds = model_output_to_labelled_clds(sp_input, model_output, cmap)
+        labelled_clouds = model_output_to_labelled_clds(
+            sp_input,
+            model_output,
+            cmap,
+            fn,
+        )
         captures.append(
             flatten_list(
                 [capture_labelled_cloud(renderer, cld) for cld in labelled_clouds]
@@ -171,23 +175,23 @@ def main(cfg: DictConfig):
     best_val_loss = torch.inf
 
     # Epochs
-    for epoch in tqdm(range(0, cfg.num_epoch), leave=True):
+    for epoch in tqdm(range(0, cfg.num_epoch), leave=True, desc="Epoch"):
         with amp_ctx:
-            training_tracker, scaler = train_epoch(
-                train_loader,
-                model,
-                optimizer,
-                loss_fn,
-                scaler=scaler,
-                fp16=cfg.fp16,
-            )
+            # training_tracker, scaler = train_epoch(
+            #     train_loader,
+            #     model,
+            #     optimizer,
+            #     loss_fn,
+            #     scaler=scaler,
+            #     fp16=cfg.fp16,
+            # )
 
-            val_tracker = eval_epoch(
-                val_loader,
-                model,
-                loss_fn,
-                fp16=cfg.fp16,
-            )
+            # val_tracker = eval_epoch(
+            #     val_loader,
+            #     model,
+            #     loss_fn,
+            #     fp16=cfg.fp16,
+            # )
 
             if (epoch + 1) % cfg.capture_output == 0:
                 batch_images = capture_output(
