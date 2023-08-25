@@ -11,7 +11,7 @@ wandb:
 fp16: True
 num_epoch: 5000
 lr_decay: True
-lr: 0.001
+lr: 0.1
 early_stop_epoch: 20
 early_stop: True
 
