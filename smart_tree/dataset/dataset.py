@@ -83,7 +83,6 @@ class TreeDataset:
 
     def __getitem__(self, idx):
         filename = Path(f"{self.directory}/{self.tree_paths[idx]}")
-        print(filename)
         cld = self.load(filename)
 
         try:
@@ -105,8 +104,6 @@ class TreeDataset:
         input_features = torch.cat(
             [at_least_2d(getattr(cld, attr)) for attr in self.input_features], dim=1
         )
-
-        o3d_viewer([o3d_cloud(input_features.cpu()), o3d_cloud(cld.xyz.cpu())])
 
         target_features = torch.cat(
             [at_least_2d(getattr(cld, attr)) for attr in self.target_features], dim=1
@@ -147,10 +144,10 @@ class TreeDataset:
         coords = coords.squeeze(1)
         loss_mask = torch.ones(feats.shape[0], dtype=torch.bool, device=feats.device)
 
-        input_feats = data[:, : input_features.shape[1]]
-        target_feats = data[:, input_features.shape[1] :]
+        input_feats = feats[:, : input_features.shape[1]]
+        target_feats = feats[:, input_features.shape[1] :]
 
-        return (input_feats, target_feats, coords, loss_mask, filename)
+        return (input_feats, target_feats), coords, loss_mask, filename
 
     def __len__(self):
         return len(self.tree_paths)
@@ -227,7 +224,7 @@ class SingleTreeInference:
         )
 
         feats, coords, _, voxel_id_tv = surface_voxel_generator.generate_voxel_with_id(
-            cloud.cat().contiguous()
+            torch.cat((cloud.xyz, cloud.rgb), dim=1).contiguous()
         )  #
 
         indice = torch.zeros((coords.shape[0], 1), dtype=torch.int32)

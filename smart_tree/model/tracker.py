@@ -11,7 +11,7 @@ class Tracker:
     def update(self, loss_dict: dict):
         self.running_epoch_radius_loss.append(loss_dict["radius"].item())
         self.running_epoch_direction_loss.append(loss_dict["direction"].item())
-        self.running_epoch_class_loss.append(loss_dict["class"].item())
+        self.running_epoch_class_loss.append(loss_dict["class_l"].item())
 
     @property
     def radius_loss(self):

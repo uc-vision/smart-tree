@@ -86,7 +86,13 @@ def sample_tree(
         dtype=int,
     )
 
-    pbar = tqdm(total=distances.shape[0], leave=False, desc="Allocating Points")
+    pbar = tqdm(
+        total=distances.shape[0],
+        leave=False,
+        miniters=1,
+        mininterval=0,
+        desc="Allocating Points",
+    )
 
     while True:
         pbar.update((distances > 0).sum().item() - pbar.n)
