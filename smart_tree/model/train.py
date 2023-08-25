@@ -116,11 +116,11 @@ def capture_output(
             cmap,
             fn,
         )
-        # captures.append(
-        #     flatten_list(
-        #         [capture_labelled_cloud(renderer, cld) for cld in labelled_clouds]
-        #     )
-        # )
+        captures.append(
+            flatten_list(
+                [capture_labelled_cloud(renderer, cld) for cld in labelled_clouds]
+            )
+        )
     model.train()
     return captures
 
