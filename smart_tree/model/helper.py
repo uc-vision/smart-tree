@@ -74,7 +74,7 @@ def to_labelled_clds(
         xyz = coords[mask]
         rgb = torch.rand(xyz.shape)  # rgb[mask]
 
-        radii, direction, class_l = split_outputs(model_output, mask)
+        radii, direction, class_l = split_outputs(model_output.features, mask)
 
         labelled_cloud = Cloud(
             xyz=xyz,

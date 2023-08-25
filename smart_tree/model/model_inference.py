@@ -60,7 +60,8 @@ class ModelInference:
             print("Model Loaded Succesfully")
 
     def forward(self, cloud: Cloud, return_masked=True):
-        outputs, inputs, masks = [], [], []
+        inputs, masks = [], []
+        radius, direction, class_l = [], [], []
 
         dataloader = load_dataloader(
             cloud,
@@ -80,18 +81,24 @@ class ModelInference:
                 device=self.device,
             )
 
-            out = self.model.forward(sparse_input)
+            preds = self.model.forward(sparse_input)
+
+            radius.append(preds["radius"].detach().cpu())
+            direction.append(preds["direction"].detach().cpu())
+            class_l.append(preds["class_l"].detach().cpu())
 
             inputs.append(features.detach().cpu())
-            outputs.append(out.detach().cpu())
             masks.append(mask.detach().cpu())
 
+        radius = torch.cat(radius)
+        direction = torch.cat(direction)
+        class_l = torch.cat(class_l)
+
         inputs = torch.cat(inputs)
-        outputs = torch.cat(outputs)
         masks = torch.cat(masks)
 
-        medial_vector = torch.exp(outputs[:, [0]]) * outputs[:, 1:4]
-        class_l = torch.argmax(outputs[:, 4:], dim=1, keepdim=True)
+        medial_vector = torch.exp(radius) * direction
+        class_l = torch.argmax(class_l, dim=1, keepdim=True)
 
         lc = Cloud(
             xyz=inputs[:, :3],

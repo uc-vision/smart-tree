@@ -33,7 +33,7 @@ class TreeDataset:
         buffer_size: float,
         input_features: List[str],
         target_features: List[str],
-        preprocessing=None,
+        augmentation=None,
         cache: bool = True,
         device=torch.device("cuda:0"),
     ):
@@ -42,7 +42,7 @@ class TreeDataset:
         self.blocking = blocking
         self.block_size = block_size
         self.buffer_size = buffer_size
-        self.augmentation = preprocessing
+        self.augmentation = augmentation
         self.directory = directory
         self.device = device
 
