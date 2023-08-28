@@ -1,13 +1,14 @@
 import contextlib
 import logging
+import math
 import os
 from functools import partial
+from typing import List
 
 import hydra
 import numpy as np
 import open3d as o3d
 import torch
-import wandb
 from hydra.core.hydra_config import HydraConfig
 from hydra.utils import call, get_original_cwd, instantiate, to_absolute_path
 from omegaconf import DictConfig, OmegaConf
@@ -15,25 +16,25 @@ from py_structs.torch import map_tensors
 from sklearn.metrics import f1_score, mean_absolute_percentage_error
 from tqdm import tqdm
 
+import wandb
 from smart_tree.data_types.cloud import Cloud
 from smart_tree.dataset.dataset import TreeDataset
 from smart_tree.model.model import Smart_Tree
 from smart_tree.model.sparse import batch_collate, sparse_from_batch
-from smart_tree.util.maths import torch_normalized
-from smart_tree.o3d_abstractions.geometries import o3d_cloud
-from smart_tree.util.misc import concate_dict_of_tensors, flatten_list
 from smart_tree.o3d_abstractions.camera import Renderer, o3d_headless_render
+from smart_tree.o3d_abstractions.geometries import o3d_cloud
 from smart_tree.o3d_abstractions.visualizer import o3d_viewer
+from smart_tree.util.maths import torch_normalized
+from smart_tree.util.misc import concate_dict_of_tensors, flatten_list
 
-from .helper import (
-    get_batch,
-    model_output_to_labelled_clds,
-)
+from .helper import get_batch, model_output_to_labelled_clds
 from .tracker import Tracker
+
+from pathlib import Path
 
 
 def train_epoch(
-    train_loader,
+    data_loader,
     model,
     optimizer,
     loss_fn,
@@ -44,8 +45,10 @@ def train_epoch(
     tracker = Tracker()
 
     for sp_input, targets, mask, fn in tqdm(
-        get_batch(train_loader, device, fp16),
+        get_batch(data_loader, device, fp16),
+        desc="Batch",
         leave=False,
+        total=math.ceil(len(data_loader) / data_loader.batch_size),
     ):
         preds = model.forward(sp_input)
 
@@ -82,6 +85,7 @@ def eval_epoch(
         get_batch(data_loader, device, fp16),
         desc="Evaluating",
         leave=False,
+        total=math.ceil(len(data_loader) / data_loader.batch_size),
     ):
         preds = model.forward(sp_input)
         loss = loss_fn(preds, targets, mask)
@@ -92,8 +96,7 @@ def eval_epoch(
 
 
 @torch.no_grad()
-def capture_output(
-    renderer,
+def capture_epoch(
     data_loader,
     model,
     cmap,
@@ -107,6 +110,7 @@ def capture_output(
         get_batch(data_loader, device, fp16),
         desc="Capturing Outputs",
         leave=False,
+        total=math.ceil(len(data_loader) / data_loader.batch_size),
     ):
         model_output = model.forward(sp_input)
 
@@ -116,13 +120,59 @@ def capture_output(
             cmap,
             fn,
         )
-        captures.append(
-            flatten_list(
-                [capture_labelled_cloud(renderer, cld) for cld in labelled_clouds]
+
+    model.train()
+    return labelled_clouds
+
+
+@torch.no_grad()
+def capture_clouds(
+    data_loader,
+    model,
+    cmap,
+    fp16=False,
+    device=torch.device("cuda"),
+) -> List[Cloud]:
+    model.eval()
+    clouds = []
+
+    for sp_input, targets, mask, filenames in tqdm(
+        get_batch(data_loader, device, fp16),
+        desc="Capturing Outputs",
+        leave=False,
+        total=math.ceil(len(data_loader) / data_loader.batch_size),
+    ):
+        model_output = model.forward(sp_input)
+        clouds.extend(
+            model_output_to_labelled_clds(
+                sp_input,
+                model_output,
+                cmap,
+                filenames,
             )
         )
+
     model.train()
-    return captures
+    return clouds
+
+
+def capture_and_log(loader, model, epoch, wandb_run, cfg):
+    clouds = capture_clouds(
+        loader,
+        model,
+        cfg.cmap,
+        fp16=cfg.fp16,
+    )
+
+    for cloud in tqdm(clouds, desc="Uploading Clouds", leave=False):
+        seg_cloud = cloud.to_o3d_seg_cld(np.asarray(cfg.cmap))
+        xyz_rgb = np.concatenate(
+            (np.asarray(seg_cloud.points), np.asarray(seg_cloud.colors) * 255), -1
+        )
+        wandb_run.log(
+            {f"{Path(cloud.filename).stem}": wandb.Object3D(xyz_rgb)},
+            step=epoch,
+        )
 
 
 @hydra.main(
@@ -146,7 +196,7 @@ def main(cfg: DictConfig):
     log.info(f"Directory : {run_dir}")
     log.info(f"Machine: {os.uname()[1]}")
 
-    renderer = Renderer(1920, 1080)
+    renderer = Renderer(960, 540)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -193,20 +243,20 @@ def main(cfg: DictConfig):
                 fp16=cfg.fp16,
             )
 
-            # if (epoch + 1) % cfg.capture_output == 0:
-            #     batch_images = capture_output(
-            #         renderer,
-            #         test_loader,
-            #         model,
-            #         cfg.cmap,
-            #         fp16=cfg.fp16,
-            #     )
-            #     log_images("Test Output", flatten_list(batch_images), epoch)
+            test_tracker = eval_epoch(
+                test_loader,
+                model,
+                loss_fn,
+                fp16=cfg.fp16,
+            )
+
+            if (epoch + 1) % cfg.capture_output == 0:
+                capture_and_log(test_loader, model, epoch, wandb.run, cfg)
+                capture_and_log(val_loader, model, epoch, wandb.run, cfg)
 
         scheduler.step(val_tracker.total_loss) if cfg.lr_decay else None
 
         # Save Best Model
-        print(val_tracker.total_loss)
         if val_tracker.total_loss < best_val_loss:
             epochs_no_improve = 0
             best_val_loss = val_tracker.total_loss
