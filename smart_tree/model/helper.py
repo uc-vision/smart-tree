@@ -1,15 +1,17 @@
-from typing import List
-import torch
-import wandb
-import numpy as np
 import os
 import sys
+from functools import partial
+from pathlib import Path
+from typing import List
 
-from .sparse import sparse_from_batch
+import numpy as np
+import torch
 from py_structs.torch import map_tensors
 
-from functools import partial
+import wandb
 from smart_tree.data_types.cloud import Cloud
+
+from .sparse import sparse_from_batch
 
 
 def get_batch(dataloader, device, fp_16=False):
@@ -84,6 +86,7 @@ def to_labelled_clds(
             rgb=rgb,
             medial_vector=radii * direction,
             class_l=class_l,
+            filename=Path(filenames[i]),
         )
 
         clouds.append(labelled_cloud.to_device(torch.device("cpu")))

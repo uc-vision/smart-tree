@@ -1,15 +1,12 @@
 # @package: _global_
 
-run:
-  dir: ./outputs
-
 wandb:
   project: tree
   entity: harry1576
-  mode: disabled 
+  mode: online 
 
 fp16: True
-num_epoch: 5000
+num_epoch: 1
 lr_decay: True
 lr: 0.1
 early_stop_epoch: 20
@@ -18,11 +15,7 @@ early_stop: True
 batch_size: 8
 directory: /local/smart-tree/data/branches
 json_path: smart_tree/conf/training-split.json
-blocking: True
-block_size: 4
-buffer_size: 0.4
 voxel_size: 0.01
-
 
 cmap:
   - [0.450, 0.325, 0.164] # Trunk
@@ -45,9 +38,6 @@ train_dataset:
   voxel_size: ${voxel_size}
   directory: ${directory}
   json_path: ${json_path}
-  blocking: ${blocking}
-  block_size: ${block_size}
-  buffer_size: ${buffer_size}
   input_features: ${input_features}
   target_features: ${target_features}
   augmentation:
@@ -62,9 +52,6 @@ test_dataset:
   voxel_size: ${voxel_size}
   directory: ${directory}
   json_path: ${json_path}
-  blocking: ${blocking}
-  block_size: ${block_size}
-  buffer_size: ${buffer_size}
   input_features: ${input_features}
   target_features: ${target_features}
   augmentation:
@@ -79,11 +66,9 @@ validation_dataset:
   voxel_size: ${voxel_size}
   directory: ${directory}
   json_path: ${json_path}
-  blocking: ${blocking}
-  block_size: ${block_size}
-  buffer_size: ${buffer_size}
   input_features: ${input_features}
   target_features: ${target_features}
+  cache: True
   augmentation:
     _target_:  smart_tree.dataset.augmentations.AugmentationPipeline 
     augmentations:
@@ -94,7 +79,7 @@ validation_dataset:
 train_data_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: ${batch_size}
-  drop_last: True
+  drop_last: False
   pin_memory: False
   num_workers: 0
   shuffle: False
@@ -111,7 +96,7 @@ train_data_loader:
 validation_data_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: ${batch_size}
-  drop_last: True
+  drop_last: False
   pin_memory: False
   num_workers: 0
   shuffle: False
@@ -123,7 +108,7 @@ validation_data_loader:
 test_data_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: ${batch_size}
-  drop_last: True
+  drop_last: False
   pin_memory: False
   num_workers: 0
   shuffle: False
