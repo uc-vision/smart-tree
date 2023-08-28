@@ -8,8 +8,8 @@ pipeline:
 
   model_inference: 
     _target_: smart_tree.model.model_inference.ModelInference
-    model_path: /local/smart-tree/outputs/2023-08-29/08-41-20/sweet-blaze-229_model.pt #smart_tree/model/weights/noble-elevator-58_model.pt
-    weights_path: /local/smart-tree/outputs/2023-08-29/08-41-20/sweet-blaze-229_model_weights.pt #smart_tree/model/weights/noble-elevator-58_model_weights.pt
+    model_path: smart_tree/model/weights/noble-elevator-58_model.pt
+    weights_path: smart_tree/model/weights/noble-elevator-58_model_weights.pt
     voxel_size: 0.01
     block_size: 4
     buffer_size: 0.4
@@ -22,7 +22,7 @@ pipeline:
     min_connection_length: 0.02 
     minimum_graph_vertices: 32
 
-  view_model_output : True
+  view_model_output : False
   view_skeletons : True
   save_path: /
   save_outputs : False
