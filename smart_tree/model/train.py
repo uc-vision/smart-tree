@@ -172,8 +172,18 @@ def capture_and_log(loader, model, epoch, wandb_run, cfg):
             (np.asarray(seg_cloud.points), np.asarray(seg_cloud.colors) * 255),
             -1,
         )
+
+        medial_cld_pts = np.asarray(cloud.medial_pts)
+        xyz_rgb2 = np.concatenate(
+            (medial_cld_pts, np.asarray(seg_cloud.colors) * 255),
+            -1,
+        )
+
         wandb_run.log(
-            {f"{Path(cloud.filename).stem}": wandb.Object3D(xyz_rgb)},
+            {
+                # {f"{Path(cloud.filename).stem}": wandb.Object3D(xyz_rgb),
+                f"{Path(cloud.filename).stem}_medial": wandb.Object3D(xyz_rgb2)
+            },
             step=epoch,
         )
 
@@ -254,8 +264,8 @@ def main(cfg: DictConfig):
             )
 
             # if (epoch + 1) % cfg.capture_output == 0:
-            #     capture_and_log(test_loader, model, epoch, wandb.run, cfg)
-            #     capture_and_log(val_loader, model, epoch, wandb.run, cfg)
+            # capture_and_log(test_loader, model, epoch, wandb.run, cfg)
+            # capture_and_log(val_loader, model, epoch, wandb.run, cfg)
 
         scheduler.step(val_tracker.total_loss) if cfg.lr_decay else None
 
@@ -266,6 +276,8 @@ def main(cfg: DictConfig):
             wandb.run.summary["Best Test Loss"] = best_val_loss
             torch.save(model.state_dict(), f"{run_dir}/{run_name}_model_weights.pt")
             log.info(f"Weights Saved at epoch: {epoch}")
+
+            capture_and_log(val_loader, model, epoch, wandb.run, cfg)
         else:
             epochs_no_improve += 1
 

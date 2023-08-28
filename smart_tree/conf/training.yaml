@@ -8,11 +8,11 @@ wandb:
 fp16: False
 num_epoch: 500
 lr_decay: True
-lr: 0.01
+lr: 0.1
 early_stop_epoch: 20
 early_stop: True
 
-batch_size: 16
+batch_size: 8
 directory: /local/smart-tree/data/branches
 json_path: smart_tree/conf/training-split.json
 voxel_size: 0.01
@@ -29,7 +29,7 @@ input_features:
 
 target_features:
   - radius
-  - direction
+  - medial_direction
   - class_l
 
 train_dataset:
@@ -82,7 +82,7 @@ train_data_loader:
   drop_last: True
   pin_memory: False
   num_workers: 0
-  shuffle: False
+  shuffle: True
   # sampler:
   #   _target_: torch.utils.data.RandomSampler
   #   replacement: True
@@ -99,7 +99,7 @@ validation_data_loader:
   drop_last: True
   pin_memory: False
   num_workers: 0
-  shuffle: False
+  shuffle: True
   collate_fn:
     _target_: smart_tree.model.sparse.batch_collate
     _partial_: True
@@ -111,7 +111,7 @@ test_data_loader:
   drop_last: True
   pin_memory: False
   num_workers: 0
-  shuffle: False
+  shuffle: True
   collate_fn:
     _target_: smart_tree.model.sparse.batch_collate
     _partial_: True
@@ -125,6 +125,7 @@ model:
   radius_fc_planes: [8, 8, 4, 1]
   direction_fc_planes: [8, 8, 4, 3]
   class_fc_planes: [8, 8, 4, 2] 
+  bias: False
 
 optimizer:
   _target_: torch.optim.Adam 

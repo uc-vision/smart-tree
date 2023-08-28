@@ -55,7 +55,7 @@ def model_output_to_labelled_clds(
 
 def split_outputs(features, mask):
     radii = torch.exp(features["radius"][mask])
-    direction = features["direction"][mask]
+    direction = features["medial_direction"][mask]
     class_l = torch.argmax(features["class_l"], dim=1)[mask]
 
     return radii, direction, class_l

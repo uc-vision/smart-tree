@@ -257,7 +257,7 @@ class Cloud:
         return self.medial_vector.pow(2).sum(1).sqrt()
 
     @property
-    def direction(self) -> torch.Tensor:
+    def medial_direction(self) -> torch.Tensor:
         return F.normalize(self.medial_vector)
 
     @staticmethod

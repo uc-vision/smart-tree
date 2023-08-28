@@ -61,7 +61,7 @@ class ModelInference:
 
     def forward(self, cloud: Cloud, return_masked=True):
         inputs, masks = [], []
-        radius, direction, class_l = [], [], []
+        radius, medial_direction, class_l = [], [], []
 
         dataloader = load_dataloader(
             cloud,
@@ -84,10 +84,8 @@ class ModelInference:
             preds = self.model.forward(sparse_input)
 
             radius.append(preds["radius"].detach().cpu())
-            if "branch_direction" in preds:
-                direction.append(preds["branch_direction"].detach().cpu())
-            else:
-                direction.append(preds["direction"].detach().cpu())
+
+            medial_direction.append(preds["medial_direction"].detach().cpu())
 
             class_l.append(preds["class_l"].detach().cpu())
 
@@ -95,13 +93,13 @@ class ModelInference:
             masks.append(mask.detach().cpu())
 
         radius = torch.cat(radius)
-        direction = torch.cat(direction)
+        medial_direction = torch.cat(medial_direction)
         class_l = torch.cat(class_l)
 
         inputs = torch.cat(inputs)
         masks = torch.cat(masks)
 
-        medial_vector = torch.exp(radius) * direction
+        medial_vector = torch.exp(radius) * medial_direction
         class_l = torch.argmax(class_l, dim=1, keepdim=True)
 
         lc = Cloud(

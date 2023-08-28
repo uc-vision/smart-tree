@@ -85,7 +85,7 @@ class Smart_Tree(nn.Module):
         unet_out = self.UNet(x)
 
         predictions["radius"] = self.radius_head(unet_out).features
-        predictions["direction"] = F.normalize(self.direction_head(unet_out).features)
+        predictions["medial_direction"] = F.normalize(self.direction_head(unet_out).features)
         predictions["class_l"] = self.class_head(unet_out).features
 
         return predictions

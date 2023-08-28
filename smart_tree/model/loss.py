@@ -30,22 +30,14 @@ def compute_loss(
             target_medial_direction = targets[:, 1:4][mask]
             target_branch_direction = targets[:, 4:7][mask]
 
-            losses["medial_direction"] = direction_loss_fn(
-                predicted_medial_direction,
-                target_medial_direction,
-            )
             losses["branch_direction"] = direction_loss_fn(
                 predicted_branch_direction,
                 target_branch_direction,
             )
 
-        case {"radius": radius, "direction": direction, "class_l": class_l}:
-            predicted_direction = preds["direction"][mask]
-            target_direction = targets[:, 1:-1][mask]
-            losses["medial_direction"] = direction_loss_fn(
-                predicted_direction,
-                target_direction,
-            )
+        case {"radius": radius, "medial_direction": direction, "class_l": class_l}:
+            predicted_medial_direction = preds["medial_direction"][mask]
+            target_medial_direction = targets[:, 1:-1][mask]
 
     predicted_radius = preds["radius"][mask]  #
     target_radius = targets[:, [0]][mask]
@@ -56,6 +48,9 @@ def compute_loss(
     if target_radius_log:
         target_radius = torch.log(target_radius)
 
+    losses["medial_direction"] = direction_loss_fn(
+        predicted_medial_direction, target_medial_direction
+    )
     losses["radius"] = radius_loss_fn(predicted_radius.view(-1), target_radius.view(-1))
     losses["class_l"] = class_loss_fn(predicted_class, target_class)
 
