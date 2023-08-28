@@ -8,14 +8,14 @@ from pathlib import Path
 
 from smart_tree.data_types.tree import TreeSkeleton
 from smart_tree.data_types.cloud import Cloud
-from smart_tree.util.file import load_data_npz
+from smart_tree.util.file import load_data_npz, load_cloud
 from smart_tree.o3d_abstractions.visualizer import ViewerItem, o3d_viewer
 
 
 def view_synthetic_data(data: List[Tuple[Cloud, TreeSkeleton]], line_width=1):
     geometries = []
     for i, item in enumerate(data):
-        (cloud, skeleton), path = item
+        cloud, path = item
 
         tree_name = path.stem
         visible = i == 0
@@ -34,6 +34,11 @@ def view_synthetic_data(data: List[Tuple[Cloud, TreeSkeleton]], line_width=1):
             ViewerItem(
                 f"{tree_name}_medial_vectors",
                 cloud.to_o3d_medial_vectors(),
+                is_visible=visible,
+            ),
+            ViewerItem(
+                f"{tree_name}_branch_vectors",
+                cloud.to_o3d_branch_directions(),
                 is_visible=visible,
             ),
             # ViewerItem(
@@ -90,7 +95,7 @@ def paths_from_args(args, glob="*.npz"):
 def main():
     args = parse_args()
 
-    data = [(load_data_npz(filename), filename) for filename in paths_from_args(args)]
+    data = [(load_cloud(filename), filename) for filename in paths_from_args(args)]
     view_synthetic_data(data, args.line_width)
 
 

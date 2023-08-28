@@ -7,10 +7,11 @@ import torch
 from hydra.utils import instantiate
 from tqdm import tqdm
 
-from smart_tree.data_types.cloud import LabelledCloud
+from smart_tree.data_types.cloud import Cloud
 from smart_tree.model.helper import get_batch, model_output_to_labelled_clds
+from smart_tree.o3d_abstractions.geometries import o3d_cloud
 
-from open3d_vis import render
+# from open3d_vis import render
 import open3d as o3d
 
 import numpy as np
@@ -18,15 +19,14 @@ import numpy as np
 
 @hydra.main(
     version_base=None,
-    config_path="../conf",
-    config_name="vine-dataset",
+    config_path="../conf/",
+    config_name="training",
 )
 def main(cfg: DictConfig):
     torch.manual_seed(42)
     torch.cuda.manual_seed_all(42)
     log = logging.getLogger(__name__)
 
-    cfg = cfg.training
     torch.multiprocessing.set_start_method("spawn")
 
     train_loader = instantiate(cfg.train_data_loader)
@@ -49,8 +49,8 @@ def main(cfg: DictConfig):
             xyz = coords[mask]
             class_colors = cmap[labels]
 
-            boxes = render.boxes(xyz, xyz + 1, class_colors)
-            o3d.visualization.draw([boxes])
+            # boxes = render.boxes(xyz, xyz + 1, class_colors)
+            o3d.visualization.draw([o3d_cloud(xyz)])
 
 
 if __name__ == "__main__":

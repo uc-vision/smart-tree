@@ -34,7 +34,7 @@ def random_sample(read_dir, json_save_path):
         json.dump(data, outfile, indent=4, sort_keys=False)
 
 
-def strattified_sample(read_dir, json_save_path):
+def strattified_sample(read_dir, json_save_path, split=[0.65, 0.25, 0.1]):
     dirs = os.listdir(read_dir)
 
     train_paths = []
@@ -50,9 +50,15 @@ def strattified_sample(read_dir, json_save_path):
 
         train_paths.append(items[: int(0.8 * len(items))])
         test_paths.append(
-            items[int(0.8 * len(items)) : int(0.8 * len(items) + int(0.1 * len(items)))]
+            items[
+                int(split[0] * len(items)) : int(
+                    split[0] * len(items) + int(split[1] * len(items))
+                )
+            ]
         )
-        val_paths.append(items[int(0.8 * len(items)) + int(0.1 * len(items)) :])
+        val_paths.append(
+            items[int(split[0] * len(items)) + int(split[1] * len(items)) :]
+        )
 
     data = {}
 

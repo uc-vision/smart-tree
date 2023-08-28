@@ -24,7 +24,7 @@ from ..o3d_abstractions.geometries import o3d_cloud
 class TreeDataset:
     def __init__(
         self,
-        voxel_size: int,
+        voxel_size: float,
         json_path: Path,
         directory: Path,
         mode: str,
@@ -43,9 +43,7 @@ class TreeDataset:
         self.input_features = input_features
         self.target_features = target_features
 
-        assert Path(
-            json_path
-        ).is_file(), f"json metadata does not exist at '{json_path}'"
+        assert Path(json_path).is_file(), f"No json metadata at '{json_path}'"
         json_data = json.load(open(json_path))
 
         if self.mode == "train":
@@ -87,6 +85,17 @@ class TreeDataset:
 
     def process_cloud(self, cld: Cloud, filename: str):
         cld = cld.to_device(self.device)
+
+        block_center_idx = torch.randint(
+            cld.xyz.shape[0], size=(1,), device=cld.xyz.device
+        )
+        block_center = cld.xyz[block_center_idx].reshape(-1)
+        block_filter = cube_filter(
+            cld.xyz,
+            block_center,
+            4 + (0.4 * 2),
+        )
+        cld = cld.filter(block_filter)
 
         if self.augmentation != None:
             cld = self.augmentation(cld)
@@ -136,7 +145,8 @@ class TreeDataset:
 
         feats = feats.squeeze(1)
         coords = coords.squeeze(1)
-        loss_mask = torch.ones(feats.shape[0], dtype=torch.bool, device=feats.device)
+        # loss_mask = torch.ones(feats.shape[0], dtype=torch.bool, device=feats.device)
+        loss_mask = cube_filter(feats[:, :3], block_center, 4)
 
         input_feats = feats[:, : input_features.shape[1]]
         target_feats = feats[:, input_features.shape[1] :]

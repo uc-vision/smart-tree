@@ -16,37 +16,47 @@ def compute_loss(
     target_radius_log=True,
     vector_class=None,
 ):
-    predicted_radius = preds["radius"]  #
-    predicted_direction = preds["direction"]
-    predicted_class = preds["class_l"]
-    target_class = targets[:, [-1]].long()
-    target_direction = targets[:, 1:-1]
-    target_radius = targets[:, [0]]
+    losses = {}
 
-    if mask is not None:
-        predicted_radius = predicted_radius[mask]
-        predicted_direction = predicted_direction[mask]
-        predicted_class = predicted_class[mask]
-        target_radius = target_radius[mask]
-        target_direction = target_direction[mask]
-        target_class = target_class[mask]
+    match preds:
+        case {
+            "radius": radius,
+            "medial_direction": medial_direction,
+            "branch_direction": branch_direction,
+            "class_l": class_l,
+        }:
+            predicted_medial_direction = preds["medial_direction"][mask]
+            predicted_branch_direction = preds["branch_direction"][mask]
+            target_medial_direction = targets[:, 1:4][mask]
+            target_branch_direction = targets[:, 4:7][mask]
 
-    # Only compute vector loss on branch points...
-    if vector_class is not None:
-        vector_mask = target_class == vector_class
-        vector_mask = vector_mask.view(-1)
-        predicted_radius = predicted_radius[vector_mask]
-        predicted_direction = predicted_direction[vector_mask]
-        target_radius = target_radius[vector_mask]
-        target_direction = target_direction[vector_mask]
+            losses["medial_direction"] = direction_loss_fn(
+                predicted_medial_direction,
+                target_medial_direction,
+            )
+            losses["branch_direction"] = direction_loss_fn(
+                predicted_branch_direction,
+                target_branch_direction,
+            )
+
+        case {"radius": radius, "direction": direction, "class_l": class_l}:
+            predicted_direction = preds["direction"][mask]
+            target_direction = targets[:, 1:-1][mask]
+            losses["medial_direction"] = direction_loss_fn(
+                predicted_direction,
+                target_direction,
+            )
+
+    predicted_radius = preds["radius"][mask]  #
+    target_radius = targets[:, [0]][mask]
+
+    predicted_class = preds["class_l"][mask]
+    target_class = targets[:, [-1]].long()[mask]
 
     if target_radius_log:
         target_radius = torch.log(target_radius)
 
-    losses = {}
-
     losses["radius"] = radius_loss_fn(predicted_radius.view(-1), target_radius.view(-1))
-    losses["direction"] = direction_loss_fn(predicted_direction, target_direction)
     losses["class_l"] = class_loss_fn(predicted_class, target_class)
 
     return losses

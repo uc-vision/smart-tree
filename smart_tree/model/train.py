@@ -19,7 +19,9 @@ from tqdm import tqdm
 import wandb
 from smart_tree.data_types.cloud import Cloud
 from smart_tree.dataset.dataset import TreeDataset
-from smart_tree.model.model import Smart_Tree
+from smart_tree.model.model import Smart_Tree, Smarter_Tree
+from smart_tree.model.loss import compute_loss
+
 from smart_tree.model.sparse import batch_collate, sparse_from_batch
 from smart_tree.o3d_abstractions.camera import Renderer, o3d_headless_render
 from smart_tree.o3d_abstractions.geometries import o3d_cloud
@@ -167,7 +169,8 @@ def capture_and_log(loader, model, epoch, wandb_run, cfg):
     for cloud in tqdm(clouds, desc="Uploading Clouds", leave=False):
         seg_cloud = cloud.to_o3d_seg_cld(np.asarray(cfg.cmap))
         xyz_rgb = np.concatenate(
-            (np.asarray(seg_cloud.points), np.asarray(seg_cloud.colors) * 255), -1
+            (np.asarray(seg_cloud.points), np.asarray(seg_cloud.colors) * 255),
+            -1,
         )
         wandb_run.log(
             {f"{Path(cloud.filename).stem}": wandb.Object3D(xyz_rgb)},
@@ -250,9 +253,9 @@ def main(cfg: DictConfig):
                 fp16=cfg.fp16,
             )
 
-            if (epoch + 1) % cfg.capture_output == 0:
-                capture_and_log(test_loader, model, epoch, wandb.run, cfg)
-                capture_and_log(val_loader, model, epoch, wandb.run, cfg)
+            # if (epoch + 1) % cfg.capture_output == 0:
+            #     capture_and_log(test_loader, model, epoch, wandb.run, cfg)
+            #     capture_and_log(val_loader, model, epoch, wandb.run, cfg)
 
         scheduler.step(val_tracker.total_loss) if cfg.lr_decay else None
 

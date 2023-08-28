@@ -80,8 +80,8 @@ class RandomCubicCrop(Augmentation):
 
     def __call__(self, cloud):
         random_pt = cloud.xyz[torch.randint(0, cloud.xyz.shape[0], (1,))]
-        min_corner = random_pt - self.size / 2
-        max_corner = random_pt + self.size / 2
+        min_corner = random_pt - (self.size / 2)
+        max_corner = random_pt + (self.size / 2)
 
         mask = torch.logical_and(
             cloud.xyz >= min_corner,
@@ -102,7 +102,9 @@ class RandomDropout(Augmentation):
         )
 
         indices = torch.randint(
-            high=cloud.xyz.shape[0], size=(num_indices, 1), device=cloud.xyz.device
+            high=cloud.xyz.shape[0],
+            size=(num_indices, 1),
+            device=cloud.xyz.device,
         ).squeeze(1)
         return cloud.filter(indices)
 

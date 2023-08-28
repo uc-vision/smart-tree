@@ -84,7 +84,11 @@ class ModelInference:
             preds = self.model.forward(sparse_input)
 
             radius.append(preds["radius"].detach().cpu())
-            direction.append(preds["direction"].detach().cpu())
+            if "branch_direction" in preds:
+                direction.append(preds["branch_direction"].detach().cpu())
+            else:
+                direction.append(preds["direction"].detach().cpu())
+
             class_l.append(preds["class_l"].detach().cpu())
 
             inputs.append(features.detach().cpu())

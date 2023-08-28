@@ -248,7 +248,7 @@ class Cloud:
 
             """ SUPPORT LEGACY NPZ -> Remove in Future..."""
             if key in ["vector"]:
-                torch_kwargs["medial_vector"] = torch.tensor(value)
+                torch_kwargs["medial_vector"] = torch.tensor(value).float()
 
         return Cloud(**torch_kwargs)
 
