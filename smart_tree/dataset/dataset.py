@@ -28,20 +28,14 @@ class TreeDataset:
         json_path: Path,
         directory: Path,
         mode: str,
-        blocking: bool,
-        block_size: float,
-        buffer_size: float,
         input_features: List[str],
         target_features: List[str],
         augmentation=None,
-        cache: bool = True,
+        cache: bool = False,
         device=torch.device("cuda:0"),
     ):
         self.voxel_size = voxel_size
         self.mode = mode
-        self.blocking = blocking
-        self.block_size = block_size
-        self.buffer_size = buffer_size
         self.augmentation = augmentation
         self.directory = directory
         self.device = device

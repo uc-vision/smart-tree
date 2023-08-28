@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import List, Optional
 
 import numpy as np
@@ -12,8 +13,8 @@ from typeguard import typechecked
 
 from ..o3d_abstractions.geometries import o3d_cloud, o3d_lines_between_clouds
 from ..o3d_abstractions.visualizer import o3d_viewer
-from ..util.queries import skeleton_to_points
 from ..util.misc import to_torch, voxel_downsample
+from ..util.queries import skeleton_to_points
 
 
 @typechecked
@@ -25,6 +26,7 @@ class Cloud:
     branch_direction: Optional[TensorType["N", 3]] = None
     branch_ids: Optional[TensorType["N", 1]] = None
     class_l: Optional[TensorType["N", 1]] = None
+    filename: Optional[Path] = None
 
     def __len__(self):
         return self.xyz.shape[0]
@@ -66,6 +68,8 @@ class Cloud:
         branch_dir_cloud = o3d_cloud(cpu_cld.xyz + (cpu_cld.branch_direction * scale))
         return o3d_lines_between_clouds(cpu_cld.to_o3d_cld(), branch_dir_cloud)
 
+    # def to_wandb_seg_cld(self, cmap: np.ndarray = np.array([[1, 0, 0], [0, 1, 0]])):
+
     def filter(cloud: Cloud, mask) -> Cloud:
         mask = mask.to(cloud.xyz.device)
         xyz = cloud.xyz[mask]
@@ -79,6 +83,7 @@ class Cloud:
         )
         class_l = cloud.class_l[mask] if cloud.class_l is not None else None
         branch_ids = cloud.branch_ids[mask] if cloud.branch_ids is not None else None
+        filename = cloud.filename if cloud.filename is not None else None
 
         return Cloud(
             xyz=xyz,
@@ -87,6 +92,7 @@ class Cloud:
             branch_direction=branch_direction,
             class_l=class_l,
             branch_ids=branch_ids,
+            filename=filename,
         )
 
     def filter_by_class(self, classes):
@@ -143,6 +149,7 @@ class Cloud:
         )
         class_l = self.class_l.to(device) if self.class_l is not None else None
         branch_ids = self.branch_ids.to(device) if self.branch_ids is not None else None
+        filename = self.filename if self.filename is not None else None
 
         return Cloud(
             xyz=xyz,
@@ -151,6 +158,7 @@ class Cloud:
             branch_direction=branch_direction,
             class_l=class_l,
             branch_ids=branch_ids,
+            filename=filename,
         )
 
     def cat(self):
