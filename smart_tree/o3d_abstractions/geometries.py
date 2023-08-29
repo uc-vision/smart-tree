@@ -243,7 +243,7 @@ def sample_o3d_lineset(lineset, sample_rate):
     return np.concatenate(pts, axis=0)
 
 
-def o3d_elipsoid(semi_axes=(1.0, 1.0, 1.0), num_segments=32):
+def o3d_elipsoid(semi_axes=(1.0, 1.0, 1.0), position=(0.0, 0.0, 0.0), num_segments=32):
     """
     Create vertices and triangles for an ellipsoid mesh.
 
@@ -280,4 +280,47 @@ def o3d_elipsoid(semi_axes=(1.0, 1.0, 1.0), num_segments=32):
     # Create two triangles from each quad
     triangles = np.column_stack((a, b, c, b, d, c)).reshape(-1, 3)
 
-    return o3d_mesh(vertices, triangles)
+    return o3d_mesh(vertices + position, triangles)
+
+
+def o3d_semi_ellipsoid(semi_axes=(1.0, 1.0, 1.0), num_segments=32, num_slices=16):
+    """
+    Create vertices and triangles for a semi-ellipsoid mesh without using loops.
+
+    Parameters:
+        semi_axes (tuple): Lengths of the semi-axes (a, b, c) of the semi-ellipsoid.
+        num_segments (int): Number of segments around the circumference.
+        num_slices (int): Number of slices along the height.
+
+    Returns:
+        vertices (numpy.ndarray): Array of vertex coordinates.
+        triangles (numpy.ndarray): Array of triangle vertex indices.
+    """
+    a, b, c = semi_axes
+
+    u = np.linspace(0, np.pi, num_segments)
+    v = np.linspace(0, np.pi / 2, num_slices)
+
+    u, v = np.meshgrid(u, v)
+
+    x = a * np.cos(u) * np.sin(v)
+    y = b * np.sin(u) * np.sin(v)
+    z = c * np.cos(v)
+
+    # Convert the mesh grid into vertices
+    vertices = np.column_stack((x.flatten(), y.flatten(), z.flatten()))
+
+    # Create triangles from the vertices
+    num_vertices = num_segments * num_slices
+
+    i, j = np.meshgrid(np.arange(num_slices - 1), np.arange(num_segments - 1))
+    i, j = i.flatten(), j.flatten()
+
+    a = i * num_segments + j
+    b = a + 1
+    c = (i + 1) * num_segments + j
+    d = c + 1
+
+    triangles = np.column_stack((a, b, c, b, d, c)).reshape(-1, 3)
+
+    return o3d_mesh(vertices, triangles.astype(np.uint32))

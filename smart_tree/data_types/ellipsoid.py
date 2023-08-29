@@ -21,8 +21,8 @@ patch_typeguard()
 
 @typechecked
 @dataclass
-class Cloud:
-    xyz: TensorType["N", 3]
+class Ellipsoid:
+    axis_lengths: TensorType["N", 3]
     rgb: Optional[TensorType["N", 3]] = None
     medial_vector: Optional[TensorType["N", 3]] = None
     branch_direction: Optional[TensorType["N", 3]] = None

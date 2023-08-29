@@ -32,17 +32,23 @@ class Skeletonizer:
         K: int,
         min_connection_length: float,
         minimum_graph_vertices: int,
+        outlier_remove_nb_points: int = 8,
         device: torch.device = torch.device("cuda:0"),
     ):
         self.K = K
         self.min_connection_length = min_connection_length
         self.minimum_graph_vertices = minimum_graph_vertices
+        self.outlier_remove_nb_points = outlier_remove_nb_points
         self.device = device
 
     def forward(self, cloud: Cloud) -> DisjointTreeSkeleton:
         cloud.to_device(self.device)
 
-        mask = outlier_removal(cloud.medial_pts, cloud.radius.unsqueeze(1), nb_points=8)
+        mask = outlier_removal(
+            cloud.medial_pts,
+            cloud.radius.unsqueeze(1),
+            nb_points=self.outlier_remove_nb_points,
+        )
         cloud = cloud.filter(mask)
 
         graph: Graph = nn_graph(

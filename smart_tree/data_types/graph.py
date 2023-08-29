@@ -22,6 +22,7 @@ class Graph:
 
     def to_o3d_lineset(self, colour=(1, 0, 0)) -> o3d.geometry.LineSet:
         graph_cpu = self.to_device(torch.device("cpu"))
+        print(graph_cpu.vertices.shape, graph_cpu.edges.shape)
         return o3d_line_set(graph_cpu.vertices, graph_cpu.edges, colour=colour)
 
     def to_device(self, device: torch.device):

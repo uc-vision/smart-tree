@@ -61,7 +61,7 @@ class ModelInference:
 
     def forward(self, cloud: Cloud, return_masked=True):
         inputs, masks = [], []
-        radius, medial_direction, class_l = [], [], []
+        radius, medial_direction, branch_direction, class_l = [], [], [], []
 
         dataloader = load_dataloader(
             cloud,

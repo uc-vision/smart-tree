@@ -277,7 +277,7 @@ def main(cfg: DictConfig):
             torch.save(model.state_dict(), f"{run_dir}/{run_name}_model_weights.pt")
             log.info(f"Weights Saved at epoch: {epoch}")
 
-            capture_and_log(val_loader, model, epoch, wandb.run, cfg)
+            # capture_and_log(val_loader, model, epoch, wandb.run, cfg)
         else:
             epochs_no_improve += 1
 
