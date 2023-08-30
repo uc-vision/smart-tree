@@ -32,7 +32,7 @@ Then activate the environment using: <br>`conda activate smart-tree`
 
 ## 📈 Training:
 
-To train the model open smart_tree/conf/tree-dataset.yaml.
+To train the model open smart_tree/conf/training.yaml.
 
 You will need to update (alternatively these can be overwritten with hydra): 
 
@@ -51,7 +51,7 @@ The best model weights and model will be stored in the generated outputs directo
 
 We supply two different models with weights:
 * `noble-elevator-58` contains branch/foliage segmentation. <br>
-* `peach-forest-65` is only trained on points from branching structure. <br>
+* `peach-forest-65` is only trained on points from the branching structure. <br>
 
 If you wish to run smart-tree using your own weights you will need to update the model paths in the `tree-dataset.yaml`. <br>
 
