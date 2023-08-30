@@ -22,6 +22,9 @@ def o3d_mesh(verts, tris):
 
 
 def o3d_merge_meshes(meshes, colourize=False):
+    if len(meshes) < 1:
+        raise ValueError("Meshes List is Empty")
+
     if colourize:
         for m in meshes:
             m.paint_uniform_color(np.random.rand(3))

@@ -27,7 +27,7 @@ class Cloud:
     medial_vector: Optional[TensorType["N", 3]] = None
     branch_direction: Optional[TensorType["N", 3]] = None
     branch_ids: Optional[TensorType["N"]] = None
-    class_l: Optional[TensorType["N"]] = None
+    class_l: Optional[torch.tensor] = None
     filename: Optional[Path] = None
 
     def __len__(self):
@@ -72,7 +72,7 @@ class Cloud:
 
     # def to_wandb_seg_cld(self, cmap: np.ndarray = np.array([[1, 0, 0], [0, 1, 0]])):
 
-    def filter(cloud: Cloud, mask) -> Cloud:
+    def filter(cloud: Cloud, mask: TensorType["N"]) -> Cloud:
         mask = mask.to(cloud.xyz.device)
         xyz = cloud.xyz[mask]
         rgb = cloud.rgb[mask] if cloud.rgb is not None else None
@@ -255,8 +255,8 @@ class Cloud:
         return Cloud(**torch_kwargs)
 
     @property
-    def radius(self) -> torch.Tensor:
-        return self.medial_vector.pow(2).sum(1).sqrt()
+    def radius(self) -> TensorType["N", 1]:
+        return self.medial_vector.pow(2).sum(1).sqrt().unsqueeze(1)
 
     @property
     def medial_direction(self) -> torch.Tensor:

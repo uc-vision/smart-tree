@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 import pickle
 from copy import deepcopy
 from dataclasses import dataclass
@@ -98,7 +101,7 @@ class TreeSkeleton:
             branch.xyz = torch.cat((connection_pt, branch.xyz))
             branch.radii = torch.cat((branch.radii[[0]], branch.radii))
 
-    def prune(self, min_radius: float, min_length: float, root_id=None):
+    def prune(self, min_radius: float, min_length: float, root_id=None) -> TreeSkeleton:
         """
         If a branch doesn't meet the initial radius threshold or length threshold we want to remove it and all
         it's predecessors...
@@ -110,11 +113,7 @@ class TreeSkeleton:
         keep = {root_id: self.branches[root_id]}
         remove = {}
 
-        for branch_id, branch in tqdm(
-            self.branches.items(),
-            leave=False,
-            desc="Pruning Branches",
-        ):
+        for branch_id, branch in self.branches.items():
             if branch.parent_id not in keep and branch._id != root_id:
                 remove[branch_id] = branch
             elif branch.length < min_length:
@@ -202,7 +201,7 @@ class DisjointTreeSkeleton:
         o3d_viewer([self.to_o3d_lineset(), self.to_o3d_tube()])
 
     def to_pickle(self, path):
-        with open("disjoint_skeleton.pkl", "wb") as pickle_file:
+        with open(f"{path}", "wb") as pickle_file:
             pickle.dump(self, pickle_file)
 
     @staticmethod
@@ -213,8 +212,8 @@ class DisjointTreeSkeleton:
 
 def connect(
     skeleton_1: TreeSkeleton,
-    skeleton_1_child_branch_key: int,
-    skeleton_1_child_vert_idx: int,
+    skeleton_1_parent_branch_key: int,
+    skeleton_1_parent_vert_idx: int,
     skeleton_2: TreeSkeleton,
     skeleton_2_child_branch_key: int,
     skeleton_2_child_vert_idx: int,

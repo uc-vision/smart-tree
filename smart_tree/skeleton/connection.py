@@ -1,7 +1,7 @@
 from smart_tree.data_types.tree import (
     DisjointTreeSkeleton,
     TreeSkeleton,
-    connect_skeletons,
+    connect,
 )
 from smart_tree.o3d_abstractions.visualizer import o3d_viewer
 
@@ -18,9 +18,12 @@ if __name__ == "__main__":
         reverse=True,
     )
 
-    # skeletons_sorted[0].view()
+    skeletons_sorted[0].view()
+    skeletons_sorted[1].view()
 
-    skel = connect_skeletons(skeletons_sorted[0], 0, 0, skeletons_sorted[1], 0, 0)
+    quit()
+
+    skel = connect(skeletons_sorted[0], 0, 0, skeletons_sorted[1], 0, 0)
 
     skel.view()
 

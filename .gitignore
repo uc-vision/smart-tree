@@ -154,3 +154,6 @@ test_data/
 
 *.ply
 *.obj
+
+sys
+re

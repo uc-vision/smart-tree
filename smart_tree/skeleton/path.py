@@ -4,13 +4,19 @@ import sys
 import numpy as np
 import open3d as o3d
 import torch
+from torchtyping import TensorType, patch_typeguard
 from tqdm import tqdm
+from typeguard import typechecked
+from typing import Tuple
 
 from ..data_types.branch import BranchSkeleton
+from ..data_types.cloud import Cloud
 from ..o3d_abstractions.geometries import o3d_cloud, o3d_path, o3d_sphere, o3d_tube_mesh
 from ..o3d_abstractions.visualizer import o3d_viewer
 from ..util.misc import flatten_list
 from .graph import nn
+
+patch_typeguard()
 
 
 def trace_route(preds, idx, termination_pts):
@@ -23,9 +29,12 @@ def trace_route(preds, idx, termination_pts):
     return preds.new_tensor(path, dtype=torch.long).flip(0), idx
 
 
+@typechecked
 def select_path_points(
-    points: torch.tensor, path_verts: torch.tensor, radii: torch.tensor
-):
+    points: TensorType["N", 3],
+    path_verts: TensorType["M", 3],
+    radii: TensorType["M", 1],
+) -> Tuple:
     """
     Finds points nearest to a path (specified by points with radii).
     points: (N, 3) 3d points of point cloud
@@ -53,15 +62,12 @@ def select_path_points(
     return idx_point[order], idx_path[order]
 
 
+@typechecked
 def sample_tree(
-    medial_pts,
-    medial_radii,
+    cloud: Cloud,
     preds,
     distances,
-    all_points,
     root_idx=0,
-    visualize=False,
-    pbar=None,
 ):
     """
     Medial Points: NN estimated medial points
@@ -80,7 +86,7 @@ def sample_tree(
 
     termination_pts = torch.tensor([], device=torch.device("cuda"))
     branch_ids = torch.full(
-        (medial_pts.shape[0],),
+        (len(cloud),),
         -1,
         device=torch.device("cuda"),
         dtype=int,
@@ -89,15 +95,14 @@ def sample_tree(
     pbar = tqdm(
         total=distances.shape[0],
         leave=False,
-        miniters=1,
-        mininterval=0,
         desc="Allocating Points",
     )
 
     while True:
-        pbar.update((distances > 0).sum().item() - pbar.n)
+        pbar.update(n=((distances < 0).sum().item() - pbar.n))
+        pbar.refresh()
 
-        farthest = distances.argmax().item()
+        farthest = distances.argmax()
 
         if distances[farthest] <= 0:
             break
@@ -111,12 +116,12 @@ def sample_tree(
 
         """ Gets the points around that path (and which path indexs they are close to) """
         idx_points, idx_path = select_path_points(
-            medial_pts,
-            medial_pts[path_vertices_idx],
-            medial_radii[path_vertices_idx],
+            cloud.medial_pts,
+            cloud.medial_pts[path_vertices_idx],
+            cloud.radius[path_vertices_idx],
         )
 
-        """ Mark this points as allocated and as termination points """
+        """ Mark these points as allocated and as termination points """
         distances[idx_points] = -1
         distances[path_vertices_idx] = -1
         termination_pts = torch.unique(
@@ -135,8 +140,8 @@ def sample_tree(
 
         branches[branch_id] = BranchSkeleton(
             branch_id,
-            xyz=medial_pts[path_vertices_idx].cpu(),
-            radii=medial_radii[path_vertices_idx].cpu(),
+            xyz=cloud.medial_pts[path_vertices_idx].cpu(),
+            radii=cloud.radius[path_vertices_idx].cpu(),
             parent_id=int(branch_ids[termination_idx].item()),
         )
 

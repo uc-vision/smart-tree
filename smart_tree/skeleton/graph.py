@@ -10,6 +10,10 @@ from cudf import DataFrame
 from tqdm import tqdm
 
 from ..data_types.graph import Graph
+from torchtyping import TensorType, patch_typeguard
+from typeguard import typechecked
+
+patch_typeguard()
 
 
 def knn(src, dest, K=50, r=1.0, grid=None):
@@ -36,9 +40,10 @@ def nn(src, dest, r=1.0, grid=None):
     return idx, dist, grid
 
 
-def nn_graph(points: torch.Tensor, radii, K=40):
+@typechecked
+def nn_graph(points: TensorType["N", 3], radii: TensorType["N", 1], K=40):
     idxs, dists, _ = knn(points, points, K=K, r=radii.max().item())
-    idxs[dists > radii.unsqueeze(1)] = -1
+    idxs[dists > radii] = -1
     edges, edge_weights = make_edges(dists, idxs)
     return Graph(points, edges, edge_weights)
 
@@ -47,7 +52,7 @@ def medial_nn_graph(points: torch.Tensor, radii, medial_dist, K=40):
     # edges weighted based on distance to medial axis
     idxs, dists, _ = knn(points, points, K=K, r=radii.max().item() / 4.0)
     dists_ = dists + medial_dist[idxs]  # Add medial distance to distance graph...
-    idxs[dists > radii.unsqueeze(1)] = -1
+    idxs[dists > radii] = -1
 
     return make_edges(dists_, idxs)
 
@@ -105,25 +110,3 @@ def remap_edges(edges):
     renumbered_edges = mapping[node_indices].reshape(edges.shape)
 
     return renumbered_edges
-
-
-def connected_components(edges, edge_weights, minimum_vertices=0, max_components=10):
-    g = cuda_graph(edges, edge_weights)
-
-    connected_components = cugraph.connected_components(g)
-
-    num_labels = connected_components["labels"].to_pandas().value_counts()
-    valid_labels = num_labels[num_labels > minimum_vertices].index
-
-    graphs = []
-
-    for label in tqdm(
-        valid_labels[:max_components], desc="Getting Connected Componenets", leave=False
-    ):
-        graphs.append(
-            cugraph.subgraph(
-                g, connected_components.query(f"labels == {label}")["vertex"]
-            )
-        )
-
-    return graphs

@@ -21,7 +21,7 @@ from ..o3d_abstractions.geometries import (
 )
 from ..o3d_abstractions.visualizer import o3d_viewer
 from .filter import outlier_removal
-from .graph import connected_components, decompose_cuda_graph, nn_graph
+from .graph import decompose_cuda_graph, nn_graph
 from .path import sample_tree
 from .shortest_path import edge_graph, graph_shortest_paths, pred_graph, shortest_paths
 
@@ -46,7 +46,7 @@ class Skeletonizer:
 
         mask = outlier_removal(
             cloud.medial_pts,
-            cloud.radius.unsqueeze(1),
+            cloud.radius,
             nb_points=self.outlier_remove_nb_points,
         )
         cloud = cloud.filter(mask)
@@ -62,12 +62,11 @@ class Skeletonizer:
         )
 
         skeletons = []
-        for subgraph_id, subgraph in enumerate(
-            tqdm(subgraphs, desc="Processing Connected Components", leave=False)
-        ):
-            skeletons.append(
-                self.process_subgraph(cloud, subgraph, skeleton_id=subgraph_id)
-            )
+
+        pbar = tqdm(subgraphs, desc="Skeletonizing", leave=False)
+        for subgraph_id, subgraph in enumerate(pbar):
+            skeleton = self.process_subgraph(cloud, subgraph, subgraph_id)
+            skeletons.append(skeleton)
 
         return DisjointTreeSkeleton(skeletons)
 
@@ -102,11 +101,9 @@ class Skeletonizer:
         )
 
         branches = sample_tree(
-            subgraph_cloud.medial_pts,
-            subgraph_cloud.radius.unsqueeze(1),
+            subgraph_cloud,
             preds,
             distances,
-            subgraph_cloud.xyz,
         )
 
         return TreeSkeleton(skeleton_id, branches)

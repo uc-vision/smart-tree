@@ -22,6 +22,8 @@ class BranchSkeleton:
     parent_id: int
     xyz: TensorType["N", 3]
     radii: TensorType["N", 1]
+    branch_direction: Optional[TensorType["N", 3]] = None
+
     child_id: Optional[int] = None
 
     def __post_init__(self) -> None:
@@ -39,7 +41,9 @@ class BranchSkeleton:
         return o3d_path(self.xyz, colour)
 
     def to_o3d_tube(self) -> o3d.geometry.TriangleMesh:
-        return o3d_tube_mesh(self.xyz.numpy(), self.radii.numpy(), self.colour)
+        return o3d_tube_mesh(
+            self.xyz.numpy(), self.radii.reshape(-1).numpy(), self.colour
+        )
 
     def to_tubes(self, colour=(1, 0, 0)) -> List[Tube]:
         a_, b_, r1_, r2_ = (
@@ -60,17 +64,17 @@ class BranchSkeleton:
         )
 
     @property
-    def length(self) -> TensorType[1]:
+    def length(self) -> torch.tensor:
         return (self.xyz[1:] - self.xyz[:-1]).norm(dim=1).sum()
 
     @property
-    def initial_radius(self) -> TensorType[1]:
+    def initial_radius(self) -> torch.tensor:
         return torch.max(self.radii[0], self.radii[-1])
 
     @property
-    def biggest_radius_idx(self) -> TensorType[1]:
+    def biggest_radius_idx(self) -> torch.tensor:
         return torch.argmax(self.radii)
 
     @property
-    def biggest_radius(self) -> TensorType[1]:
+    def biggest_radius(self) -> torch.tensor:
         return torch.max(self.radii)
