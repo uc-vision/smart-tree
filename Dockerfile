@@ -26,4 +26,4 @@ RUN bash create-env.sh
 
 CMD run-smart-tree +path=test_data/output.ply pipeline.view_model_output=False pipeline.view_skeletons=False
 
-ENV NAME test
+ENV NAME smart_tree

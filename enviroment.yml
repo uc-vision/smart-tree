@@ -12,7 +12,6 @@ dependencies:
   - pip  
   - conda-forge:cudatoolkit-dev=11.7 # NVCC for compiling FRNN
   - conda-forge:cub
-  - conda-forge:gcc_linux-64=11.3
 #  - conda-forge:cudatoolkit=11.7
   - pytorch::pytorch-cuda=11.7
   - pytorch::pytorch
