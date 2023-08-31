@@ -6,12 +6,16 @@ import cupy
 import open3d as o3d
 import torch
 from cudf import DataFrame
-from torchtyping import TensorType
+from torchtyping import TensorType, patch_typeguard
 from tqdm import tqdm
+from typeguard import typechecked
 
 from ..o3d_abstractions.geometries import o3d_line_set
 
+patch_typeguard()
 
+
+@typechecked
 @dataclass
 class Graph:
     vertices: TensorType["N", 3]
@@ -19,8 +23,7 @@ class Graph:
     edge_weights: TensorType["N", 1]
 
     def to_o3d_lineset(self, colour=(1, 0, 0)) -> o3d.geometry.LineSet:
-        graph_cpu = self.to_device(torch.device("cpu"))
-        return o3d_line_set(graph_cpu.vertices, graph_cpu.edges, colour=colour)
+        return o3d_line_set(self.vertices, self.edges, colour=colour)
 
     def to_device(self, device: torch.device):
         return Graph(
@@ -29,7 +32,10 @@ class Graph:
             self.edge_weights.to(device),
         )
 
-    def connected_cugraph_components(self, minimum_vertices=10) -> List[cugraph.Graph]:
+    def connected_cugraph_components(
+        self,
+        minimum_vertices: int = 10,
+    ) -> List[cugraph.Graph]:
         g = cuda_graph(self.edges, self.edge_weights)
         df = cugraph.connected_components(g)
 
