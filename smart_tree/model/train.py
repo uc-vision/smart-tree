@@ -3,12 +3,15 @@ import logging
 import math
 import os
 from functools import partial
+from pathlib import Path
 from typing import List
 
 import hydra
 import numpy as np
 import open3d as o3d
+import taichi as ti
 import torch
+import wandb
 from hydra.core.hydra_config import HydraConfig
 from hydra.utils import call, get_original_cwd, instantiate, to_absolute_path
 from omegaconf import DictConfig, OmegaConf
@@ -16,12 +19,10 @@ from py_structs.torch import map_tensors
 from sklearn.metrics import f1_score, mean_absolute_percentage_error
 from tqdm import tqdm
 
-import wandb
 from smart_tree.data_types.cloud import Cloud
 from smart_tree.dataset.dataset import TreeDataset
-from smart_tree.model.model import Smart_Tree, Smarter_Tree
 from smart_tree.model.loss import compute_loss
-
+from smart_tree.model.model import Smart_Tree
 from smart_tree.model.sparse import batch_collate, sparse_from_batch
 from smart_tree.o3d_abstractions.camera import Renderer, o3d_headless_render
 from smart_tree.o3d_abstractions.geometries import o3d_cloud
@@ -31,8 +32,6 @@ from smart_tree.util.misc import concate_dict_of_tensors, flatten_list
 
 from .helper import get_batch, model_output_to_labelled_clds
 from .tracker import Tracker
-
-from pathlib import Path
 
 
 def train_epoch(
@@ -48,9 +47,9 @@ def train_epoch(
 
     for sp_input, targets, mask, fn in tqdm(
         get_batch(data_loader, device, fp16),
-        desc="Batch",
+        desc="Training",
         leave=False,
-        total=math.ceil(len(data_loader) / data_loader.batch_size),
+        total=len(data_loader),
     ):
         preds = model.forward(sp_input)
 
@@ -87,11 +86,12 @@ def eval_epoch(
         get_batch(data_loader, device, fp16),
         desc="Evaluating",
         leave=False,
-        total=math.ceil(len(data_loader) / data_loader.batch_size),
+        total=len(data_loader),
     ):
         preds = model.forward(sp_input)
         loss = loss_fn(preds, targets, mask)
         tracker.update(loss)
+
     model.train()
 
     return tracker
@@ -112,7 +112,7 @@ def capture_epoch(
         get_batch(data_loader, device, fp16),
         desc="Capturing Outputs",
         leave=False,
-        total=math.ceil(len(data_loader) / data_loader.batch_size),
+        total=len(data_loader),
     ):
         model_output = model.forward(sp_input)
 
@@ -142,7 +142,7 @@ def capture_clouds(
         get_batch(data_loader, device, fp16),
         desc="Capturing Outputs",
         leave=False,
-        total=math.ceil(len(data_loader) / data_loader.batch_size),
+        total=len(data_loader),
     ):
         model_output = model.forward(sp_input)
         clouds.extend(
@@ -181,8 +181,8 @@ def capture_and_log(loader, model, epoch, wandb_run, cfg):
 
         wandb_run.log(
             {
-                # {f"{Path(cloud.filename).stem}": wandb.Object3D(xyz_rgb),
-                f"{Path(cloud.filename).stem}_medial": wandb.Object3D(xyz_rgb2)
+                f"{Path(cloud.filename).stem}": wandb.Object3D(xyz_rgb),
+                f"{Path(cloud.filename).stem}_medial": wandb.Object3D(xyz_rgb2),
             },
             step=epoch,
         )
@@ -198,6 +198,7 @@ def main(cfg: DictConfig):
     torch.cuda.manual_seed_all(42)
     log = logging.getLogger(__name__)
 
+    ti.init(arch=ti.gpu)
     wandb.init(
         project=cfg.wandb.project,
         entity=cfg.wandb.entity,
@@ -256,15 +257,15 @@ def main(cfg: DictConfig):
                 fp16=cfg.fp16,
             )
 
-            test_tracker = eval_epoch(
-                test_loader,
-                model,
-                loss_fn,
-                fp16=cfg.fp16,
-            )
+            # test_tracker = eval_epoch(
+            #     test_loader,
+            #     model,
+            #     loss_fn,
+            #     fp16=cfg.fp16,
+            # )
 
             # if (epoch + 1) % cfg.capture_output == 0:
-            # capture_and_log(test_loader, model, epoch, wandb.run, cfg)
+            #    capture_and_log(test_loader, model, epoch, wandb.run, cfg)
             # capture_and_log(val_loader, model, epoch, wandb.run, cfg)
 
         scheduler.step(val_tracker.total_loss) if cfg.lr_decay else None
@@ -276,7 +277,8 @@ def main(cfg: DictConfig):
             wandb.run.summary["Best Test Loss"] = best_val_loss
             torch.save(model.state_dict(), f"{run_dir}/{run_name}_model_weights.pt")
             log.info(f"Weights Saved at epoch: {epoch}")
-
+            with amp_ctx:
+                capture_and_log(test_loader, model, epoch, wandb.run, cfg)
             # capture_and_log(val_loader, model, epoch, wandb.run, cfg)
         else:
             epochs_no_improve += 1

@@ -25,8 +25,8 @@ dependencies = [
     'py_structs',
     'torchtyping',
     'beartype',
-    'typeguard==2.11.1'
-
+    'typeguard==2.11.1',
+    'taichi',
 ]
 
 [tool.setuptools.packages]

@@ -86,16 +86,18 @@ class TreeDataset:
     def process_cloud(self, cld: Cloud, filename: str):
         cld = cld.to_device(self.device)
 
-        block_center_idx = torch.randint(
-            cld.xyz.shape[0], size=(1,), device=cld.xyz.device
-        )
-        block_center = cld.xyz[block_center_idx].reshape(-1)
-        block_filter = cube_filter(
-            cld.xyz,
-            block_center,
-            4 + (0.4 * 2),
-        )
-        cld = cld.filter(block_filter)
+        # block_center_idx = torch.randint(
+        #     cld.xyz.shape[0],
+        #     size=(1,),
+        #     device=cld.xyz.device,
+        # )
+        # block_center = cld.xyz[block_center_idx].reshape(-1)
+        # block_filter = cube_filter(
+        #     cld.xyz,
+        #     block_center,
+        #     4 + (0.4 * 2),
+        # )
+        # cld = cld.filter(block_filter)
 
         if self.augmentation != None:
             cld = self.augmentation(cld)
@@ -103,16 +105,20 @@ class TreeDataset:
         xyzmin, _ = torch.min(cld.xyz, axis=0)
         xyzmax, _ = torch.max(cld.xyz, axis=0)
 
-        # data = cld.cat()
-        input_features = torch.cat(
-            [at_least_2d(getattr(cld, attr)) for attr in self.input_features], dim=1
+        input_feats = torch.cat(
+            [at_least_2d(getattr(cld, attr)) for attr in self.input_features],
+            dim=1,
         )
 
-        target_features = torch.cat(
-            [at_least_2d(getattr(cld, attr)) for attr in self.target_features], dim=1
-        )
+        if cld.is_labelled:
+            target_features = torch.cat(
+                [at_least_2d(getattr(cld, attr)) for attr in self.target_features],
+                dim=1,
+            )
 
-        data = torch.cat([input_features, target_features], dim=1)
+            data = torch.cat([input_feats, target_features], dim=1)
+        else:
+            data = input_feats
 
         assert (
             data.shape[0] > 0
@@ -145,11 +151,11 @@ class TreeDataset:
 
         feats = feats.squeeze(1)
         coords = coords.squeeze(1)
-        # loss_mask = torch.ones(feats.shape[0], dtype=torch.bool, device=feats.device)
-        loss_mask = cube_filter(feats[:, :3], block_center, 4)
+        loss_mask = torch.ones(feats.shape[0], dtype=torch.bool, device=feats.device)
+        # loss_mask = cube_filter(feats[:, :3], block_center, 4)
 
-        input_feats = feats[:, : input_features.shape[1]]
-        target_feats = feats[:, input_features.shape[1] :]
+        input_feats = feats[:, : input_feats.shape[1]]
+        target_feats = feats[:, input_feats.shape[1] :]
 
         return (input_feats, target_feats), coords, loss_mask, filename
 

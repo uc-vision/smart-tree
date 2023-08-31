@@ -36,11 +36,11 @@ def view_synthetic_data(data: List[Tuple[Cloud, TreeSkeleton]], line_width=1):
                 cloud.to_o3d_medial_vectors(),
                 is_visible=visible,
             ),
-            ViewerItem(
-                f"{tree_name}_branch_vectors",
-                cloud.to_o3d_branch_directions(),
-                is_visible=visible,
-            ),
+            # ViewerItem(
+            #     f"{tree_name}_branch_vectors",
+            #     cloud.to_o3d_branch_directions(),
+            #     is_visible=visible,
+            # ),
             # ViewerItem(
             #     f"{tree_name}_skeleton",
             #     skeleton.to_o3d_lineset(),

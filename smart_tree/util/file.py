@@ -165,7 +165,7 @@ def load_cloud(path: Path):
     xyz = np.asarray(data.points)
     rgb = np.asarray(data.colors) if np.asarray(data.colors).shape[0] != 0 else None
 
-    if rgb != None:
+    if rgb.all() != None:
         return Cloud.from_numpy(xyz=xyz, rgb=rgb)
 
     return Cloud.from_numpy(xyz=xyz, rgb=np.ones((xyz.shape[0], 3)))

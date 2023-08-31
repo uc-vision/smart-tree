@@ -15,6 +15,7 @@ from ..o3d_abstractions.geometries import o3d_cloud, o3d_lines_between_clouds
 from ..o3d_abstractions.visualizer import o3d_viewer
 from ..util.misc import to_torch, voxel_downsample
 from ..util.queries import skeleton_to_points
+from dataclasses import asdict
 
 patch_typeguard()
 
@@ -45,7 +46,7 @@ class Cloud:
             cpu_cld.paint()
         return o3d_cloud(cpu_cld.xyz, colours=cpu_cld.rgb)
 
-    def to_o3d_seg_cld(self, cmap: np.ndarray = np.array([[1, 0, 0], [0, 1, 0]])):
+    def to_o3d_seg_cld(self, cmap: np.ndarray = np.random.rand(100, 3)):
         cpu_cld = self.cpu()
         colours = cmap[cpu_cld.class_l.view(-1).int()]
         return o3d_cloud(cpu_cld.xyz, colours=colours)
@@ -70,33 +71,6 @@ class Cloud:
         branch_dir_cloud = o3d_cloud(cpu_cld.xyz + (cpu_cld.branch_direction * scale))
         return o3d_lines_between_clouds(cpu_cld.to_o3d_cld(), branch_dir_cloud)
 
-    # def to_wandb_seg_cld(self, cmap: np.ndarray = np.array([[1, 0, 0], [0, 1, 0]])):
-
-    def filter(cloud: Cloud, mask: TensorType["N"]) -> Cloud:
-        mask = mask.to(cloud.xyz.device)
-        xyz = cloud.xyz[mask]
-        rgb = cloud.rgb[mask] if cloud.rgb is not None else None
-
-        medial_vector = (
-            cloud.medial_vector[mask] if cloud.medial_vector is not None else None
-        )
-        branch_direction = (
-            cloud.branch_direction[mask] if cloud.branch_direction is not None else None
-        )
-        class_l = cloud.class_l[mask] if cloud.class_l is not None else None
-        branch_ids = cloud.branch_ids[mask] if cloud.branch_ids is not None else None
-        filename = cloud.filename if cloud.filename is not None else None
-
-        return Cloud(
-            xyz=xyz,
-            rgb=rgb,
-            medial_vector=medial_vector,
-            branch_direction=branch_direction,
-            class_l=class_l,
-            branch_ids=branch_ids,
-            filename=filename,
-        )
-
     def filter_by_class(self, classes):
         classes = torch.tensor(classes, device=self.class_l.device)
         mask = torch.isin(
@@ -111,29 +85,43 @@ class Cloud:
         return filter(cloud, mask)
 
     def pin_memory(self):
-        xyz = self.xyz.pin_memory()
-        rgb = self.rgb.pin_memory() if self.rgb is not None else None
-        medial_vector = (
-            self.medial_vector.pin_memory() if self.medial_vector is not None else None
-        )
-        branch_direction = (
-            self.branch_direction.pin_memory()
+        properties = {
+            "xyz": self.xyz.pin_memory(),
+            "rgb": self.rgb.pin_memory() if self.rgb is not None else None,
+            "medial_vector": self.medial_vector.pin_memory()
+            if self.medial_vector is not None
+            else None,
+            "branch_direction": self.branch_direction.pin_memory()
             if self.branch_direction is not None
-            else None
-        )
-        class_l = self.class_l.pin_memory() if self.class_l is not None else None
-        branch_ids = (
-            self.branch_ids.pin_memory() if self.branch_ids is not None else None
-        )
+            else None,
+            "class_l": self.class_l.pin_memory() if self.class_l is not None else None,
+            "branch_ids": self.branch_ids.pin_memory()
+            if self.branch_ids is not None
+            else None,
+        }
 
-        return Cloud(
-            xyz=xyz,
-            rgb=rgb,
-            medial_vector=medial_vector,
-            branch_direction=branch_direction,
-            class_l=class_l,
-            branch_ids=branch_ids,
-        )
+        return Cloud(**properties)
+
+    def filter(cloud: Cloud, mask: TensorType["N"]) -> Cloud:
+        mask = mask.to(cloud.xyz.device)
+
+        filtered_properties = {
+            "xyz": cloud.xyz[mask],
+            "rgb": cloud.rgb[mask] if cloud.rgb is not None else None,
+            "medial_vector": cloud.medial_vector[mask]
+            if cloud.medial_vector is not None
+            else None,
+            "branch_direction": cloud.branch_direction[mask]
+            if cloud.branch_direction is not None
+            else None,
+            "class_l": cloud.class_l[mask] if cloud.class_l is not None else None,
+            "branch_ids": cloud.branch_ids[mask]
+            if cloud.branch_ids is not None
+            else None,
+            "filename": cloud.filename if cloud.filename is not None else None,
+        }
+
+        return Cloud(**filtered_properties)
 
     def cpu(self):
         return self.to_device(torch.device("cpu"))
@@ -163,18 +151,9 @@ class Cloud:
             filename=filename,
         )
 
-    def cat(self):
-        return torch.cat(
-            (
-                self.xyz,
-                self.rgb,
-            ),
-            1,
-        )
-
     def view(self, cmap=[]):
-        if cmap == []:
-            cmap = np.random.rand(self.number_classes, 3)
+        # if cmap == []:
+        cmap = np.random.rand(self.number_classes, 3)
 
         cpu_cld = self.cpu()
         geoms = []
@@ -195,14 +174,58 @@ class Cloud:
         return self.filter(idx)
 
     def scale(self, factor):
-        return Cloud(self.xyz * factor, self.rgb)
+        new_medial_vector = None
+        if self.medial_vector != None:
+            new_medial_vector = self.medial_vector * factor
+
+        return Cloud(
+            xyz=self.xyz * factor,
+            rgb=self.rgb,
+            medial_vector=new_medial_vector,
+            branch_direction=self.branch_direction,
+            branch_ids=self.branch_ids,
+            class_l=self.class_l,
+        )
 
     def translate(self, xyz):
-        return Cloud(self.xyz + xyz.to(self.xyz.device), self.rgb)
+        return Cloud(
+            xyz=self.xyz + xyz,
+            rgb=self.rgb,
+            medial_vector=self.medial_vector,
+            branch_direction=self.branch_direction,
+            branch_ids=self.branch_ids,
+            class_l=self.class_l,
+        )
 
     def rotate(self, rot_mat):
-        rot_mat = rot_mat.to(self.xyz.dtype)
-        return Cloud(torch.matmul(self.xyz, rot_mat.to(self.xyz.device)), self.rgb)
+        new_xyz = torch.matmul(self.xyz, rot_mat.to(self.xyz.device))
+
+        new_medial_vector = None
+        if self.medial_vector != None:
+            new_medial_vector = torch.matmul(
+                self.medial_vector, rot_mat.to(self.medial_vector.device)
+            )
+
+        new_branch_dir = None
+        if self.branch_direction != None:
+            new_branch_dir = torch.matmul(
+                self.branch_direction, rot_mat.to(self.branch_direction.device)
+            )
+
+        return Cloud(
+            xyz=new_xyz,
+            rgb=self.rgb,
+            medial_vector=new_medial_vector,
+            branch_direction=new_branch_dir,
+            branch_ids=self.branch_ids,
+            class_l=self.class_l,
+        )
+
+    @property
+    def is_labelled(self) -> bool:
+        if self.medial_vector is None:
+            return False
+        return True
 
     @property
     def root_idx(self) -> int:
@@ -221,6 +244,10 @@ class Cloud:
     @property
     def min_xyz(self) -> torch.Tensor:
         return torch.min(self.xyz, 0)[0]
+
+    @property
+    def device(self) -> torch.device:
+        return self.xyz.device
 
     @property
     def bbox(self) -> tuple[torch.Tensor, torch.Tensor]:
@@ -255,7 +282,7 @@ class Cloud:
         return Cloud(**torch_kwargs)
 
     @property
-    def radius(self) -> TensorType["N", 1]:
+    def radius(self) -> TensorType["N", 1] | torch.Tensor:
         return self.medial_vector.pow(2).sum(1).sqrt().unsqueeze(1)
 
     @property
@@ -265,3 +292,14 @@ class Cloud:
     @staticmethod
     def from_o3d_cld(cld) -> Cloud:
         return Cloud.from_numpy(xyz=np.asarray(cld.points), rgb=np.asarray(cld.colors))
+
+    def with_xyz(self, new_xyz):
+        return Cloud(
+            new_xyz,
+            self.rgb,
+            self.medial_vector,
+            self.branch_direction,
+            self.branch_ids,
+            self.class_l,
+            self.filename,
+        )

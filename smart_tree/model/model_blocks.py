@@ -1,321 +1,173 @@
+from collections import OrderedDict
+
 import spconv.pytorch as spconv
 import torch
-import torch.cuda.amp
-import torch.nn as nn
-import torch.nn.functional as F
-from spconv.pytorch import SparseModule
+from spconv.pytorch.modules import SparseModule
+from torch import nn
 
 
-class SubMConvBlock(SparseModule):
-    def __init__(
-        self,
-        input_channels,
-        output_channels,
-        kernel_size,
-        norm_fn,
-        activation_fn,
-        stride=1,
-        padding=1,
-        algo=spconv.ConvAlgo.Native,
-        bias=False,
-    ):
-        super().__init__()
+# Credit to https://github.com/thangvubk/SoftGroup/blob/main/softgroup/model/blocks.py
 
-        self.sequence = spconv.SparseSequential(
-            spconv.SubMConv3d(
-                in_channels=input_channels,
-                out_channels=output_channels,
-                kernel_size=kernel_size,
-                stride=stride,
-                padding=padding,
-                bias=bias,
-                algo=algo,
-            ),
-            norm_fn(output_channels),
-            activation_fn(),
-        )
 
+class MLP(nn.Sequential):
+    def __init__(self, in_channels, out_channels, norm_fn=None, num_layers=2):
+        modules = []
+        for _ in range(num_layers - 1):
+            modules.append(nn.Linear(in_channels, in_channels))
+            if norm_fn:
+                modules.append(norm_fn(in_channels))
+            modules.append(nn.ReLU())
+        modules.append(nn.Linear(in_channels, out_channels))
+        return super().__init__(*modules)
+
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.constant_(m.bias, 0)
+        nn.init.normal_(self[-1].weight, 0, 0.01)
+        nn.init.constant_(self[-1].bias, 0)
+
+
+# current 1x1 conv in spconv2x has a bug. It will be removed after the bug is fixed
+class Custom1x1Subm3d(spconv.SparseConv3d):
     def forward(self, input):
-        return self.sequence(input)
-
-
-class EncoderBlock(SparseModule):
-    def __init__(
-        self,
-        input_channels,
-        output_channels,
-        kernel_size,
-        norm_fn,
-        activation_fn,
-        stride=2,
-        padding=1,
-        key=None,
-        algo=spconv.ConvAlgo.Native,
-        bias=False,
-    ):
-        super().__init__()
-
-        self.sequence = spconv.SparseSequential(
-            spconv.SparseConv3d(
-                input_channels,
-                output_channels,
-                kernel_size=kernel_size,
-                stride=stride,
-                indice_key=key,
-                algo=algo,
-                bias=bias,
-                padding=padding,
-            ),
-            norm_fn(output_channels),
-            activation_fn(),
+        features = torch.mm(
+            input.features,
+            self.weight.view(self.out_channels, self.in_channels).T,
         )
-
-    def forward(self, input):
-        return self.sequence(input)
-
-
-class DecoderBlock(SparseModule):
-    def __init__(
-        self,
-        input_channels,
-        output_channels,
-        kernel_size,
-        norm_fn,
-        activation_fn,
-        key=None,
-        algo=spconv.ConvAlgo.Native,
-        bias=False,
-    ):
-        super().__init__()
-
-        self.sequence = spconv.SparseSequential(
-            spconv.SparseInverseConv3d(
-                input_channels,
-                output_channels,
-                kernel_size,
-                indice_key=key,
-                algo=algo,
-                bias=bias,
-            ),
-            norm_fn(output_channels),
-            activation_fn(),
+        if self.bias is not None:
+            features += self.bias
+        out_tensor = spconv.SparseConvTensor(
+            features,
+            input.indices,
+            input.spatial_shape,
+            input.batch_size,
         )
+        out_tensor.indice_dict = input.indice_dict
+        out_tensor.grid = input.grid
+        return out_tensor
 
-    def forward(self, input):
-        return self.sequence(input)
 
-
-class ResBlock(nn.Module):
-    def __init__(
-        self,
-        input_channels,
-        output_channels,
-        kernel_size,
-        norm_fn,
-        activation_fn,
-        algo=spconv.ConvAlgo.Native,
-        bias=False,
-    ):
+class ResidualBlock(SparseModule):
+    def __init__(self, in_channels, out_channels, norm_fn, indice_key=None):
         super().__init__()
 
-        if input_channels == output_channels:
-            self.identity = spconv.SparseSequential(nn.Identity())
+        if in_channels == out_channels:
+            self.i_branch = spconv.SparseSequential(nn.Identity())
         else:
-            self.identity = spconv.SparseSequential(
-                spconv.SubMConv3d(
-                    input_channels,
-                    output_channels,
-                    kernel_size=1,
-                    padding=1,
-                    bias=False,
-                    algo=algo,
-                )
+            self.i_branch = spconv.SparseSequential(
+                Custom1x1Subm3d(in_channels, out_channels, kernel_size=1, bias=False)
             )
 
-        self.sequence = spconv.SparseSequential(
+        self.conv_branch = spconv.SparseSequential(
+            norm_fn(in_channels),
+            nn.ReLU(),
             spconv.SubMConv3d(
-                input_channels, output_channels, kernel_size, bias=False, algo=algo
+                in_channels,
+                out_channels,
+                kernel_size=3,
+                padding=1,
+                bias=False,
+                algo=spconv.ConvAlgo.Native,
+                indice_key=indice_key,
             ),
-            norm_fn(output_channels),
-            activation_fn(),
+            norm_fn(out_channels),
+            nn.ReLU(),
             spconv.SubMConv3d(
-                output_channels, output_channels, kernel_size, bias=False, algo=algo
+                out_channels,
+                out_channels,
+                kernel_size=3,
+                padding=1,
+                bias=False,
+                algo=spconv.ConvAlgo.Native,
+                indice_key=indice_key,
             ),
-            norm_fn(output_channels),
         )
-
-        self.activation_fn = spconv.SparseSequential(activation_fn())
 
     def forward(self, input):
         identity = spconv.SparseConvTensor(
             input.features, input.indices, input.spatial_shape, input.batch_size
         )
-        output = self.sequence(input)
-        output = output.replace_feature(
-            output.features + self.identity(identity).features
-        )
-        return self.activation_fn(output)
-
-
-class UBlock(nn.Module):
-    def __init__(
-        self,
-        n_planes,
-        norm_fn,
-        activation_fn,
-        kernel_size=3,
-        key_id=1,
-        algo=spconv.ConvAlgo.Native,
-        bias=False,
-    ):
-        super().__init__()
-
-        self.n_planes = n_planes
-        self.Head = ResBlock(
-            n_planes[0],
-            n_planes[0],
-            kernel_size,
-            norm_fn,
-            activation_fn,
-            algo=algo,
-            bias=bias,
-        )
-
-        if len(n_planes) > 1:
-            self.Encode = EncoderBlock(
-                n_planes[0],
-                n_planes[1],
-                kernel_size,
-                norm_fn,
-                activation_fn,
-                stride=2,
-                key=key_id,
-                algo=algo,
-                bias=bias,
-            )
-            self.U = UBlock(
-                n_planes[1:],
-                norm_fn,
-                activation_fn,
-                kernel_size,
-                key_id + 1,
-                algo,
-                bias,
-            )
-            self.Decode = DecoderBlock(
-                n_planes[1],
-                n_planes[0],
-                kernel_size,
-                norm_fn,
-                activation_fn,
-                key=key_id,
-                algo=algo,
-                bias=bias,
-            )
-            self.Tail = ResBlock(
-                n_planes[0] * 2,
-                n_planes[0],
-                kernel_size,
-                norm_fn,
-                activation_fn,
-                algo=algo,
-                bias=bias,
-            )
-
-    def forward(self, input):
-        output = self.Head(input)
-
-        identity = spconv.SparseConvTensor(
-            output.features,
-            output.indices,
-            output.spatial_shape,
-            output.batch_size,
-        )
-
-        if len(self.n_planes) > 1:
-            output = self.Encode(output)
-            output = self.U(output)
-            output = self.Decode(output)
-            output = output.replace_feature(
-                torch.cat((identity.features, output.features), dim=1)
-            )
-            output = self.Tail(output)
+        output = self.conv_branch(input)
+        out_feats = output.features + self.i_branch(identity).features
+        output = output.replace_feature(out_feats)
 
         return output
 
 
-class SparseFC(nn.Module):
-    def __init__(
-        self,
-        n_planes,
-        norm_fn,
-        activation_fn=None,
-        kernel_size=1,
-        algo=spconv.ConvAlgo.Native,
-        bias=False,
-    ):
+class UBlock(nn.Module):
+    def __init__(self, nPlanes, norm_fn, block_reps, block, indice_key_id=1):
         super().__init__()
 
-        self.sequence = spconv.SparseSequential()
-        for i in range(len(n_planes) - 2):
-            self.sequence.add(
-                spconv.SubMConv3d(
-                    n_planes[i],
-                    n_planes[i + 1],
-                    kernel_size=kernel_size,
+        self.nPlanes = nPlanes
+
+        blocks = {
+            "block{}".format(i): block(
+                nPlanes[0],
+                nPlanes[0],
+                norm_fn,
+                indice_key="subm{}".format(indice_key_id),
+            )
+            for i in range(block_reps)
+        }
+        blocks = OrderedDict(blocks)
+        self.blocks = spconv.SparseSequential(blocks)
+
+        if len(nPlanes) > 1:
+            self.conv = spconv.SparseSequential(
+                norm_fn(nPlanes[0]),
+                nn.ReLU(),
+                spconv.SparseConv3d(
+                    nPlanes[0],
+                    nPlanes[1],
+                    kernel_size=2,
+                    stride=2,
                     bias=False,
-                    algo=algo,
-                    padding=0,
-                )
+                    algo=spconv.ConvAlgo.Native,
+                    indice_key="spconv{}".format(indice_key_id),
+                ),
             )
-            self.sequence.add(norm_fn(n_planes[i + 1]))
-            self.sequence.add(activation_fn())
 
-        self.sequence.add(
-            spconv.SubMConv3d(
-                n_planes[-2],
-                n_planes[-1],
-                kernel_size=kernel_size,
-                bias=False,
-                algo=algo,
-                padding=0,
+            self.u = UBlock(
+                nPlanes[1:], norm_fn, block_reps, block, indice_key_id=indice_key_id + 1
             )
-        )
+
+            self.deconv = spconv.SparseSequential(
+                norm_fn(nPlanes[1]),
+                nn.ReLU(),
+                spconv.SparseInverseConv3d(
+                    nPlanes[1],
+                    nPlanes[0],
+                    kernel_size=2,
+                    bias=False,
+                    algo=spconv.ConvAlgo.Native,
+                    indice_key="spconv{}".format(indice_key_id),
+                ),
+            )
+
+            blocks_tail = {}
+            for i in range(block_reps):
+                blocks_tail["block{}".format(i)] = block(
+                    nPlanes[0] * (2 - i),
+                    nPlanes[0],
+                    norm_fn,
+                    indice_key="subm{}".format(indice_key_id),
+                )
+            blocks_tail = OrderedDict(blocks_tail)
+            self.blocks_tail = spconv.SparseSequential(blocks_tail)
 
     def forward(self, input):
-        return self.sequence(input)
-
-
-class MLP(nn.Module):
-    def __init__(
-        self,
-        n_planes,
-        norm_fn,
-        activation_fn=None,
-        bias=False,
-    ):
-        super().__init__()
-
-        self.sequence = spconv.SparseSequential()
-
-        for i in range(len(n_planes) - 2):
-            self.sequence.add(
-                nn.Linear(
-                    n_planes[i],
-                    n_planes[i + 1],
-                    bias=bias,
-                )
-            )
-            self.sequence.add(norm_fn(n_planes[i + 1]))
-            self.sequence.add(activation_fn())
-
-        self.sequence.add(
-            nn.Linear(
-                n_planes[-2],
-                n_planes[-1],
-                bias=bias,
-            )
+        output = self.blocks(input)
+        identity = spconv.SparseConvTensor(
+            output.features, output.indices, output.spatial_shape, output.batch_size
         )
+        if len(self.nPlanes) > 1:
+            output_decoder = self.conv(output)
+            output_decoder = self.u(output_decoder)
+            output_decoder = self.deconv(output_decoder)
+            out_feats = torch.cat((identity.features, output_decoder.features), dim=1)
+            output = output.replace_feature(out_feats)
+            output = self.blocks_tail(output)
 
-    def forward(self, input):
-        return self.sequence(input)
+        return output
