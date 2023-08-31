@@ -1,14 +1,8 @@
-from smart_tree.data_types.tree import (
-    DisjointTreeSkeleton,
-    TreeSkeleton,
-    connect,
-)
+from smart_tree.data_types.tree import DisjointTreeSkeleton, TreeSkeleton, connect
 from smart_tree.o3d_abstractions.visualizer import o3d_viewer
 
 if __name__ == "__main__":
-    disjoint_skeleton = DisjointTreeSkeleton.from_pickle(
-        "/local/smart-tree/test_data/disjoint_skeleton.pkl"
-    )
+    disjoint_skeleton = DisjointTreeSkeleton.from_pickle("/local/smart-tree/test_data/disjoint_skeleton.pkl")
 
     # disjoint_skeleton.prune(min_radius=0.01, min_length=0.08).smooth(kernel_size=11)
     # Sort skeletons by total length
@@ -40,6 +34,4 @@ if __name__ == "__main__":
 
         print(skeleton.length)
 
-        o3d_viewer(
-            [final_skeleton.to_o3d_tube(), branch.to_o3d_tube(), skeleton.to_o3d_tube()]
-        )
+        o3d_viewer([final_skeleton.to_o3d_tube(), branch.to_o3d_tube(), skeleton.to_o3d_tube()])

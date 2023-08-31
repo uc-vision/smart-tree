@@ -1,20 +1,17 @@
 import logging
-import time
-from omegaconf import DictConfig
 
 import hydra
-import torch
-from hydra.utils import instantiate
-from tqdm import tqdm
-
-from smart_tree.data_types.cloud import Cloud
-from smart_tree.model.helper import get_batch, model_output_to_labelled_clds
-from smart_tree.o3d_abstractions.geometries import o3d_cloud
+import numpy as np
 
 # from open3d_vis import render
 import open3d as o3d
+import torch
+from hydra.utils import instantiate
+from omegaconf import DictConfig
+from tqdm import tqdm
 
-import numpy as np
+from smart_tree.model.helper import get_batch
+from smart_tree.o3d_abstractions.geometries import o3d_cloud
 
 
 @hydra.main(

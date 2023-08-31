@@ -1,8 +1,8 @@
+from typing import List
+
 import numpy as np
 import torch
 import torch.nn.functional as F
-
-from typing import List
 
 
 def np_normalized(a: np.array, axis=-1, order=2) -> np.array:
@@ -52,9 +52,7 @@ def rotation_matrix_from_vectors_np(vec1: np.array, vec2: np.array) -> np.array:
     :param vec2: A 3d "destination" vector
     :return mat: A transform matrix (3x3) which when applied to vec1, aligns it with vec2.
     """
-    a, b = (vec1 / np.linalg.norm(vec1)).reshape(3), (
-        vec2 / np.linalg.norm(vec2)
-    ).reshape(3)
+    a, b = (vec1 / np.linalg.norm(vec1)).reshape(3), (vec2 / np.linalg.norm(vec2)).reshape(3)
     v = np.cross(a, b)
     c = np.dot(a, b)
     s = np.linalg.norm(v)
@@ -77,9 +75,7 @@ def rotation_matrix_from_vectors_torch(vec1, vec2):
 
 
 def make_transformation_matrix(rotation, translation):
-    return torch.vstack(
-        (torch.hstack((rotation, translation)), torch.tensor([0.0, 0.0, 0.0, 1.0]))
-    )
+    return torch.vstack((torch.hstack((rotation, translation)), torch.tensor([0.0, 0.0, 0.0, 1.0])))
 
 
 def bb_filter(

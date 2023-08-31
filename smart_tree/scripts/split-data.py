@@ -13,7 +13,6 @@ import random
 from pathlib import Path
 
 import click
-import numpy as np
 
 
 def flatten_list(l):
@@ -42,23 +41,12 @@ def strattified_sample(read_dir, json_save_path, split=[0.65, 0.25, 0.1]):
     val_paths = []
 
     for directory in dirs:
-        items = [
-            str(path.resolve())
-            for path in Path(f"{read_dir}/{directory}").rglob("*.npz")
-        ]
+        items = [str(path.resolve()) for path in Path(f"{read_dir}/{directory}").rglob("*.npz")]
         random.shuffle(items)
 
         train_paths.append(items[: int(0.8 * len(items))])
-        test_paths.append(
-            items[
-                int(split[0] * len(items)) : int(
-                    split[0] * len(items) + int(split[1] * len(items))
-                )
-            ]
-        )
-        val_paths.append(
-            items[int(split[0] * len(items)) + int(split[1] * len(items)) :]
-        )
+        test_paths.append(items[int(split[0] * len(items)) : int(split[0] * len(items) + int(split[1] * len(items)))])
+        val_paths.append(items[int(split[0] * len(items)) + int(split[1] * len(items)) :])
 
     data = {}
 
@@ -71,9 +59,7 @@ def strattified_sample(read_dir, json_save_path, split=[0.65, 0.25, 0.1]):
 
 
 @click.command()
-@click.option(
-    "--read_directory", type=click.Path(exists=True), prompt="read directory?"
-)
+@click.option("--read_directory", type=click.Path(exists=True), prompt="read directory?")
 @click.option("--json_save_path", prompt="json path?")
 @click.option("--sample_type", type=str, default=False, required=False)
 def main(read_directory, json_save_path, sample_type):

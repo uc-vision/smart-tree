@@ -1,19 +1,12 @@
-import os
-import sys
+from typing import Tuple
 
-import numpy as np
-import open3d as o3d
 import torch
 from torchtyping import TensorType, patch_typeguard
 from tqdm import tqdm
 from typeguard import typechecked
-from typing import Tuple
 
 from ..data_types.branch import BranchSkeleton
 from ..data_types.cloud import Cloud
-from ..o3d_abstractions.geometries import o3d_cloud, o3d_path, o3d_sphere, o3d_tube_mesh
-from ..o3d_abstractions.visualizer import o3d_viewer
-from ..util.misc import flatten_list
 from .graph import nn
 
 patch_typeguard()
@@ -48,9 +41,7 @@ def select_path_points(
         path_verts,
         r=radii.max().item(),
     )  # nearest path idx for each point
-    valid = dists[point_path >= 0] < radii[point_path[point_path >= 0]].squeeze(
-        1
-    )  # where the path idx is less than the distance to the point
+    valid = dists[point_path >= 0] < radii[point_path[point_path >= 0]].squeeze(1)  # where the path idx is less than the distance to the point
 
     on_path = point_path.new_zeros(point_path.shape, dtype=torch.bool)
     on_path[point_path >= 0] = valid  # points that are on the path.

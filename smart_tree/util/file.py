@@ -4,15 +4,11 @@ from typing import Tuple
 
 import numpy as np
 import open3d as o3d
-import open3d.visualization.rendering as rendering
 import yaml
-from plyfile import PlyData, PlyElement
-from tqdm import tqdm
 
 from smart_tree.data_types.branch import BranchSkeleton
 from smart_tree.data_types.cloud import Cloud
 from smart_tree.data_types.tree import TreeSkeleton
-from smart_tree.o3d_abstractions.geometries import o3d_cloud, o3d_line_set
 
 
 def unpackage_data(data: dict) -> Tuple[Cloud, TreeSkeleton]:
@@ -38,9 +34,7 @@ def unpackage_data(data: dict) -> Tuple[Cloud, TreeSkeleton]:
     branches = {}
 
     for idx, _id, parent_id in zip(branch_idx, branch_id, branch_parent_id):
-        branches[_id] = BranchSkeleton(
-            _id, parent_id, skeleton_xyz[idx], skeleton_radii[idx]
-        )
+        branches[_id] = BranchSkeleton(_id, parent_id, skeleton_xyz[idx], skeleton_radii[idx])
 
     return cld, TreeSkeleton(tree_id, branches)
 
@@ -55,21 +49,11 @@ def package_data(skeleton: TreeSkeleton, pointcloud: Cloud) -> dict:
     data["vector"] = pointcloud.vector
     data["class_l"] = pointcloud.class_l
 
-    data["skeleton_xyz"] = np.concatenate(
-        [branch.xyz for branch in skeleton.branches.values()]
-    )
-    data["skeleton_radii"] = np.concatenate(
-        [branch.radii for branch in skeleton.branches.values()]
-    )[..., np.newaxis]
-    data["branch_id"] = np.asarray(
-        [branch._id for branch in skeleton.branches.values()]
-    )
-    data["branch_parent_id"] = np.asarray(
-        [branch.parent_id for branch in skeleton.branches.values()]
-    )
-    data["branch_num_elements"] = np.asarray(
-        [len(branch) for branch in skeleton.branches.values()]
-    )
+    data["skeleton_xyz"] = np.concatenate([branch.xyz for branch in skeleton.branches.values()])
+    data["skeleton_radii"] = np.concatenate([branch.radii for branch in skeleton.branches.values()])[..., np.newaxis]
+    data["branch_id"] = np.asarray([branch._id for branch in skeleton.branches.values()])
+    data["branch_parent_id"] = np.asarray([branch.parent_id for branch in skeleton.branches.values()])
+    data["branch_num_elements"] = np.asarray([len(branch) for branch in skeleton.branches.values()])
 
     return data
 
@@ -78,21 +62,11 @@ def save_skeleton(skeleton: TreeSkeleton, save_location):
     data = {}
     data["tree_id"] = skeleton._id
 
-    data["skeleton_xyz"] = np.concatenate(
-        [branch.xyz for branch in skeleton.branches.values()]
-    )
-    data["skeleton_radii"] = np.concatenate(
-        [branch.radii for branch in skeleton.branches.values()]
-    )[..., np.newaxis]
-    data["branch_id"] = np.asarray(
-        [branch._id for branch in skeleton.branches.values()]
-    )
-    data["branch_parent_id"] = np.asarray(
-        [branch.parent_id for branch in skeleton.branches.values()]
-    )
-    data["branch_num_elements"] = np.asarray(
-        [len(branch) for branch in skeleton.branches.values()]
-    )
+    data["skeleton_xyz"] = np.concatenate([branch.xyz for branch in skeleton.branches.values()])
+    data["skeleton_radii"] = np.concatenate([branch.radii for branch in skeleton.branches.values()])[..., np.newaxis]
+    data["branch_id"] = np.asarray([branch._id for branch in skeleton.branches.values()])
+    data["branch_parent_id"] = np.asarray([branch.parent_id for branch in skeleton.branches.values()])
+    data["branch_num_elements"] = np.asarray([len(branch) for branch in skeleton.branches.values()])
 
     np.savez(save_location, **data)
 
@@ -113,9 +87,7 @@ def load_skeleton(path):
     branches = {}
 
     for idx, _id, parent_id in zip(branch_idx, branch_id, branch_parent_id):
-        branches[_id] = BranchSkeleton(
-            _id, parent_id, skeleton_xyz[idx], skeleton_radii[idx]
-        )
+        branches[_id] = BranchSkeleton(_id, parent_id, skeleton_xyz[idx], skeleton_radii[idx])
 
     return TreeSkeleton(0, branches)
 

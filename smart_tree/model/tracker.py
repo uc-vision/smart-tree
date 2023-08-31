@@ -1,5 +1,4 @@
 import wandb
-import numpy as np
 
 # Should be more generalizable ...
 

@@ -1,5 +1,4 @@
 import cupy as cp
-import cuml
 from cuml.neighbors import NearestNeighbors
 
 # Define the number of points

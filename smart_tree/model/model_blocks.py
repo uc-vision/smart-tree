@@ -5,7 +5,6 @@ import torch
 from spconv.pytorch.modules import SparseModule
 from torch import nn
 
-
 # Credit to https://github.com/thangvubk/SoftGroup/blob/main/softgroup/model/blocks.py
 
 
@@ -56,9 +55,7 @@ class ResidualBlock(SparseModule):
         if in_channels == out_channels:
             self.i_branch = spconv.SparseSequential(nn.Identity())
         else:
-            self.i_branch = spconv.SparseSequential(
-                Custom1x1Subm3d(in_channels, out_channels, kernel_size=1, bias=False)
-            )
+            self.i_branch = spconv.SparseSequential(Custom1x1Subm3d(in_channels, out_channels, kernel_size=1, bias=False))
 
         self.conv_branch = spconv.SparseSequential(
             norm_fn(in_channels),
@@ -86,9 +83,7 @@ class ResidualBlock(SparseModule):
         )
 
     def forward(self, input):
-        identity = spconv.SparseConvTensor(
-            input.features, input.indices, input.spatial_shape, input.batch_size
-        )
+        identity = spconv.SparseConvTensor(input.features, input.indices, input.spatial_shape, input.batch_size)
         output = self.conv_branch(input)
         out_feats = output.features + self.i_branch(identity).features
         output = output.replace_feature(out_feats)
@@ -129,9 +124,7 @@ class UBlock(nn.Module):
                 ),
             )
 
-            self.u = UBlock(
-                nPlanes[1:], norm_fn, block_reps, block, indice_key_id=indice_key_id + 1
-            )
+            self.u = UBlock(nPlanes[1:], norm_fn, block_reps, block, indice_key_id=indice_key_id + 1)
 
             self.deconv = spconv.SparseSequential(
                 norm_fn(nPlanes[1]),
@@ -159,9 +152,7 @@ class UBlock(nn.Module):
 
     def forward(self, input):
         output = self.blocks(input)
-        identity = spconv.SparseConvTensor(
-            output.features, output.indices, output.spatial_shape, output.batch_size
-        )
+        identity = spconv.SparseConvTensor(output.features, output.indices, output.spatial_shape, output.batch_size)
         if len(self.nPlanes) > 1:
             output_decoder = self.conv(output)
             output_decoder = self.u(output_decoder)

@@ -1,15 +1,9 @@
 import os
-
-import hydra
 from pathlib import Path
 
-from hydra.core.hydra_config import HydraConfig
-from omegaconf import DictConfig, OmegaConf
+import hydra
 from hydra.utils import instantiate
-
-from .model.model_inference import ModelInference
-from .skeleton.skeletonize import Skeletonizer
-from .pipeline import Pipeline
+from omegaconf import DictConfig
 
 
 @hydra.main(

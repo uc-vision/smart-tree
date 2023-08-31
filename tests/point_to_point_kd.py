@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 from sklearn.neighbors import KDTree
 
 # Define the number of points

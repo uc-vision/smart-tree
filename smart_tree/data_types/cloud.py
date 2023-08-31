@@ -2,20 +2,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torch import Tensor, rand
 from torchtyping import TensorType, patch_typeguard
 from typeguard import typechecked
 
 from ..o3d_abstractions.geometries import o3d_cloud, o3d_lines_between_clouds
 from ..o3d_abstractions.visualizer import o3d_viewer
-from ..util.misc import to_torch, voxel_downsample
+from ..util.misc import voxel_downsample
 from ..util.queries import skeleton_to_points
-from dataclasses import asdict
+from .tree import TreeSkeleton
 
 patch_typeguard()
 
@@ -88,16 +87,10 @@ class Cloud:
         properties = {
             "xyz": self.xyz.pin_memory(),
             "rgb": self.rgb.pin_memory() if self.rgb is not None else None,
-            "medial_vector": self.medial_vector.pin_memory()
-            if self.medial_vector is not None
-            else None,
-            "branch_direction": self.branch_direction.pin_memory()
-            if self.branch_direction is not None
-            else None,
+            "medial_vector": self.medial_vector.pin_memory() if self.medial_vector is not None else None,
+            "branch_direction": self.branch_direction.pin_memory() if self.branch_direction is not None else None,
             "class_l": self.class_l.pin_memory() if self.class_l is not None else None,
-            "branch_ids": self.branch_ids.pin_memory()
-            if self.branch_ids is not None
-            else None,
+            "branch_ids": self.branch_ids.pin_memory() if self.branch_ids is not None else None,
         }
 
         return Cloud(**properties)
@@ -108,16 +101,10 @@ class Cloud:
         filtered_properties = {
             "xyz": cloud.xyz[mask],
             "rgb": cloud.rgb[mask] if cloud.rgb is not None else None,
-            "medial_vector": cloud.medial_vector[mask]
-            if cloud.medial_vector is not None
-            else None,
-            "branch_direction": cloud.branch_direction[mask]
-            if cloud.branch_direction is not None
-            else None,
+            "medial_vector": cloud.medial_vector[mask] if cloud.medial_vector is not None else None,
+            "branch_direction": cloud.branch_direction[mask] if cloud.branch_direction is not None else None,
             "class_l": cloud.class_l[mask] if cloud.class_l is not None else None,
-            "branch_ids": cloud.branch_ids[mask]
-            if cloud.branch_ids is not None
-            else None,
+            "branch_ids": cloud.branch_ids[mask] if cloud.branch_ids is not None else None,
             "filename": cloud.filename if cloud.filename is not None else None,
         }
 
@@ -129,14 +116,8 @@ class Cloud:
     def to_device(self, device):
         xyz = self.xyz.to(device)
         rgb = self.rgb.to(device) if self.rgb is not None else None
-        medial_vector = (
-            self.medial_vector.to(device) if self.medial_vector is not None else None
-        )
-        branch_direction = (
-            self.branch_direction.to(device)
-            if self.branch_direction is not None
-            else None
-        )
+        medial_vector = self.medial_vector.to(device) if self.medial_vector is not None else None
+        branch_direction = self.branch_direction.to(device) if self.branch_direction is not None else None
         class_l = self.class_l.to(device) if self.class_l is not None else None
         branch_ids = self.branch_ids.to(device) if self.branch_ids is not None else None
         filename = self.filename if self.filename is not None else None
@@ -202,15 +183,11 @@ class Cloud:
 
         new_medial_vector = None
         if self.medial_vector != None:
-            new_medial_vector = torch.matmul(
-                self.medial_vector, rot_mat.to(self.medial_vector.device)
-            )
+            new_medial_vector = torch.matmul(self.medial_vector, rot_mat.to(self.medial_vector.device))
 
         new_branch_dir = None
         if self.branch_direction != None:
-            new_branch_dir = torch.matmul(
-                self.branch_direction, rot_mat.to(self.branch_direction.device)
-            )
+            new_branch_dir = torch.matmul(self.branch_direction, rot_mat.to(self.branch_direction.device))
 
         return Cloud(
             xyz=new_xyz,

@@ -17,12 +17,8 @@ def create_camera(width, height, fx=575, fy=575):
     return camera_parameters
 
 
-def update_camera_position(
-    camera, camera_position, camera_target=[0, 0, 0], up=np.asarray([0, 1, 0])
-):
-    camera_direction = (camera_target - camera_position) / np.linalg.norm(
-        camera_target - camera_position
-    )
+def update_camera_position(camera, camera_position, camera_target=[0, 0, 0], up=np.asarray([0, 1, 0])):
+    camera_direction = (camera_target - camera_position) / np.linalg.norm(camera_target - camera_position)
     camera_right = np.cross(camera_direction, up)
     camera_right = camera_right / np.linalg.norm(camera_right)
     camera_up = np.cross(camera_direction, camera_right)
@@ -43,9 +39,7 @@ def o3d_headless_render(geoms, camera_position, camera_up):
     render = rendering.OffscreenRenderer(width=width, height=height)
     render.scene.set_background([1.0, 1.0, 1.0, 1.0])  # RGBA
     render.setup_camera(camera.intrinsic, camera.extrinsic)
-    render.scene.scene.set_sun_light(
-        geoms[0].get_center() + np.asarray(camera_position), [1.0, 1.0, 1.0], 75000
-    )
+    render.scene.scene.set_sun_light(geoms[0].get_center() + np.asarray(camera_position), [1.0, 1.0, 1.0], 75000)
     render.scene.scene.enable_sun_light(True)
     render.scene.scene.enable_indirect_light(True)
     render.scene.scene.set_indirect_light_intensity(0.3)
@@ -82,9 +76,7 @@ class Renderer:
         self.mtl.shader = "defaultUnlit"
 
     def capture(self, geoms, camera_position, camera_up):
-        self.render.scene.scene.set_sun_light(
-            geoms[0].get_center() + np.asarray(camera_position), [1.0, 1.0, 1.0], 75000
-        )
+        self.render.scene.scene.set_sun_light(geoms[0].get_center() + np.asarray(camera_position), [1.0, 1.0, 1.0], 75000)
         for i, item in enumerate(geoms):
             self.render.scene.add_geometry(f"{i}", item, self.mtl)
 

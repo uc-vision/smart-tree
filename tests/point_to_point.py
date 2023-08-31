@@ -17,6 +17,4 @@ for i in range(0, N, batch_size):
     batch_points1 = points1[i : i + batch_size]
 
     # Compute pairwise distances for the current mini-batch
-    batch_distances = torch.norm(
-        batch_points1[:, None, :].cuda() - points2[None, :, :], dim=2
-    )
+    batch_distances = torch.norm(batch_points1[:, None, :].cuda() - points2[None, :, :], dim=2)

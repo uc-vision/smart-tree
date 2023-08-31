@@ -1,11 +1,10 @@
 import logging
 import time
-from omegaconf import DictConfig
-
 
 import hydra
 import torch
 from hydra.utils import instantiate
+from omegaconf import DictConfig
 from tqdm import tqdm
 
 from smart_tree.model.helper import get_batch

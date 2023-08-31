@@ -1,28 +1,18 @@
 from __future__ import annotations
 
-
 import pickle
-from copy import deepcopy
 from dataclasses import dataclass
 from typing import Dict, List
 
-import numpy as np
 import open3d as o3d
 import torch
 import torch.nn.functional as F
-from torch import Tensor, rand
-from torchtyping import TensorDetail, TensorType
-from tqdm import tqdm
-from typeguard import typechecked
+from torchtyping import TensorType
 
-from ..util.queries import pts_to_nearest_tube_gpu
-from ..o3d_abstractions.geometries import (
-    o3d_merge_clouds,
-    o3d_merge_linesets,
-    o3d_merge_meshes,
-)
-from ..util.misc import flatten_list, merge_dictionaries
+from ..o3d_abstractions.geometries import o3d_merge_linesets, o3d_merge_meshes
 from ..o3d_abstractions.visualizer import o3d_viewer
+from ..util.misc import flatten_list, merge_dictionaries
+from ..util.queries import pts_to_nearest_tube_gpu
 from .branch import BranchSkeleton
 from .tube import Tube
 
@@ -182,16 +172,11 @@ class DisjointTreeSkeleton:
             skeleton.smooth(kernel_size=kernel_size)
 
     def to_o3d_lineset(self):
-        return o3d_merge_linesets(
-            [s.to_o3d_lineset().paint_uniform_color(s.colour) for s in self.skeletons]
-        )
+        return o3d_merge_linesets([s.to_o3d_lineset().paint_uniform_color(s.colour) for s in self.skeletons])
 
     def to_o3d_tube(self, colour=True):
         if colour:
-            skeleton_tubes = [
-                skel.to_o3d_tube().paint_uniform_color(skel.colour)
-                for skel in self.skeletons
-            ]
+            skeleton_tubes = [skel.to_o3d_tube().paint_uniform_color(skel.colour) for skel in self.skeletons]
         else:
             skeleton_tubes = [s.to_o3d_tube() for s in self.skeletons]
 

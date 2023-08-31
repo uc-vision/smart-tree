@@ -6,8 +6,7 @@ from typing import List, Optional
 import numpy as np
 import open3d as o3d
 import torch
-from torch import Tensor, rand
-from torchtyping import TensorDetail, TensorType
+from torchtyping import TensorType
 from typeguard import typechecked
 
 from smart_tree.o3d_abstractions.geometries import o3d_path, o3d_tube_mesh
@@ -23,7 +22,6 @@ class BranchSkeleton:
     xyz: TensorType["N", 3]
     radii: TensorType["N", 1]
     branch_direction: Optional[TensorType["N", 3]] = None
-
     child_id: Optional[int] = None
 
     def __post_init__(self) -> None:
@@ -41,11 +39,9 @@ class BranchSkeleton:
         return o3d_path(self.xyz, colour)
 
     def to_o3d_tube(self) -> o3d.geometry.TriangleMesh:
-        return o3d_tube_mesh(
-            self.xyz.numpy(), self.radii.reshape(-1).numpy(), self.colour
-        )
+        return o3d_tube_mesh(self.xyz.numpy(), self.radii.reshape(-1).numpy(), self.colour)
 
-    def to_tubes(self, colour=(1, 0, 0)) -> List[Tube]:
+    def to_tubes(self) -> List[Tube]:
         a_, b_, r1_, r2_ = (
             self.xyz[:-1],
             self.xyz[1:],

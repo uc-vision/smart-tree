@@ -1,7 +1,5 @@
 import torch
-from torch import Tensor, rand
-from torchtyping import TensorType, patch_typeguard
-from typeguard import typechecked
+from torchtyping import patch_typeguard
 
 from smart_tree.data_types.branch import BranchSkeleton
 

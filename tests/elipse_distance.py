@@ -1,25 +1,15 @@
-import torch
-
-from smart_tree.o3d_abstractions.visualizer import o3d_viewer
-from smart_tree.o3d_abstractions.geometries import (
-    o3d_cloud,
-    o3d_elipsoid,
-    o3d_merge_meshes,
-)
-from smart_tree.util.file import load_cloud
-
-from smart_tree.skeleton.graph import knn, make_edges, nn_graph
-
-from smart_tree.data_types.graph import Graph
-
 from pathlib import Path
 
-from tqdm import tqdm
-
 import numpy as np
-
+import torch
 from torchtyping import TensorType, patch_typeguard
 from typeguard import typechecked
+
+from smart_tree.data_types.graph import Graph
+from smart_tree.o3d_abstractions.geometries import o3d_cloud, o3d_elipsoid
+from smart_tree.o3d_abstractions.visualizer import o3d_viewer
+from smart_tree.skeleton.graph import knn, make_edges, nn_graph
+from smart_tree.util.file import load_cloud
 
 patch_typeguard()  # use before @typechecked
 
@@ -46,9 +36,7 @@ def ellipsoid_graph(
 ):
     # This is not optimal as it requires a sufficient K
 
-    ellipsoid_semi_axis = (
-        radii.unsqueeze(1) * branch_directions * stretch_factor
-    ) + radii.unsqueeze(1)
+    ellipsoid_semi_axis = (radii.unsqueeze(1) * branch_directions * stretch_factor) + radii.unsqueeze(1)
     ellipsoid_semi_axis = torch.abs(ellipsoid_semi_axis)
 
     idxs, dists, _ = knn(points, points, K=K, r=radii.max().item() * stretch_factor)

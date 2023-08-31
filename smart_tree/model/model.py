@@ -1,17 +1,11 @@
 import functools
+from typing import List
+
 import spconv.pytorch as spconv
-import torch
-import torch.cuda.amp
 import torch.nn as nn
 import torch.nn.functional as F
 
-
-from typing import List
-from smart_tree.model.model_blocks import UBlock, MLP, ResidualBlock
-from smart_tree.util.maths import torch_normalized
-
-
-from .fp16 import force_fp32
+from smart_tree.model.model_blocks import MLP, ResidualBlock, UBlock
 
 
 class Smart_Tree(nn.Module):
@@ -80,9 +74,7 @@ class Smart_Tree(nn.Module):
         output_feats = output.features
 
         predictions["radius"] = self.radius_head(output_feats)
-        predictions["medial_direction"] = F.normalize(
-            self.medial_dir_head(output_feats)
-        )
+        predictions["medial_direction"] = F.normalize(self.medial_dir_head(output_feats))
         predictions["class_l"] = self.class_head(output_feats)
 
         return predictions

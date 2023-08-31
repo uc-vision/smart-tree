@@ -3,9 +3,7 @@ from typing import List
 
 import numpy as np
 import torch
-from torch import Tensor, rand
-from torchtyping import TensorDetail, TensorType
-from typeguard import typechecked
+from torchtyping import TensorType
 
 
 @dataclass
@@ -63,12 +61,8 @@ def sample_tubes(tubes: List[Tube], spacing):
         num_points = np.ceil(length / spacing)
 
         if int(num_points) > 0.0:
-            spaced_points = np.arange(
-                0, float(length), step=float(length / num_points)
-            ).reshape(-1, 1)
-            lin_radius = np.linspace(
-                tube.r1, tube.r2, spaced_points.shape[0], dtype=float
-            )
+            spaced_points = np.arange(0, float(length), step=float(length / num_points)).reshape(-1, 1)
+            lin_radius = np.linspace(tube.r1, tube.r2, spaced_points.shape[0], dtype=float)
 
             pts.append(tube.a + direction * spaced_points)
             radius.append(lin_radius)

@@ -1,11 +1,10 @@
 import random
 from abc import ABC, abstractmethod
-from typing import List, Mapping, Sequence
+from typing import Sequence
 
 import numpy as np
 import torch
 from beartype import beartype
-from hydra.utils import call, get_original_cwd, instantiate, to_absolute_path
 from taichi_perlin import dropout_3d
 
 from smart_tree.data_types.cloud import Cloud
@@ -26,11 +25,7 @@ class Scale(Augmentation):
     def __call__(self, cloud):
         log_min, log_max = np.log(self.min_scale), np.log(self.max_scale)
 
-        t = (
-            torch.rand(1, device=cloud.xyz.device, dtype=cloud.xyz.dtype)
-            * (log_max - log_min)
-            + log_min
-        )
+        t = torch.rand(1, device=cloud.xyz.device, dtype=cloud.xyz.dtype) * (log_max - log_min) + log_min
         return cloud.scale(torch.exp(t))
 
 
@@ -39,9 +34,7 @@ class FixedRotate(Augmentation):
         self.xyz = xyz
 
     def __call__(self, cloud: Cloud) -> Cloud:
-        self.rot_mat = euler_angles_to_rotation(
-            torch.tensor(self.xyz, device=cloud.xyz.device)
-        ).float()
+        self.rot_mat = euler_angles_to_rotation(torch.tensor(self.xyz, device=cloud.xyz.device)).float()
         return cloud.rotate(self.rot_mat)
 
 
@@ -56,11 +49,7 @@ class RandomFlips(Augmentation):
         self.prob = torch.tensor([x_prob, y_prob, z_prob], dtype=torch.float)
 
     def __call__(self, cloud: Cloud):
-        flips = (
-            (torch.rand(3) < self.prob)
-            .to(dtype=cloud.xyz.dtype, device=cloud.device)
-            .view(1, 3)
-        )
+        flips = (torch.rand(3) < self.prob).to(dtype=cloud.xyz.dtype, device=cloud.device).view(1, 3)
 
         return cloud.scale(-flips * 2 + 1)
 
@@ -86,9 +75,7 @@ class RandomCrop(Augmentation):
         self.max_translation = torch.tensor([max_x, max_y, max_z])
 
     def __call__(self, cloud):
-        offset = (
-            torch.rand(3, device=cloud.xyz.device) - 0.5
-        ) * self.max_translation.to(device=cloud.xyz.device)
+        offset = (torch.rand(3, device=cloud.xyz.device) - 0.5) * self.max_translation.to(device=cloud.xyz.device)
 
         p = cloud.xyz + offset
         mask = torch.logical_and(p >= cloud.min_xyz, p <= cloud.max_xyz).all(dim=1)
@@ -120,9 +107,7 @@ class RandomRotate(Augmentation):
     def __call__(self, cloud):
         x, y, z = (torch.rand(3) - 0.5) * self.max_rots
 
-        self.rot_mat = euler_angles_to_rotation(torch.tensor([x, y, z])).to(
-            device=cloud.xyz.device
-        )
+        self.rot_mat = euler_angles_to_rotation(torch.tensor([x, y, z])).to(device=cloud.xyz.device)
         return cloud.rotate(self.rot_mat.float())
 
 
@@ -131,17 +116,12 @@ class RandomTranslate(Augmentation):
         self.max_translation = torch.tensor([max_x, max_y, max_z])
 
     def __call__(self, cloud):
-        return cloud.translate(
-            (torch.rand(3, device=cloud.xyz.device) - 0.5)
-            * self.max_translation.to(device=cloud.xyz.device)
-        )
+        return cloud.translate((torch.rand(3, device=cloud.xyz.device) - 0.5) * self.max_translation.to(device=cloud.xyz.device))
 
 
 class Dropout3D(Augmentation):
     def __init__(self, **kwargs):
-        kwargs = {
-            k: tuple(v) if isinstance(v, Sequence) else v for k, v in kwargs.items()
-        }
+        kwargs = {k: tuple(v) if isinstance(v, Sequence) else v for k, v in kwargs.items()}
 
         self.params = dropout_3d.DropoutParams(**kwargs)
         self.dropout = dropout_3d.PointDropout(self.params)
@@ -156,10 +136,7 @@ class RandomDropout(Augmentation):
         self.max_drop_out = max_drop_out
 
     def __call__(self, cloud: Cloud) -> Cloud:
-        num_indices = int(
-            (1.0 - (self.max_drop_out * torch.rand(1, device=cloud.xyz.device)))
-            * cloud.xyz.shape[0]
-        )
+        num_indices = int((1.0 - (self.max_drop_out * torch.rand(1, device=cloud.xyz.device))) * cloud.xyz.shape[0])
 
         indices = torch.randint(
             high=cloud.xyz.shape[0],
@@ -171,9 +148,7 @@ class RandomDropout(Augmentation):
 
 class RandomAugmentation(Augmentation):
     @beartype
-    def __init__(
-        self, shuffle: bool, apply_prob: float, augmentations: Sequence[Augmentation]
-    ):
+    def __init__(self, shuffle: bool, apply_prob: float, augmentations: Sequence[Augmentation]):
         self.augmentations = augmentations
 
         self.shuffle = shuffle

@@ -1,24 +1,12 @@
 import numpy as np
 import open3d as o3d
 import torch
-import torch.nn.functional as F
 
-
-# from o3d_abstractions.viewimport o3d_view_geometries
-from smart_tree.util.maths import (
-    gen_tangents,
-    make_transformation_matrix,
-    random_unit,
-    rotation_matrix_from_vectors_torch,
-    torch_normalized,
-    vertex_dirs,
-)
+from smart_tree.util.maths import gen_tangents, random_unit, vertex_dirs
 
 
 def o3d_mesh(verts, tris):
-    return o3d.geometry.TriangleMesh(
-        o3d.utility.Vector3dVector(verts), o3d.utility.Vector3iVector(tris)
-    ).compute_triangle_normals()
+    return o3d.geometry.TriangleMesh(o3d.utility.Vector3dVector(verts), o3d.utility.Vector3iVector(tris)).compute_triangle_normals()
 
 
 def o3d_merge_meshes(meshes, colourize=False):
@@ -42,9 +30,7 @@ def o3d_merge_linesets(line_sets, colour=[0, 0, 0]):
     points = np.concatenate([ls.points for ls in line_sets])
     idxs = np.concatenate([ls.lines + offset for ls, offset in zip(line_sets, offsets)])
 
-    return o3d.geometry.LineSet(
-        o3d.utility.Vector3dVector(points), o3d.utility.Vector2iVector(idxs)
-    ).paint_uniform_color(colour)
+    return o3d.geometry.LineSet(o3d.utility.Vector3dVector(points), o3d.utility.Vector2iVector(idxs)).paint_uniform_color(colour)
 
 
 def points_to_edge_idx(points):
@@ -53,11 +39,7 @@ def points_to_edge_idx(points):
 
 
 def o3d_sphere(xyz, radius, colour=(1, 0, 0)):
-    return (
-        o3d.geometry.TriangleMesh.create_sphere(radius)
-        .translate(np.asarray(xyz))
-        .paint_uniform_color(colour)
-    )
+    return o3d.geometry.TriangleMesh.create_sphere(radius).translate(np.asarray(xyz)).paint_uniform_color(colour)
 
 
 def o3d_spheres(xyzs, radii, colour=None, colours=None):
@@ -66,9 +48,7 @@ def o3d_spheres(xyzs, radii, colour=None, colours=None):
 
 
 def o3d_line_set(vertices, edges, colour=None):
-    line_set = o3d.geometry.LineSet(
-        o3d.utility.Vector3dVector(vertices), o3d.utility.Vector2iVector(edges)
-    )
+    line_set = o3d.geometry.LineSet(o3d.utility.Vector3dVector(vertices), o3d.utility.Vector2iVector(edges))
     if colour is not None:
         return line_set.paint_uniform_color(colour)
     return line_set
@@ -139,15 +119,11 @@ def o3d_voxel_grid(
     origin=np.asarray([0, 0, 0]),
     colour=np.asarray([1, 1, 0]),
 ):
-    return o3d.geometry.VoxelGrid.create_dense(
-        origin, colour, voxel_size, width, depth, height
-    )
+    return o3d.geometry.VoxelGrid.create_dense(origin, colour, voxel_size, width, depth, height)
 
 
 def o3d_cylinder(radius, length, colour=(1, 0, 0)):
-    return o3d.geometry.TriangleMesh.create_cylinder(
-        radius, length
-    ).paint_uniform_color(colour)
+    return o3d.geometry.TriangleMesh.create_cylinder(radius, length).paint_uniform_color(colour)
 
 
 def o3d_cylinders(radii, length, colour=None, colours=None):
@@ -157,9 +133,7 @@ def o3d_cylinders(radii, length, colour=None, colours=None):
 
 def paint_o3d_geoms(geometries, colour=None, colours=None):
     if colours is not None:
-        return [
-            geom.paint_uniform_color(colours[i]) for i, geom in enumerate(geometries)
-        ]
+        return [geom.paint_uniform_color(colours[i]) for i, geom in enumerate(geometries)]
     elif colour is not None:
         return [geom.paint_uniform_color(colour) for geom in geometries]
     return geometries
@@ -205,9 +179,7 @@ def o3d_lines_between_clouds(cld1, cld2):
     pts2 = np.asarray(cld2.points)
 
     interweaved = np.hstack((pts1, pts2)).reshape(-1, 3)
-    return o3d_line_set(
-        interweaved, np.arange(0, min(pts1.shape[0], pts2.shape[0]) * 2).reshape(-1, 2)
-    )
+    return o3d_line_set(interweaved, np.arange(0, min(pts1.shape[0], pts2.shape[0]) * 2).reshape(-1, 2))
 
 
 def o3d_tube_mesh(points, radii, colour=(1, 0, 0), n=10):
@@ -238,9 +210,7 @@ def sample_o3d_lineset(lineset, sample_rate):
         num_points = np.ceil(length / sample_rate)
 
         if int(num_points) > 0.0:
-            spaced_points = np.arange(
-                0, float(length), step=float(length / num_points)
-            ).reshape(-1, 1)
+            spaced_points = np.arange(0, float(length), step=float(length / num_points)).reshape(-1, 1)
             pts.append(start + direction * spaced_points)
 
     return np.concatenate(pts, axis=0)
