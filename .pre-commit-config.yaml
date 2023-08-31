@@ -1,9 +1,8 @@
-...
--   repo: https://github.com/psf/black
+
+repos:
+  - repo: https://github.com/psf/black
     rev: 20.8b1
     hooks:
     -   id: black
         args: []
         files: .
-        
-...
