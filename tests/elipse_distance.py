@@ -36,7 +36,9 @@ def ellipsoid_graph(
 ):
     # This is not optimal as it requires a sufficient K
 
-    ellipsoid_semi_axis = (radii.unsqueeze(1) * branch_directions * stretch_factor) + radii.unsqueeze(1)
+    ellipsoid_semi_axis = (
+        radii.unsqueeze(1) * branch_directions * stretch_factor
+    ) + radii.unsqueeze(1)
     ellipsoid_semi_axis = torch.abs(ellipsoid_semi_axis)
 
     idxs, dists, _ = knn(points, points, K=K, r=radii.max().item() * stretch_factor)

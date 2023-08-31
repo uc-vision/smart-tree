@@ -15,9 +15,13 @@ def cast_tensor_type(inputs, src_type, dst_type):
             inputs = inputs.replace_feature(features)
         return inputs
     elif isinstance(inputs, abc.Mapping):
-        return type(inputs)({k: cast_tensor_type(v, src_type, dst_type) for k, v in inputs.items()})
+        return type(inputs)(
+            {k: cast_tensor_type(v, src_type, dst_type) for k, v in inputs.items()}
+        )
     elif isinstance(inputs, abc.Iterable):
-        return type(inputs)(cast_tensor_type(item, src_type, dst_type) for item in inputs)
+        return type(inputs)(
+            cast_tensor_type(item, src_type, dst_type) for item in inputs
+        )
     else:
         return inputs
 
@@ -27,7 +31,10 @@ def force_fp32(apply_to=None, out_fp16=False):
         @functools.wraps(old_func)
         def new_func(*args, **kwargs):
             if not isinstance(args[0], torch.nn.Module):
-                raise TypeError("@force_fp32 can only be used to decorate the " "method of nn.Module")
+                raise TypeError(
+                    "@force_fp32 can only be used to decorate the "
+                    "method of nn.Module"
+                )
             # get the arg spec of the decorated method
             args_info = getfullargspec(old_func)
             # get the argument names to be casted
@@ -38,7 +45,9 @@ def force_fp32(apply_to=None, out_fp16=False):
                 arg_names = args_info.args[: len(args)]
                 for i, arg_name in enumerate(arg_names):
                     if arg_name in args_to_cast:
-                        new_args.append(cast_tensor_type(args[i], torch.half, torch.float))
+                        new_args.append(
+                            cast_tensor_type(args[i], torch.half, torch.float)
+                        )
                     else:
                         new_args.append(args[i])
             # convert the kwargs that need to be processed
@@ -46,7 +55,9 @@ def force_fp32(apply_to=None, out_fp16=False):
             if kwargs:
                 for arg_name, arg_value in kwargs.items():
                     if arg_name in args_to_cast:
-                        new_kwargs[arg_name] = cast_tensor_type(arg_value, torch.half, torch.float)
+                        new_kwargs[arg_name] = cast_tensor_type(
+                            arg_value, torch.half, torch.float
+                        )
                     else:
                         new_kwargs[arg_name] = arg_value
             with torch.cuda.amp.autocast(enabled=False):

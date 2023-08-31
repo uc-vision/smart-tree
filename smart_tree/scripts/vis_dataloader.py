@@ -2,7 +2,6 @@ import logging
 
 import hydra
 import numpy as np
-
 # from open3d_vis import render
 import open3d as o3d
 import torch

@@ -44,7 +44,9 @@ class Skeletonizer:
             K=self.K,
         )
 
-        subgraphs: List[cugraph.Graph] = graph.connected_cugraph_components(minimum_vertices=self.minimum_graph_vertices)
+        subgraphs: List[cugraph.Graph] = graph.connected_cugraph_components(
+            minimum_vertices=self.minimum_graph_vertices
+        )
 
         skeletons = []
 

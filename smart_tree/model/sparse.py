@@ -14,20 +14,27 @@ def sparse_from_batch(features, coordinates, device):
 
     values, _ = torch.max(coordinates, 0)  # BXYZ -> XYZ (Biggest Spatial Size)
 
-    return spconv.SparseConvTensor(features, coordinates.int(), values[1:], batch_size=batch_size)
+    return spconv.SparseConvTensor(
+        features, coordinates.int(), values[1:], batch_size=batch_size
+    )
 
 
 def split_sparse_list(indices, features):
     cloud_ids = indices[:, 0]
 
     num_clouds = cloud_ids.max() + 1
-    return [(indices[cloud_ids == i], features[cloud_ids == i]) for i in range(num_clouds)]
+    return [
+        (indices[cloud_ids == i], features[cloud_ids == i]) for i in range(num_clouds)
+    ]
 
 
 def split_sparse(sparse_tensor):
     cloud_ids = sparse_tensor.indices[:, 0]
     num_clouds = cloud_ids.max() + 1
-    return [(sparse_tensor.indices[cloud_ids == i], sparse_tensor.features[cloud_ids == i]) for i in range(num_clouds)]
+    return [
+        (sparse_tensor.indices[cloud_ids == i], sparse_tensor.features[cloud_ids == i])
+        for i in range(num_clouds)
+    ]
 
 
 def batch_collate(batch):
@@ -41,11 +48,15 @@ def batch_collate(batch):
     if isinstance(batch_feats[0], tuple):
         input_feats, target_feats = tuple(zip(*batch_feats))
 
-        input_feats, target_feats, coords, mask = [torch.cat(x) for x in [input_feats, target_feats, batch_coords, batch_mask]]
+        input_feats, target_feats, coords, mask = [
+            torch.cat(x) for x in [input_feats, target_feats, batch_coords, batch_mask]
+        ]
 
         return [(input_feats, target_feats), coords, mask, fn]
 
-    feats, coords, mask = [torch.cat(x) for x in [batch_feats, batch_coords, batch_mask]]
+    feats, coords, mask = [
+        torch.cat(x) for x in [batch_feats, batch_coords, batch_mask]
+    ]
 
     return [feats, coords, mask, fn]
 
@@ -79,7 +90,9 @@ def sparse_quantize(
     voxel_size = np.array(voxel_size)
     coords = np.floor(coords / voxel_size).astype(np.int32)
 
-    _, indices, inverse_indices = np.unique(ravel_hash(coords), return_index=True, return_inverse=True)
+    _, indices, inverse_indices = np.unique(
+        ravel_hash(coords), return_index=True, return_inverse=True
+    )
     coords = coords[indices]
 
     outputs = [coords]

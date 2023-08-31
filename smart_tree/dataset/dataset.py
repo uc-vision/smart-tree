@@ -47,7 +47,11 @@ class TreeDataset:
         elif self.mode == "test":
             self.tree_paths = json_data["test"]
 
-        missing = [path for path in self.tree_paths if not Path(f"{self.directory}/{path}").is_file()]
+        missing = [
+            path
+            for path in self.tree_paths
+            if not Path(f"{self.directory}/{path}").is_file()
+        ]
 
         assert len(missing) == 0, f"Missing {len(missing)} files: {missing}"
 
@@ -110,7 +114,9 @@ class TreeDataset:
         else:
             data = input_feats
 
-        assert data.shape[0] > 0, f"Empty cloud after augmentation: {self.tree_paths[idx]}"
+        assert (
+            data.shape[0] > 0
+        ), f"Empty cloud after augmentation: {self.tree_paths[idx]}"
 
         surface_voxel_generator = PointToVoxel(
             vsize_xyz=[self.voxel_size] * 3,
@@ -174,8 +180,12 @@ class SingleTreeInference:
         self.compute_blocks()
 
     def compute_blocks(self):
-        self.xyz_quantized = torch.div(self.cloud.xyz, self.block_size, rounding_mode="floor")
-        self.block_ids, pnt_counts = torch.unique(self.xyz_quantized, return_counts=True, dim=0)
+        self.xyz_quantized = torch.div(
+            self.cloud.xyz, self.block_size, rounding_mode="floor"
+        )
+        self.block_ids, pnt_counts = torch.unique(
+            self.xyz_quantized, return_counts=True, dim=0
+        )
 
         # Remove blocks that have less than specified amount of points...
         self.block_ids = self.block_ids[pnt_counts > self.min_points]
@@ -217,7 +227,9 @@ class SingleTreeInference:
             max_num_points_per_voxel=1,
         )
 
-        feats, coords, _, voxel_id_tv = surface_voxel_generator.generate_voxel_with_id(torch.cat((cloud.xyz, cloud.rgb), dim=1).contiguous())  #
+        feats, coords, _, voxel_id_tv = surface_voxel_generator.generate_voxel_with_id(
+            torch.cat((cloud.xyz, cloud.rgb), dim=1).contiguous()
+        )  #
 
         indice = torch.zeros((coords.shape[0], 1), dtype=torch.int32)
         coords = torch.cat((indice, coords), dim=1)

@@ -50,8 +50,12 @@ def compute_loss(
     if target_radius_log:
         target_radius = torch.log(target_radius)
 
-    losses["medial_direction"] = direction_loss_fn(predicted_medial_direction[vector_mask], target_medial_direction[vector_mask])
-    losses["radius"] = radius_loss_fn(predicted_radius.view(-1)[vector_mask], target_radius.view(-1)[vector_mask])
+    losses["medial_direction"] = direction_loss_fn(
+        predicted_medial_direction[vector_mask], target_medial_direction[vector_mask]
+    )
+    losses["radius"] = radius_loss_fn(
+        predicted_radius.view(-1)[vector_mask], target_radius.view(-1)[vector_mask]
+    )
     losses["class_l"] = class_loss_fn(predicted_class, target_class)
 
     return losses
@@ -78,7 +82,9 @@ def dice_loss(outputs, targets):
 
     intersection = (outputs * targets).sum()
 
-    return 1 - ((2.0 * intersection + smooth) / (outputs.sum() + targets.sum() + smooth))
+    return 1 - (
+        (2.0 * intersection + smooth) / (outputs.sum() + targets.sum() + smooth)
+    )
 
 
 def focal_loss(outputs, targets):

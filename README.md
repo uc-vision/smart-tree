@@ -34,9 +34,9 @@ Then activate the environment using: <br>`conda activate smart-tree`
 
 To train the model open smart_tree/conf/tree-dataset.yaml.
 
-You will need to update (alternatively these can be overwritten with hydra): 
+You will need to update (alternatively these can be overwritten with hydra):
 
-- training.dataset.json_path to the location of where your smart_tree/conf/tree-split.json is stored. 
+- training.dataset.json_path to the location of where your smart_tree/conf/tree-split.json is stored.
 - training.dataset.directory to the location of where you downloaded the data (you can choose whether to train on the data with foliage or without based on the directory you supply).
 
 You can experiment with/adjust hyper-parameter settings too.
@@ -74,7 +74,7 @@ Please use the following BibTeX entry to cite our work: <br>
 }
 ```
 
-## 📥 Contact 
+## 📥 Contact
 
 Should you have any questions, comments or suggestions please use the following contact details:
 harry.dobbs@pg.canterbury.ac.nz

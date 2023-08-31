@@ -12,7 +12,7 @@ def sample_branch_skeleton():
         _id=1,
         parent_id=0,
         xyz=torch.tensor([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]),
-        radii=torch.tensor([0.1, 0.2]),
+        radii=torch.tensor([[0.1], [0.2]]),
     )
 
 
@@ -43,19 +43,19 @@ def test_filter(sample_branch_skeleton):
     assert isinstance(filtered_branch_skeleton, BranchSkeleton)
 
     assert torch.equal(filtered_branch_skeleton.xyz, torch.tensor([[0.0, 0.0, 0.0]]))
-    assert torch.equal(filtered_branch_skeleton.radii, torch.tensor([0.1]))
+    assert torch.equal(filtered_branch_skeleton.radii, torch.tensor([[0.1]]))
     assert filtered_branch_skeleton._id == sample_branch_skeleton._id
     assert filtered_branch_skeleton.parent_id == sample_branch_skeleton.parent_id
     assert filtered_branch_skeleton.child_id == sample_branch_skeleton.child_id
 
 
 def test_to_o3d_lineset(sample_branch_skeleton):
-    lineset = sample_branch_skeleton.to_o3d_lineset()
+    lineset = sample_branch_skeleton.as_o3d_lineset()
 
     assert isinstance(lineset, o3d.geometry.LineSet)
 
 
 def test_to_o3d_tube(sample_branch_skeleton):
-    tube_mesh = sample_branch_skeleton.to_o3d_tube()
+    tube_mesh = sample_branch_skeleton.as_o3d_tube()
 
     assert isinstance(tube_mesh, o3d.geometry.TriangleMesh)

@@ -172,11 +172,16 @@ class DisjointTreeSkeleton:
             skeleton.smooth(kernel_size=kernel_size)
 
     def to_o3d_lineset(self):
-        return o3d_merge_linesets([s.to_o3d_lineset().paint_uniform_color(s.colour) for s in self.skeletons])
+        return o3d_merge_linesets(
+            [s.to_o3d_lineset().paint_uniform_color(s.colour) for s in self.skeletons]
+        )
 
     def to_o3d_tube(self, colour=True):
         if colour:
-            skeleton_tubes = [skel.to_o3d_tube().paint_uniform_color(skel.colour) for skel in self.skeletons]
+            skeleton_tubes = [
+                skel.to_o3d_tube().paint_uniform_color(skel.colour)
+                for skel in self.skeletons
+            ]
         else:
             skeleton_tubes = [s.to_o3d_tube() for s in self.skeletons]
 

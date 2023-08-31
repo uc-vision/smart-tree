@@ -44,4 +44,4 @@ view-pcd = "smart_tree.scripts.view_pcd:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = "test_*.py"
+python_files = "*_test.py"

@@ -11,7 +11,9 @@ class ViewerItem:
     is_visible: bool = True
 
 
-def o3d_viewer(items: Union[Sequence[ViewerItem], List[o3d.geometry.Geometry]], line_width=1):
+def o3d_viewer(
+    items: Union[Sequence[ViewerItem], List[o3d.geometry.Geometry]], line_width=1
+):
     mat = o3d.visualization.rendering.MaterialRecord()
     mat.shader = "defaultLit"
 

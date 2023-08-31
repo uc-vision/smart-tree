@@ -3,7 +3,7 @@
 wandb:
   project: tree
   entity: harry1576
-  mode: online 
+  mode: online
 
 fp16: False
 num_epoch: 500
@@ -41,7 +41,7 @@ train_dataset:
   input_features: ${input_features}
   target_features: ${target_features}
   # augmentation:
-  #   _target_:  smart_tree.dataset.augmentations.AugmentationPipeline 
+  #   _target_:  smart_tree.dataset.augmentations.AugmentationPipeline
   #   augmentations:
   #     - _target_:  smart_tree.dataset.augmentations.RandomCubicCrop
   #       size: 4.0
@@ -55,7 +55,7 @@ test_dataset:
   input_features: ${input_features}
   target_features: ${target_features}
   # augmentation:
-  #   _target_:  smart_tree.dataset.augmentations.AugmentationPipeline 
+  #   _target_:  smart_tree.dataset.augmentations.AugmentationPipeline
   #   augmentations:
   #     - _target_:  smart_tree.dataset.augmentations.RandomCubicCrop
   #       size: 4.0
@@ -70,7 +70,7 @@ validation_dataset:
   target_features: ${target_features}
   cache: True
   # augmentation:
-  #   _target_:  smart_tree.dataset.augmentations.AugmentationPipeline 
+  #   _target_:  smart_tree.dataset.augmentations.AugmentationPipeline
   #   augmentations:
   #     - _target_:  smart_tree.dataset.augmentations.RandomCubicCrop
   #       size: 4.0
@@ -124,11 +124,11 @@ model:
   unet_planes: [8, 16, 32, 64]
   radius_fc_planes: [8, 8, 4, 1]
   direction_fc_planes: [8, 8, 4, 3]
-  class_fc_planes: [8, 8, 4, 2] 
+  class_fc_planes: [8, 8, 4, 2]
   bias: False
 
 optimizer:
-  _target_: torch.optim.Adam 
+  _target_: torch.optim.Adam
   lr: ${lr}
 
 scheduler:
@@ -140,7 +140,7 @@ loss_fn:
   _partial_: True
   vector_class: 0
   target_radius_log: True
- 
+
   radius_loss_fn:
     _target_ : smart_tree.model.loss.L1Loss
     _partial_: True

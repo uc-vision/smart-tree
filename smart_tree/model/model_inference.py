@@ -59,7 +59,9 @@ class ModelInference:
             self.batch_size,
         )
 
-        for features, coordinates, mask, filename in tqdm(dataloader, desc="Inferring", leave=False):
+        for features, coordinates, mask, filename in tqdm(
+            dataloader, desc="Inferring", leave=False
+        ):
             sparse_input = sparse_from_batch(
                 features[:, :3],
                 coordinates,

@@ -8,7 +8,9 @@ num_ellipsoids = 50000
 num_points = 50000
 
 # Example ellipsoid data (replace with your ellipsoid data)
-ellipsoid_centers = np.random.rand(num_ellipsoids, 3)  # Replace with your ellipsoid centers
+ellipsoid_centers = np.random.rand(
+    num_ellipsoids, 3
+)  # Replace with your ellipsoid centers
 ellipsoid_axes = np.random.rand(num_ellipsoids, 3)  # Replace with your ellipsoid axes
 
 # Example point data (replace with your point data)

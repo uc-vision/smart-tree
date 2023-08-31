@@ -38,7 +38,12 @@ def concate_dict_of_tensors(tensors: dict, device=torch.device("cpu")):
 
 
 def unique_n_colours(num_colours, cmap="hsv"):
-    return np.asarray([cmapy.color(cmap, i) for i in range(0, 255, math.ceil(255 / num_colours))]).reshape(-1, 3) / 255
+    return (
+        np.asarray(
+            [cmapy.color(cmap, i) for i in range(0, 255, math.ceil(255 / num_colours))]
+        ).reshape(-1, 3)
+        / 255
+    )
 
 
 def unique_n_random_colours(num_colours):
@@ -54,7 +59,9 @@ def points_to_edges(points):
 
 
 def voxel_downsample(xyz, voxel_size):
-    xyz_quantized = xyz // voxel_size  # torch.div(xyz + (voxel_size / 2), voxel_size, rounding_mode="floor")
+    xyz_quantized = (
+        xyz // voxel_size
+    )  # torch.div(xyz + (voxel_size / 2), voxel_size, rounding_mode="floor")
 
     unique, idx, counts = torch.unique(
         xyz_quantized,

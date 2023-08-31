@@ -12,7 +12,9 @@ from tqdm import tqdm
     config_name="test-dataloader",
 )
 def main(cfg: DictConfig):
-    train_dataloader = instantiate(cfg.data_loader, dataset=instantiate(cfg.dataset, mode="train"))
+    train_dataloader = instantiate(
+        cfg.data_loader, dataset=instantiate(cfg.dataset, mode="train")
+    )
 
     start_time = time.time()
     for data in tqdm(train_dataloader):
