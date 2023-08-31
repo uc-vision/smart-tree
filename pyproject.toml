@@ -40,25 +40,3 @@ run-smart-tree = "smart_tree.cli:main"
 train-smart-tree = "smart_tree.model.train:main"
 view-npz = "smart_tree.scripts.view_npz:main"
 view-pcd = "smart_tree.scripts.view_pcd:main"
-
-[tool.black]
-line-length = 150
-include = '\.pyi?$'
-exclude = '''
-/(
-      .eggs         # exclude a few common directories in the
-    | .git          # root of the project
-    | .hg
-    | .mypy_cache
-    | .tox
-    | venv
-    | _build
-    | buck-out
-    | build
-    | dist
-  )/
-'''
-
-[tool.isort]
-skip = [".gitignore", ".dockerignore"]
-profile = "black"
