@@ -15,7 +15,7 @@ def sample_graph():
         [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], dtype=torch.float32
     )
     edges = torch.tensor([[0, 1], [1, 2], [2, 0]], dtype=torch.int64)
-    edge_weights = torch.tensor([1.0, 2.0, 3.0], dtype=torch.float32)
+    edge_weights = torch.tensor([[1.0], [2.0], [3.0]], dtype=torch.float32)
     return Graph(vertices, edges, edge_weights)
 
 
@@ -29,7 +29,7 @@ def test_to_o3d_lineset(sample_graph):
 
 # Test the 'to_device' method
 def test_to_device(sample_graph):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     device_graph = sample_graph.to_device(device)
 
     # Check if the vertices, edges, and edge_weights are on the target device and have the correct dtype

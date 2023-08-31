@@ -45,3 +45,6 @@ view-pcd = "smart_tree.scripts.view_pcd:main"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "*_test.py"
+
+[tool.isort]
+profile = "black"

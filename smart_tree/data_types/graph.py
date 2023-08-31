@@ -22,6 +22,18 @@ class Graph:
     edges: TensorType["N", 2]
     edge_weights: TensorType["N", 1]
 
+    def __len__(self) -> int:
+        return self.edges.shape[0]
+
+    def __str__(self) -> str:
+        return (
+            f"{'*' * 80}"
+            f"Graph :\n"
+            f"Num Edges: {self.edges.shape[0]}\n"
+            f"Num Vertices: {self.vertices.shape[0]}\n"
+            f"{'*' * 80}"
+        )
+
     def to_o3d_lineset(self, colour=(1, 0, 0)) -> o3d.geometry.LineSet:
         return o3d_line_set(self.vertices, self.edges, colour=colour)
 
