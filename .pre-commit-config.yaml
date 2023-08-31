@@ -4,5 +4,4 @@ repos:
     rev: 20.8b1
     hooks:
     -   id: black
-        args: []
-        files: smart_tree/*
+        args: [--safe]
