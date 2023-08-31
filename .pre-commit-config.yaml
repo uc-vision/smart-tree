@@ -5,4 +5,4 @@ repos:
     hooks:
     -   id: black
         args: []
-        files: .
+        files: smart_tree/*
