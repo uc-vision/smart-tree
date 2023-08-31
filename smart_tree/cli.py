@@ -12,7 +12,7 @@ from omegaconf import DictConfig
     config_name="pipeline",
 )
 def main(cfg: DictConfig):
-    pipeline = instantiate(cfg.pipeline)
+    pipeline = instantiate(cfg)
 
     if "path" in dict(cfg):
         pipeline.process_cloud(Path(cfg.path))
