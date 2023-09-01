@@ -5,7 +5,7 @@ from typing import List, Literal, Optional
 import torch
 import torch.utils.data
 from spconv.pytorch.utils import PointToVoxel
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from typeguard import typechecked
 
@@ -23,12 +23,12 @@ class Dataset:
         json_path: Path | str,
         directory: Path | str,
         mode: Literal["train", "validation", "test", "unlabelled"],
-        augmentation: Optional[AugmentationPipeline] = None,
+        transform: Optional[AugmentationPipeline] = None,
         cache: bool = False,
         device=torch.device("cuda:0"),
     ):
         self.mode = mode
-        self.augmentation = augmentation
+        self.transform = transform
         self.directory = directory
         self.device = device
 
@@ -65,7 +65,7 @@ class Dataset:
         cld = self.load(self.full_paths[idx])
 
         try:
-            return self.process_cloud(cld, self.full_paths[idx])
+            return self.process_cloud(cld)
         except Exception:
             print(f"Exception processing {cld}")
             raise
@@ -73,14 +73,13 @@ class Dataset:
     def __len__(self):
         return len(self.full_paths)
 
-    def process_cloud(self, cld: Cloud, filename: str) -> Cloud | LabelledCloud:
-        cld = cld.to_device(self.device)
+    def process_cloud(self, cld: Cloud):
+        sample = cld.to_device(self.device)
 
-        if self.augmentation != None:
-            cld = self.augmentation(cld)
+        if self.transform != None:
+            sample = self.transform(cld)
 
-        return cld
-
+        return sample
         if cld.input_features is None:
             raise ValueError(f"Missing input features {filename}")
 

@@ -3,7 +3,7 @@ import open3d as o3d
 import open3d.visualization.rendering as rendering
 
 
-def create_camera(width, height, fx=575, fy=575):
+def create_camera(width: int, height: int, fx: int = 575, fy: int = 575):
     camera_parameters = o3d.camera.PinholeCameraParameters()
     camera_parameters.extrinsic = np.eye(4)
     camera_parameters.intrinsic.set_intrinsics(

@@ -8,7 +8,8 @@ import open3d as o3d
 class ViewerItem:
     name: str
     geometry: o3d.geometry.Geometry
-    is_visible: bool = True
+    is_visible: bool = False
+    group: str = ""
 
 
 def o3d_viewer(

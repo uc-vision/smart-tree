@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, fields
+from functools import partial
 from pathlib import Path
 from typing import Optional
 
@@ -10,8 +11,6 @@ import torch
 import torch.nn.functional as F
 from torchtyping import TensorType, patch_typeguard
 from typeguard import typechecked
-
-from smart_tree.o3d_abstractions.visualizer import ViewerItem
 
 from ..o3d_abstractions.geometries import o3d_cloud, o3d_lines_between_clouds
 from ..o3d_abstractions.visualizer import ViewerItem, o3d_viewer
@@ -89,11 +88,15 @@ class Cloud:
     def bounding_box(self) -> tuple[TensorType[3], TensorType[3]]:
         return self.min_xyz, self.max_xyz
 
+    @property
+    def group_name(self) -> str:
+        return f"{self.filename.stem}" if self.filename != None else ""
+
     def as_o3d_cld(self) -> o3d.geometry.PointCloud:
-        return o3d_cloud(self.xyz, self.rgb)
+        return o3d_cloud(self.xyz, colours=self.rgb)
 
     def viewer_items(self) -> list[ViewerItem]:
-        return [ViewerItem("Cloud", self.as_o3d_cld(), is_visible=True)]
+        return [ViewerItem("Cloud", self.as_o3d_cld(), False, group=self.group_name)]
 
     def view(self) -> None:
         o3d_viewer(self.viewer_items())
@@ -118,6 +121,8 @@ class LabelledCloud(Cloud):
 
     loss_mask: Optional[TensorType["N", 1]] = None
     vector_loss_mask: Optional[TensorType["N", 1]] = None
+
+    vector: Optional[TensorType["N", 3]] = None  # Legacy
 
     def scale(self, factor: float | TensorType[1]) -> LabelledCloud:
         args = asdict(self)
@@ -182,7 +187,7 @@ class LabelledCloud(Cloud):
     ) -> o3d.geometry.PointCloud:
         if cmap is None:
             cmap = torch.rand(self.number_classes, 3)
-        colours = cmap[self.class_l.view(-1).int()]
+        colours = cmap.to(self.device)[self.class_l.view(-1).int()]
         return o3d_cloud(self.xyz, colours=colours)
 
     def as_o3d_trunk_cld(self) -> o3d.geometry.PointCloud:
@@ -206,15 +211,16 @@ class LabelledCloud(Cloud):
 
     def viewer_items(self) -> list[ViewerItem]:
         items = super().viewer_items()
+        item = partial(ViewerItem, is_visible=False, group=self.group_name)
         if self.medial_vector is not None:
-            items += [ViewerItem("Medial Vectors", self.as_o3d_medial_vectors())]
+            items += [item("Medial Vectors", self.as_o3d_medial_vectors())]
         if self.branch_direction is not None:
-            items += [ViewerItem("Branch Directions", self.as_o3d_branch_directions())]
+            items += [item("Branch Directions", self.as_o3d_branch_directions())]
         if self.branch_ids is not None:
-            items += [ViewerItem("Trunk", self.as_o3d_trunk_cld())]
-            items += [ViewerItem("Branches", self.as_o3d_branch_cld())]
+            items += [item("Trunk", self.as_o3d_trunk_cld())]
+            items += [item("Branches", self.as_o3d_branch_cld())]
         if self.class_l is not None:
-            items += [ViewerItem("Segmented", self.as_o3d_segmented_cld())]
+            items += [item("Segmented", self.as_o3d_segmented_cld())]
         return items
 
     def view(self):
@@ -239,10 +245,7 @@ class CloudLoader:
         cloud_fields = {f.name: data[f.name] for f in fields(Cloud) if f.name in data}
 
         for k, v in cloud_fields.items():
-            if k in ["class_l", "branch_ids"]:
-                cloud_fields[k] = torch.from_numpy(v).long().reshape(-1, 1)
-            else:
-                cloud_fields[k] = torch.from_numpy(v).float()
+            cloud_fields[k] = torch.from_numpy(v).float()
         cloud_fields["filename"] = Path(fn)
         return Cloud(**cloud_fields)
 
@@ -253,6 +256,10 @@ class CloudLoader:
         for k, v in labelled_cloud_fields.items():
             if k in ["class_l", "branch_ids"]:
                 labelled_cloud_fields[k] = torch.from_numpy(v).long().reshape(-1, 1)
+
+            elif k in ["vector"]:
+                labelled_cloud_fields["medial_vector"] = torch.from_numpy(v).float()
+
             else:
                 labelled_cloud_fields[k] = torch.from_numpy(v).float()
         labelled_cloud_fields["filename"] = Path(fn)

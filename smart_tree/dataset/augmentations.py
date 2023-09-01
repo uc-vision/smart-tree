@@ -88,8 +88,10 @@ class RandomCrop(Augmentation):
             torch.rand(3, device=cloud.xyz.device) - 0.5
         ) * self.max_translation.to(device=cloud.xyz.device)
 
-        p = cloud.xyz + offset
-        mask = torch.logical_and(p >= cloud.min_xyz, p <= cloud.max_xyz).all(dim=1)
+        mask = torch.logical_and(
+            cloud.xyz + offset >= cloud.min_xyz,
+            cloud.xyz + offset <= cloud.max_xyz,
+        ).all(dim=1)
 
         return cloud.filter(mask)
 
@@ -161,7 +163,10 @@ class RandomDropout(Augmentation):
 class RandomAugmentation(Augmentation):
     @beartype
     def __init__(
-        self, shuffle: bool, apply_prob: float, augmentations: Sequence[Augmentation]
+        self,
+        shuffle: bool,
+        apply_prob: float,
+        augmentations: Sequence[Augmentation],
     ):
         self.augmentations = augmentations
 

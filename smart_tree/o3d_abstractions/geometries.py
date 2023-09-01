@@ -4,9 +4,11 @@ import numpy as np
 import open3d as o3d
 import torch
 
-from smart_tree.util.maths import gen_tangents, random_unit, vertex_dirs
+from ..util.maths import gen_tangents, random_unit, vertex_dirs
+from ..util.misc import move_to_cpu
 
 
+@move_to_cpu
 def o3d_mesh(verts, tris):
     mesh = o3d.geometry.TriangleMesh(
         o3d.utility.Vector3dVector(verts),
@@ -49,6 +51,7 @@ def o3d_merge_linesets(line_sets, colour=[0, 0, 0]):
     ).paint_uniform_color(colour)
 
 
+@move_to_cpu
 def o3d_sphere(xyz, radius, colour=(1, 0, 0)):
     return (
         o3d.geometry.TriangleMesh.create_sphere(radius)
@@ -57,11 +60,13 @@ def o3d_sphere(xyz, radius, colour=(1, 0, 0)):
     )
 
 
+@move_to_cpu
 def o3d_spheres(xyzs, radii, colour=None, colours=None):
     spheres = [o3d_sphere(xyz, r) for xyz, r in zip(xyzs, radii)]
     return paint_o3d_geoms(spheres, colour, colours)
 
 
+@move_to_cpu
 def o3d_line_set(vertices, edges, colour=None):
     line_set = o3d.geometry.LineSet(
         o3d.utility.Vector3dVector(vertices), o3d.utility.Vector2iVector(edges)
@@ -71,10 +76,12 @@ def o3d_line_set(vertices, edges, colour=None):
     return line_set
 
 
+@move_to_cpu
 def o3d_line_sets(vertices, edges):
     return [o3d_line_set(v, e) for v, e in zip(vertices, edges)]
 
 
+@move_to_cpu
 def o3d_path(vertices, colour=(1, 0, 0)):
     idx = torch.arange(vertices.shape[0] - 1)
     return o3d_line_set(
@@ -82,10 +89,12 @@ def o3d_path(vertices, colour=(1, 0, 0)):
     ).paint_uniform_color(colour)
 
 
+@move_to_cpu
 def o3d_paths(vertices):
     return [o3d_path(v) for v in vertices]
 
 
+@move_to_cpu
 def o3d_merge_clouds(points_clds):
     points = np.concatenate([np.asarray(pcd.points) for pcd in points_clds])
     colors = np.concatenate([np.asarray(pcd.colors) for pcd in points_clds])
@@ -93,6 +102,7 @@ def o3d_merge_clouds(points_clds):
     return o3d_cloud(points, colours=colors)
 
 
+@move_to_cpu
 def o3d_cloud(points, colour=None, colours=None, normals=None):
     cloud = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(points))
     if normals is not None:
@@ -106,6 +116,7 @@ def o3d_cloud(points, colour=None, colours=None, normals=None):
     return cloud.paint_uniform_color([1, 0, 0])
 
 
+@move_to_cpu
 def o3d_clouds(batch_points, colour=None, colours=None, p_colours=None):
     # KN#
     # colour -> paint all the same colour
@@ -123,6 +134,7 @@ def o3d_clouds(batch_points, colour=None, colours=None, p_colours=None):
     return [o3d_cloud(p, n) for p, n in zip(batch_points)]
 
 
+@move_to_cpu
 def o3d_voxel_grid(
     width: float,
     depth: float,
@@ -136,12 +148,14 @@ def o3d_voxel_grid(
     )
 
 
+@move_to_cpu
 def o3d_cylinder(radius, length, colour=(1, 0, 0)):
     return o3d.geometry.TriangleMesh.create_cylinder(
         radius, length
     ).paint_uniform_color(colour)
 
 
+@move_to_cpu
 def o3d_cylinders(radii, length, colour=None, colours=None):
     cylinders = [o3d_cylinder(r, l, colour) for r, l in zip(radii, length)]
     return paint_o3d_geoms(cylinders, colour, colours)
@@ -202,6 +216,7 @@ def o3d_lines_between_clouds(cld1, cld2):
     )
 
 
+@move_to_cpu
 def o3d_tube_mesh(points, radii, colour=(1, 0, 0), n=10):
     points = points.cpu().numpy()
     radii = radii.cpu().numpy()

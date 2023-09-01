@@ -20,6 +20,32 @@ def at_least_2d(tensors: Union[List[torch.tensor], torch.tensor], expand_dim=1):
             return tensors
 
 
+def move_to_cpu(func):
+    def wrapper(*args, **kwargs):
+        new_args = []
+        for arg in args:
+            if isinstance(arg, torch.Tensor) and arg.is_cuda:
+                new_args.append(arg.cpu())
+            else:
+                new_args.append(arg)
+
+        new_kwargs = {}
+        for key, value in kwargs.items():
+            if isinstance(value, torch.Tensor) and value.is_cuda:
+                new_kwargs[key] = value.cpu()
+            else:
+                new_kwargs[key] = value
+
+        result = func(*new_args, **new_kwargs)
+
+        if isinstance(result, torch.Tensor) and result.is_cuda:
+            return result.cpu()
+        else:
+            return result
+
+    return wrapper
+
+
 def to_torch(numpy_arrays: List[np.array], device=torch.device("cpu")):
     return [torch.from_numpy(np_arr).float().to(device) for np_arr in numpy_arrays]
 
