@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, fields
-from functools import cached_property
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 import numpy as np
 import open3d as o3d
