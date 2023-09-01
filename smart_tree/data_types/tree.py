@@ -93,7 +93,7 @@ class TreeSkeleton:
                     branch.radii.reshape(1, 1, -1),
                     kernel,
                     padding="same",
-                ).reshape(-1)
+                ).view(-1)
 
     @property
     def length(self) -> TensorType[1]:
@@ -137,17 +137,6 @@ class TreeSkeleton:
 
     def view(self):
         o3d_viewer(self.view_items)
-
-    # def sample_skeleton(self, spacing):
-    #     return sample_tubes(self.to_tubes(), spacing)
-
-    # def point_to_skeleton(self):
-    #     tubes = self.to_tubes()
-
-    #     def point_to_tube(pt):
-    #         return pts_to_nearest_tube_gpu(pt.reshape(-1, 3), tubes)
-
-    #     return point_to_tube  # v, idx, _
 
 
 @dataclass

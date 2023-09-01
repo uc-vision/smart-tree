@@ -46,27 +46,3 @@ def collate_tubes(tubes: List[Tube]) -> CollatedTube:
     r2 = torch.stack([tube.r2 for tube in tubes])
 
     return CollatedTube(a, b, r1, r2)
-
-
-# def sample_tubes(tubes: List[Tube], spacing):
-#     pts, radius = [], []
-
-#     for i, tube in enumerate(tubes):
-#         v = tube.b - tube.a
-#         length = np.linalg.norm(v)
-
-#         direction = v / length
-#         num_points = np.ceil(length / spacing)
-
-#         if int(num_points) > 0.0:
-#             spaced_points = np.arange(
-#                 0, float(length), step=float(length / num_points)
-#             ).reshape(-1, 1)
-#             lin_radius = np.linspace(
-#                 tube.r1, tube.r2, spaced_points.shape[0], dtype=float
-#             )
-
-#             pts.append(tube.a + direction * spaced_points)
-#             radius.append(lin_radius)
-
-#     return np.concatenate(pts, axis=0), np.concatenate(radius, axis=0)

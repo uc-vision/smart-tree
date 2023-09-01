@@ -56,7 +56,6 @@ class BranchSkeleton:
         for k, v in args.items():
             if v is not None and isinstance(v, torch.Tensor):
                 args[k] = v.to(device)
-
         return BranchSkeleton(**args)
 
     @property

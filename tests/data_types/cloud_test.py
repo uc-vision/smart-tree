@@ -26,10 +26,12 @@ def test_str_method(sample_cloud_data):
     expected_str = (
         f"{'*' * 80}"
         f"Cloud:\n"
+        f"Num pts: {xyz.shape[0]}\n"
         f"Coloured: True\n"
         f"Filename: {filename}\n"
         f"{'*' * 80}"
     )
+
     assert str(cloud) == expected_str
 
 
@@ -283,13 +285,19 @@ def test_rotate_method_with_optionals(sample_labelled_cloud_with_optionals):
     assert rotated_cloud.rgb is None
 
 
-def test_pin_memory_method(sample_labelled_cloud):
+def test_pin_memory_property(sample_labelled_cloud_with_optionals):
+    cloud = sample_labelled_cloud_with_optionals
+
+    assert cloud.number_classes == 2
+
+
+def test_unique_class_method(sample_labelled_cloud):
     # Ensure that the 'pin_memory' method correctly pins float tensor properties
     pinned_cloud = sample_labelled_cloud.pin_memory()
 
     # Check if 'xyz', 'rgb', 'medial_vector', 'branch_direction', 'branch_ids', and 'class_l' are pinned
     assert all(
-        isinstance(getattr(pinned_cloud, prop_name), torch.Tensor)
+        getattr(pinned_cloud, prop_name).is_pinned()
         for prop_name in [
             "xyz",
             "rgb",

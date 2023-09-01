@@ -58,7 +58,7 @@ def points_to_edges(points):
     return torch.column_stack((parents, children))
 
 
-def voxel_downsample(xyz, voxel_size):
+def voxel_filter(xyz, voxel_size):
     xyz_quantized = (
         xyz // voxel_size
     )  # torch.div(xyz + (voxel_size / 2), voxel_size, rounding_mode="floor")
@@ -74,9 +74,9 @@ def voxel_downsample(xyz, voxel_size):
     _, ind_sorted = torch.sort(idx, stable=True)
     cum_sum = counts.cumsum(0)
     cum_sum = torch.cat((torch.tensor([0], device=cum_sum.device), cum_sum[:-1]))
-    first_indicies = ind_sorted[cum_sum[1:]]
+    mask = ind_sorted[cum_sum[1:]]
 
-    return first_indicies
+    return mask
 
 
 def merge_dictionaries(dict1, dict2):

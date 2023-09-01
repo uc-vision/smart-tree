@@ -26,7 +26,6 @@ def test_as_o3d_lineset(sample_graph):
     assert isinstance(lineset, o3d.geometry.LineSet)
 
 
-# Test the 'to_device' method
 def test_to_device(sample_graph):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     device_graph = sample_graph.to_device(device)

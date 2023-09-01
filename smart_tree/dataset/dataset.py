@@ -1,84 +1,94 @@
 import json
 from pathlib import Path
-from typing import List
+from typing import List, Literal, Optional
 
 import torch
 import torch.utils.data
 from spconv.pytorch.utils import PointToVoxel
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from typeguard import typechecked
 
-from ..data_types.cloud import Cloud
+from ..data_types.cloud import Cloud, CloudLoader, LabelledCloud
 from ..model.sparse import batch_collate
 from ..util.file import load_cloud
 from ..util.maths import cube_filter
 from ..util.misc import at_least_2d
+from .augmentations import AugmentationPipeline
 
 
-class TreeDataset:
+@typechecked
+class Dataset:
     def __init__(
         self,
-        voxel_size: float,
-        json_path: Path,
-        directory: Path,
-        mode: str,
-        input_features: List[str],
-        target_features: List[str],
-        augmentation=None,
+        json_path: Path | str,
+        directory: Path | str,
+        mode: Literal["train", "validation", "test", "unlabelled"],
+        augmentation: Optional[AugmentationPipeline] = None,
         cache: bool = False,
         device=torch.device("cuda:0"),
     ):
-        self.voxel_size = voxel_size
         self.mode = mode
         self.augmentation = augmentation
         self.directory = directory
         self.device = device
 
-        self.input_features = input_features
-        self.target_features = target_features
-
         assert Path(json_path).is_file(), f"No json metadata at '{json_path}'"
         json_data = json.load(open(json_path))
 
         if self.mode == "train":
-            self.tree_paths = json_data["train"]
+            tree_paths = json_data["train"]
         elif self.mode == "validation":
-            self.tree_paths = json_data["validation"]
-        elif self.mode == "test":
-            self.tree_paths = json_data["test"]
+            tree_paths = json_data["validation"]
+        elif mode == "test":
+            tree_paths = json_data["test"]
 
-        missing = [
-            path
-            for path in self.tree_paths
-            if not Path(f"{self.directory}/{path}").is_file()
-        ]
+        # Check the value of self.directory
+        assert Path(self.directory).is_dir(), "Directory path is invalid"
 
-        assert len(missing) == 0, f"Missing {len(missing)} files: {missing}"
+        self.full_paths = [Path(f"{self.directory}/{p}") for p in tree_paths]
+        invalid_paths = [path for path in self.full_paths if not path.exists()]
+        assert not invalid_paths, f"Missing {len(invalid_paths)} files: {invalid_paths}"
 
         self.cache = {} if cache else None
-        self.load_cloud = load_cloud if self.mode != "test" else load_cloud
+        self.cloud_loader = CloudLoader()
 
-    def load(self, filename) -> Cloud:
+    def load(self, filename) -> Cloud | LabelledCloud:
         if self.cache is None:
-            return self.load_cloud(filename)
+            return self.cloud_loader.load(filename)
 
         if filename not in self.cache:
-            self.cache[filename] = self.load_cloud(filename).pin_memory()
+            self.cache[filename] = self.cloud_loader.load(filename).pin_memory()
 
         return self.cache[filename]
 
     def __getitem__(self, idx):
-        filename = Path(f"{self.directory}/{self.tree_paths[idx]}")
-        cld = self.load(filename)
+        cld = self.load(self.full_paths[idx])
 
         try:
-            return self.process_cloud(cld, self.tree_paths[idx])
+            return self.process_cloud(cld, self.full_paths[idx])
         except Exception:
-            print(f"Exception processing {filename} with {len(cld)} points")
+            print(f"Exception processing {cld}")
             raise
 
-    def process_cloud(self, cld: Cloud, filename: str):
+    def __len__(self):
+        return len(self.full_paths)
+
+    def process_cloud(self, cld: Cloud, filename: str) -> Cloud | LabelledCloud:
         cld = cld.to_device(self.device)
+
+        if self.augmentation != None:
+            cld = self.augmentation(cld)
+
+        return cld
+
+        if cld.input_features is None:
+            raise ValueError(f"Missing input features {filename}")
+
+        if self.mode != "unlabelled" and cld.target_features is None:
+            raise ValueError(f"Missing target features {filename}")
+
+        return cld
 
         # block_center_idx = torch.randint(
         #     cld.xyz.shape[0],
@@ -152,9 +162,6 @@ class TreeDataset:
         target_feats = feats[:, input_feats.shape[1] :]
 
         return (input_feats, target_feats), coords, loss_mask, filename
-
-    def __len__(self):
-        return len(self.tree_paths)
 
 
 class SingleTreeInference:

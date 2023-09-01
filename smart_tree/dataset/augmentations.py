@@ -18,7 +18,7 @@ class Augmentation(ABC):
 
 
 class Scale(Augmentation):
-    def __init__(self, min_scale=0.9, max_scale=1.1):
+    def __init__(self, min_scale: float, max_scale: float):
         self.min_scale = min_scale
         self.max_scale = max_scale
 

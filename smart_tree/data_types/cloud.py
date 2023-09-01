@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, fields
+from functools import cached_property
 from pathlib import Path
 from typing import Optional, Union
 
@@ -15,7 +16,7 @@ from smart_tree.o3d_abstractions.visualizer import ViewerItem
 
 from ..o3d_abstractions.geometries import o3d_cloud, o3d_lines_between_clouds
 from ..o3d_abstractions.visualizer import ViewerItem, o3d_viewer
-from ..util.misc import voxel_downsample
+from ..util.misc import voxel_filter
 from ..util.queries import skeleton_to_points
 from .tree import TreeSkeleton
 
@@ -36,12 +37,13 @@ class Cloud:
         return (
             f"{'*' * 80}"
             f"Cloud:\n"
+            f"Num pts: {self.xyz.shape[0]}\n"
             f"Coloured: {hasattr(self, 'rgb')}\n"
             f"Filename: {self.filename}\n"
             f"{'*' * 80}"
         )
 
-    def scale(self, factor: float) -> Cloud:
+    def scale(self, factor: float | TensorType[1]) -> Cloud:
         scaled_xyz = self.xyz * factor
         return Cloud(xyz=scaled_xyz, rgb=self.rgb, filename=self.filename)
 
@@ -53,11 +55,14 @@ class Cloud:
         rotated_xyz = torch.matmul(self.xyz, rotation_matrix.T)
         return Cloud(xyz=rotated_xyz, rgb=self.rgb, filename=self.filename)
 
+    def voxel_downsample(self, voxel_size: float | TensorType[1]) -> Cloud:
+        return self.filter(voxel_filter(self.xyz, self.rgb, voxel_size))
+
     def filter(self, mask: TensorType["N", bool]) -> Cloud:
         filtered_rgb = self.rgb[mask] if self.rgb is not None else None
         return Cloud(xyz=self.xyz[mask], rgb=filtered_rgb, filename=self.filename)
 
-    def to_device(self, device: torch.device):
+    def to_device(self, device: torch.device) -> Cloud:
         return Cloud(
             xyz=self.xyz.to(device),
             rgb=self.rgb.to(device) if self.rgb is not None else None,
@@ -70,11 +75,15 @@ class Cloud:
 
     @property
     def max_xyz(self) -> TensorType[3]:
-        return torch.max(self.xyz, 0)[0]
+        return torch.max(self.xyz, dim=0)[0]
 
     @property
     def min_xyz(self) -> TensorType[3]:
-        return torch.min(self.xyz, 0)[0]
+        return torch.min(self.xyz, dim=0)[0]
+
+    @property
+    def centre(self) -> TensorType[3]:
+        return torch.mean(self.xyz, dim=0)
 
     @property
     def bounding_box(self) -> tuple[TensorType[3], TensorType[3]]:
@@ -97,10 +106,12 @@ class Cloud:
 @dataclass
 class LabelledCloud(Cloud):
     """
-    Medial Vector: Vector towards medial axis
-    Branch Direction: Unit vector of branch direction of closest branch
-    Branch ID: ID of closest branch
-    Class: Class of point (I.E. 0 = trunk, 1 = branch, 2 = leaf)
+    medial_vector: Vector towards medial axis
+    branch_direction: Unit vector of branch direction of closest branch
+    branch_ids: ID of closest branch
+    class_l: Class of point (I.E. 0 = trunk, 1 = branch, 2 = leaf)
+    loss_mask: Areas we don't want to compute any loss on i.e. near edges of a block
+    vector_loss_mask: Ares we don't want to compute loss on for the medial vector i.e. leaves
     """
 
     medial_vector: Optional[TensorType["N", 3]] = None
@@ -108,7 +119,10 @@ class LabelledCloud(Cloud):
     branch_ids: Optional[TensorType["N", 1]] = None
     class_l: Optional[TensorType["N", 1]] = None
 
-    def scale(self, factor: float) -> LabelledCloud:
+    loss_mask: Optional[TensorType["N", 1]] = None
+    vector_loss_mask: Optional[TensorType["N", 1]] = None
+
+    def scale(self, factor: float | TensorType[1]) -> LabelledCloud:
         args = asdict(self)
         args["xyz"] = args["xyz"] * factor
         if args["medial_vector"] is not None:
@@ -149,14 +163,13 @@ class LabelledCloud(Cloud):
         for k, v in args.items():
             if v is not None and isinstance(v, torch.Tensor):
                 args[k] = v.to(device)
-
         return LabelledCloud(**args)
 
     @property
     def number_classes(self) -> int:
         if not hasattr(self, "class_l"):
             return 1
-        return torch.unique(self.class_l).item() + 1
+        return torch.unique(self.class_l).shape[0]
 
     @property
     def radius(self) -> TensorType["N", 1]:
@@ -211,258 +224,38 @@ class LabelledCloud(Cloud):
 
 
 class CloudLoader:
-    def load(self, npz_file: Union[str, Path]) -> Union[Cloud, LabelledCloud]:
-        # Load the NPZ file
+    def load(self, npz_file: str | Path):
         data = np.load(npz_file)
 
-        # Check if any of the optional parameters exist to determine the type
         optional_params = [
             f.name for f in fields(LabelledCloud) if f.default is not None
         ]
 
         for param in optional_params:
             if param in data:
-                return self._load_as_labelled_cloud(data)
+                return self._load_as_labelled_cloud(data, npz_file)
 
-        return self._load_as_cloud(data)
+        return self._load_as_cloud(data, npz_file)
 
-    def _load_as_cloud(self, data) -> Cloud:
-        # Filter the fields that exist in the Cloud class
+    def _load_as_cloud(self, data, fn) -> Cloud:
         cloud_fields = {f.name: data[f.name] for f in fields(Cloud) if f.name in data}
 
+        for k, v in cloud_fields.items():
+            if k in ["class_l", "branch_ids"]:
+                cloud_fields[k] = torch.from_numpy(v).long().reshape(-1, 1)
+            else:
+                cloud_fields[k] = torch.from_numpy(v).float()
+        cloud_fields["filename"] = Path(fn)
         return Cloud(**cloud_fields)
 
-    def _load_as_labelled_cloud(self, data) -> LabelledCloud:
-        # Filter the fields that exist in the LabelledCloud class
+    def _load_as_labelled_cloud(self, data, fn) -> LabelledCloud:
         labelled_cloud_fields = {
             f.name: data[f.name] for f in fields(LabelledCloud) if f.name in data
         }
-
+        for k, v in labelled_cloud_fields.items():
+            if k in ["class_l", "branch_ids"]:
+                labelled_cloud_fields[k] = torch.from_numpy(v).long().reshape(-1, 1)
+            else:
+                labelled_cloud_fields[k] = torch.from_numpy(v).float()
+        labelled_cloud_fields["filename"] = Path(fn)
         return LabelledCloud(**labelled_cloud_fields)
-
-
-#     def to_device(self, device):
-#         xyz = self.xyz.to(device)
-#         rgb = self.rgb.to(device) if self.rgb is not None else None
-#         medial_vector = (
-#             self.medial_vector.to(device) if self.medial_vector is not None else None
-#         )
-#         branch_direction = (
-#             self.branch_direction.to(device)
-#             if self.branch_direction is not None
-#             else None
-#         )
-#         class_l = self#     def filter_by_class(self, classes):
-#         classes = torch.tensor(classes, device=self.class_l.device)
-#         mask = torch.isin(
-#             self.class_l,
-#             classes,
-#         )
-#         return self.filter(mask.view(-1))
-
-#     def filter_by_skeleton(skeleton: TreeSkeleton, cloud: Cloud, threshold=1.1):
-#         distances, radii, vectors_ = skeleton_to_points(cloud, skeleton, chunk_size=512)
-#         mask = distances < radii * threshold
-#         return filter(cloud, mask)
-
-#     def pin_memory(self):
-#         properties = {
-#             "xyz": self.xyz.pin_memory(),
-#             "rgb": self.rgb.pin_memory() if self.rgb is not None else None,
-#             "medial_vector": self.medial_vector.pin_memory()
-#             if self.medial_vector is not None
-#             else None,
-#             "branch_direction": self.branch_direction.pin_memory()
-#             if self.branch_direction is not None
-#             else None,
-#             "class_l": self.class_l.pin_memory() if self.class_l is not None else None,
-#             "branch_ids": self.branch_ids.pin_memory()
-#             if self.branch_ids is not None
-#             else None,
-#         }
-
-#         return Cloud(**properties)
-
-#     def filter(cloud: Cloud, mask: TensorType["N"]) -> Cloud:
-#         mask = mask.to(cloud.xyz.device)
-
-#         filtered_properties = {
-#             "xyz": cloud.xyz[mask],
-#             "rgb": cloud.rgb[mask] if cloud.rgb is not None else None,
-#             "medial_vector": cloud.medial_vector[mask]
-#             if cloud.medial_vector is not None
-#             else None,
-#             "branch_direction": cloud.branch_direction[mask]
-#             if cloud.branch_direction is not None
-#             else None,
-#             "class_l": cloud.class_l[mask] if cloud.class_l is not None else None,
-#             "branch_ids": cloud.branch_ids[mask]
-#             if cloud.branch_ids is not None
-#             else None,
-#             "filename": cloud.filename if cloud.filename is not None else None,
-#         }
-
-#         return Cloud(**filtered_properties)
-
-#     def cpu(self):
-#         return self.to_device(torch.device("cpu"))
-#             rgb=rgb,
-#             medial_vector=medial_vector,
-#             branch_direction=branch_direction,
-#             class_l=class_l,
-#             branch_ids=branch_ids,
-#             filename=filename,
-#         )
-
-#     def view(self, cmap=[]):
-#         # if cmap == []:
-#         cmap = np.random.rand(self.number_classes, 3)
-
-#         cpu_cld = self.cpu()
-#         geoms = []
-
-#         geoms.append(cpu_cld.to_o3d_cld())
-#         if cpu_cld.class_l != None:
-#             geoms.append(cpu_cld.to_o3d_seg_cld(cmap))
-
-#         if cpu_cld.medial_vector != None:
-#             projected = o3d_cloud(cpu_cld.xyz + cpu_cld.medial_vector, colour=(1, 0, 0))
-#             geoms.append(projected)
-#             geoms.append(o3d_lines_between_clouds(cpu_cld.to_o3d_cld(), projected))
-
-#         o3d_viewer(geoms)
-
-#     def voxel_down_sample(self, voxel_size):
-#         idx = voxel_downsample(self.xyz, voxel_size)
-#         return self.filter(idx)
-
-#     def scale(self, factor):
-#         new_medial_vector = None
-#         if self.medial_vector != None:
-#             new_medial_vector = self.medial_vector * factor
-
-#         return Cloud(
-#             xyz=self.xyz * factor,
-#             rgb=self.rgb,
-#             medial_vector=new_medial_vector,
-#             branch_direction=self.branch_direction,
-#             branch_ids=self.branch_ids,
-#             class_l=self.class_l,
-#         )
-
-#     def translate(self, xyz):
-#         return Cloud(
-#             xyz=self.xyz + xyz,
-#             rgb=self.rgb,
-#             medial_vector=self.medial_vector,
-#             branch_direction=self.branch_direction,
-#             branch_ids=self.branch_ids)
-
-#     @staticmethod
-#     def from_o3d_cld(cld) -> Cloud:
-#         return Cloud.from_numpy(xyz=np.asarray(cld.points), rgb=np.asarray(cld.colors))
-#             class_l=self.class_l,
-#         )
-
-#     def rotate(self, rot_mat):
-#         new_xyz = torch.matmul(self.xyz, rot_mat.to(self.xyz.device))
-
-#         new_medial_vector = None
-#         if self.medial_vector != None:
-#             new_medial_vector = torch.matmul(
-#                 self.medial_vector, rot_mat.to(self.medial_vector.device)
-#             )
-
-#         new_branch_dir = None
-#         if self.branch_direction != None:
-#             new_branch_dir = torch.matmul(
-#                 self.branch_direction, rot_mat.to(self.branch_direction.device)
-#             )
-
-#         return Cloud(
-#             xyz=new_xyz,
-#             rgb=self.rgb,
-#             medial_vector=new_medial_vector,
-#             branch_direction=new_branch_dir,
-#             branch_ids=self.branch_ids,
-#             class_l=self.class_l,
-#         )
-
-#     @property
-#     def is_labelled(self) -> bool:
-#         if self.medial_vector is None:
-#             return False
-#         return True
-
-#     @property
-#     def root_idx(self) -> int:
-#         return torch.argmin(self.xyz[:, 1]).item()
-
-#     @property
-#     def number_classes(self) -> int:
-#         if not hasattr(self, "class_l"):
-#             return 1
-#         return torch.max(self.class_l).item() + 1
-
-#     @property
-#     def max_xyz(self) -> torch.Tensor:
-#         return torch.max(self.xyz, 0)[0]
-
-#     @property
-#     def min_xyz(self) -> torch.Tensor:
-#         return torch.min(self.xyz, 0)[0]
-
-#     @property
-#     def device(self) -> torch.device:
-#         return self.xyz.device
-
-#     @property
-#     def bbox(self) -> tuple[torch.Tensor, torch.Tensor]:
-#         # defined by centre coordinate, x/2, y/2, z/2
-#         dimensions = (self.max_xyz - self.min_xyz) / 2
-#         centre = self.min_xyz + dimensions
-#         return centre, dimensions
-
-#     @property
-#     def medial_pts(self) -> torch.Tensor:
-#         return self.xyz + self.medial_vector
-
-#     @staticmethod
-#     def from_numpy(**kwargs) -> "Cloud":
-#         torch_kwargs = {}
-
-#         for key, value in kwargs.items():
-#             if key in [
-#                 "xyz",
-#                 "rgb",
-#                 "medial_vector",
-#                 "branch_direction",
-#                 "branch_ids",
-#                 "class_l",
-#             ]:
-#                 torch_kwargs[key] = torch.tensor(value).float()
-
-#             """ SUPPORT LEGACY NPZ -> Remove in Future..."""
-#             if key in ["vector"]:
-#                 torch_kwargs["medial_vector"] = torch.tensor(value).float()
-
-#         return Cloud(**torch_kwargs)
-
-#     @property
-#     def radius(self) -> TensorType["N", 1] | torch.Tensor:
-#         return self.medial_vector.pow(2).sum(1).sqrt().unsqueeze(1)
-
-#     @property
-#     def medial_direction(self) -> torch.Tensor:
-#         return F.normalize(self.medial_vector)
-
-#     def with_xyz(self, new_xyz):
-#         return Cloud(
-#             new_xyz,
-#             self.rgb,
-#             self.medial_vector,
-#             self.branch_direction,
-#             self.branch_ids,
-#             self.class_l,
-#             self.filename,
-#         )
