@@ -60,7 +60,7 @@ class Graph:
     def to_device(self, device: torch.device):
         args = asdict(self)
         for k, v in args.items():
-            if v is not None and isinstance(v, torch.Tensor):
+            if isinstance(v, torch.Tensor):
                 args[k] = v.to(device)
 
         return Graph(**args)

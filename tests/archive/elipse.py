@@ -3,8 +3,7 @@ from pathlib import Path
 import numpy as np
 from tqdm import tqdm
 
-from smart_tree.o3d_abstractions.geometries import (o3d_elipsoid,
-                                                    o3d_merge_meshes)
+from smart_tree.o3d_abstractions.geometries import o3d_elipsoid, o3d_merge_meshes
 from smart_tree.o3d_abstractions.visualizer import o3d_viewer
 from smart_tree.util.file import load_cloud
 from smart_tree.util.maths import rotation_matrix_from_vectors_np

@@ -1,9 +1,8 @@
 from dataclasses import asdict, dataclass
 from typing import List
 
-import numpy as np
 import torch
-from torchtyping import TensorType, patch_typeguard
+from torchtyping import TensorType
 from typeguard import typechecked
 
 

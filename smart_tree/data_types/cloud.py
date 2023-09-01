@@ -16,8 +16,6 @@ from smart_tree.o3d_abstractions.visualizer import ViewerItem
 from ..o3d_abstractions.geometries import o3d_cloud, o3d_lines_between_clouds
 from ..o3d_abstractions.visualizer import ViewerItem, o3d_viewer
 from ..util.misc import voxel_filter
-from ..util.queries import skeleton_to_points
-from .tree import TreeSkeleton
 
 patch_typeguard()
 
@@ -42,7 +40,10 @@ class Cloud:
             f"{'*' * 80}"
         )
 
-    def scale(self, factor: float | TensorType[1]) -> Cloud:
+    def scale(
+        self,
+        factor: float | TensorType[1, float] | TensorType[1, 3, float],
+    ) -> Cloud:
         scaled_xyz = self.xyz * factor
         return Cloud(xyz=scaled_xyz, rgb=self.rgb, filename=self.filename)
 
@@ -55,9 +56,9 @@ class Cloud:
         return Cloud(xyz=rotated_xyz, rgb=self.rgb, filename=self.filename)
 
     def voxel_downsample(self, voxel_size: float | TensorType[1]) -> Cloud:
-        return self.filter(voxel_filter(self.xyz, self.rgb, voxel_size))
+        return self.filter(voxel_filter(self.xyz, voxel_size))
 
-    def filter(self, mask: TensorType["N", bool]) -> Cloud:
+    def filter(self, mask: TensorType["N"]) -> Cloud:
         filtered_rgb = self.rgb[mask] if self.rgb is not None else None
         return Cloud(xyz=self.xyz[mask], rgb=filtered_rgb, filename=self.filename)
 
@@ -86,10 +87,7 @@ class Cloud:
 
     @property
     def bounding_box(self) -> tuple[TensorType[3], TensorType[3]]:
-        # defined by centre coordinate, x/2, y/2, z/2
-        dimensions = (self.max_xyz - self.min_xyz) / 2
-        centre = self.min_xyz + dimensions
-        return centre, dimensions
+        return self.min_xyz, self.max_xyz
 
     def as_o3d_cld(self) -> o3d.geometry.PointCloud:
         return o3d_cloud(self.xyz, self.rgb)
@@ -110,7 +108,7 @@ class LabelledCloud(Cloud):
     branch_ids: ID of closest branch
     class_l: Class of point (I.E. 0 = trunk, 1 = branch, 2 = leaf)
     loss_mask: Areas we don't want to compute any loss on i.e. near edges of a block
-    vector_loss_mask: Ares we don't want to compute loss on for the medial vector i.e. leaves
+    vector_loss_mask: Where we don't want to compute loss for the medial vector or branch direction i.e. leaves
     """
 
     medial_vector: Optional[TensorType["N", 3]] = None
@@ -135,14 +133,15 @@ class LabelledCloud(Cloud):
             args["medial_vector"] = torch.matmul(args["medial_vector"], rot_matrix.T)
         if args["branch_direction"] is not None:
             args["branch_direction"] = torch.matmul(
-                args["branch_direction"], rot_matrix.T
+                args["branch_direction"],
+                rot_matrix.T,
             )
         return LabelledCloud(**args)
 
     def filter(self, mask: TensorType["N", torch.bool]) -> LabelledCloud:
         args = asdict(self)
         for k, v in args.items():
-            if v is not None and isinstance(v, torch.Tensor):
+            if isinstance(v, torch.Tensor):
                 args[k] = v[mask]
         return LabelledCloud(**args)
 
@@ -153,14 +152,14 @@ class LabelledCloud(Cloud):
     def pin_memory(self):
         args = asdict(self)
         for k, v in args.items():
-            if v is not None and isinstance(v, torch.Tensor):
+            if isinstance(v, torch.Tensor):
                 args[k] = v.pin_memory()
         return LabelledCloud(**args)
 
     def to_device(self, device: torch.device):
         args = asdict(self)
         for k, v in args.items():
-            if v is not None and isinstance(v, torch.Tensor):
+            if isinstance(v, torch.Tensor):
                 args[k] = v.to(device)
         return LabelledCloud(**args)
 

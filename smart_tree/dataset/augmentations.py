@@ -46,8 +46,7 @@ class FixedRotate(Augmentation):
 
 class CentreCloud(Augmentation):
     def __call__(self, cloud: Cloud) -> Cloud:
-        centre, (x, y, z) = cloud.bbox
-        return cloud.translate(-centre + torch.tensor([0, y, 0], device=centre.device))
+        return cloud.translate(-cloud.centre)
 
 
 class RandomFlips(Augmentation):
@@ -61,7 +60,7 @@ class RandomFlips(Augmentation):
             .view(1, 3)
         )
 
-        return cloud.scale(-flips * 2 + 1)
+        return cloud.scale(-flips * 2.0 + 1.0)
 
 
 class VoxelDownsample(Augmentation):
@@ -69,7 +68,7 @@ class VoxelDownsample(Augmentation):
         self.voxel_size = voxel_size
 
     def __call__(self, cloud: Cloud) -> Cloud:
-        return cloud.voxel_down_sample(self.voxel_size)
+        return cloud.voxel_downsample(self.voxel_size)
 
 
 class FixedTranslate(Augmentation):
@@ -151,21 +150,12 @@ class Dropout3D(Augmentation):
 
 
 class RandomDropout(Augmentation):
-    def __init__(self, max_drop_out):
-        self.max_drop_out = max_drop_out
+    def __init__(self, probability: float):
+        self.probability = probability
 
     def __call__(self, cloud: Cloud) -> Cloud:
-        num_indices = int(
-            (1.0 - (self.max_drop_out * torch.rand(1, device=cloud.xyz.device)))
-            * cloud.xyz.shape[0]
-        )
-
-        indices = torch.randint(
-            high=cloud.xyz.shape[0],
-            size=(num_indices, 1),
-            device=cloud.xyz.device,
-        ).squeeze(1)
-        return cloud.filter(indices)
+        mask = torch.rand(cloud.xyz.shape[0]) < self.probability
+        return cloud.filter(mask.to(bool))
 
 
 class RandomAugmentation(Augmentation):

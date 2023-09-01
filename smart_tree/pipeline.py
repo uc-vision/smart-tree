@@ -6,8 +6,7 @@ import torch
 from .data_types.cloud import Cloud
 from .data_types.tree import DisjointTreeSkeleton
 from .o3d_abstractions.visualizer import o3d_viewer
-from .util.file import (load_cloud, save_o3d_cloud, save_o3d_lineset,
-                        save_o3d_mesh)
+from .util.file import load_cloud, save_o3d_cloud, save_o3d_lineset, save_o3d_mesh
 
 
 class Pipeline:

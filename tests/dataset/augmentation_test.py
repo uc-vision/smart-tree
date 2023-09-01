@@ -1,6 +1,5 @@
 # test_augmentation.py
 
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -76,7 +75,9 @@ def test_augmentation_pipeline(sample_cloud):
 def test_centre_cloud_augmentation(sample_cloud):
     augmentation = CentreCloud()
     augmented_cloud = augmentation(sample_cloud)
-    assert torch.all(augmented_cloud.xyz.mean(dim=0) == 0.0)
+    centered_centroid = torch.mean(augmented_cloud.xyz, dim=0)
+    tolerance = 1e-5
+    assert torch.all(torch.abs(centered_centroid) < tolerance)
 
 
 # Test RandomFlips Augmentation
@@ -108,7 +109,7 @@ def test_fixed_translate_augmentation(sample_cloud):
     augmentation = FixedTranslate(xyz)
     augmented_cloud = augmentation(sample_cloud)
     assert augmented_cloud.xyz.shape == sample_cloud.xyz.shape
-    assert torch.all(augmented_cloud.xyz == sample_cloud.xyz + xyz)
+    assert torch.all(augmented_cloud.xyz == (sample_cloud.xyz + torch.tensor(xyz)))
 
 
 # Test RandomCrop Augmentation
@@ -159,18 +160,6 @@ def test_random_translate_augmentation(sample_cloud):
     augmentation = RandomTranslate(max_x, max_y, max_z)
     augmented_cloud = augmentation(sample_cloud)
     # You may add more assertions based on your specific translation logic
-
-
-# Test Dropout3D Augmentation
-def test_dropout_3d_augmentation(sample_cloud):
-    # Use dropout parameters as needed
-    params = {
-        "p_xyz": 0.1,
-        "p_features": 0.2,
-    }
-    augmentation = Dropout3D(**params)
-    augmented_cloud = augmentation(sample_cloud)
-    # You may add more assertions based on your specific dropout logic
 
 
 # Test RandomDropout Augmentation

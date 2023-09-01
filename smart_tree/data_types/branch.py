@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import List, Optional
 
-import numpy as np
 import open3d as o3d
 import torch
 from torchtyping import TensorType, patch_typeguard
@@ -54,7 +53,7 @@ class BranchSkeleton:
     def to_device(self, device: torch.device):
         args = asdict(self)
         for k, v in args.items():
-            if v is not None and isinstance(v, torch.Tensor):
+            if v is isinstance(v, torch.Tensor):
                 args[k] = v.to(device)
         return BranchSkeleton(**args)
 

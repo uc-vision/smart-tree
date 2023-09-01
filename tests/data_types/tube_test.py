@@ -1,5 +1,3 @@
-from dataclasses import asdict
-from typing import List
 
 import pytest
 import torch

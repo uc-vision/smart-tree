@@ -7,12 +7,12 @@ from typing import Dict, List, Optional
 import open3d as o3d
 import torch
 import torch.nn.functional as F
-from torchtyping import TensorType, patch_typeguard
+from torchtyping import TensorType
 from typeguard import typechecked
 
 from ..o3d_abstractions.geometries import o3d_merge_linesets, o3d_merge_meshes
 from ..o3d_abstractions.visualizer import ViewerItem, o3d_viewer
-from ..util.misc import flatten_list, merge_dictionaries
+from ..util.misc import flatten_list
 from ..util.queries import pts_to_nearest_tube_gpu
 from .branch import BranchSkeleton
 from .tube import Tube

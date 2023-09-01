@@ -11,7 +11,6 @@ from typeguard import typechecked
 
 from ..data_types.cloud import Cloud, CloudLoader, LabelledCloud
 from ..model.sparse import batch_collate
-from ..util.file import load_cloud
 from ..util.maths import cube_filter
 from ..util.misc import at_least_2d
 from .augmentations import AugmentationPipeline

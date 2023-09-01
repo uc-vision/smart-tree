@@ -112,15 +112,13 @@ def test_bounding_box_property(sample_cloud_data):
     xyz, rgb, filename = sample_cloud_data
     cloud = Cloud(xyz=xyz, rgb=rgb, filename=filename)
 
-    center, dimensions = cloud.bounding_box
+    bottom_corner, top_corner = cloud.bounding_box
 
     min_xyz = xyz.min(dim=0).values
     max_xyz = xyz.max(dim=0).values
-    expected_center = (min_xyz + max_xyz) / 2
-    expected_dimensions = (max_xyz - min_xyz) / 2
 
-    assert torch.allclose(center, expected_center)
-    assert torch.allclose(dimensions, expected_dimensions)
+    assert torch.allclose(bottom_corner, min_xyz)
+    assert torch.allclose(top_corner, max_xyz)
 
 
 @pytest.fixture

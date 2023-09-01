@@ -1,5 +1,4 @@
-from smart_tree.data_types.tree import (DisjointTreeSkeleton, TreeSkeleton,
-                                        connect)
+from smart_tree.data_types.tree import DisjointTreeSkeleton, TreeSkeleton, connect
 from smart_tree.o3d_abstractions.visualizer import o3d_viewer
 
 if __name__ == "__main__":
