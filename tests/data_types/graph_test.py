@@ -19,9 +19,8 @@ def sample_graph():
     return Graph(vertices, edges, edge_weights)
 
 
-# Test the 'to_o3d_lineset' method
-def test_to_o3d_lineset(sample_graph):
-    lineset = sample_graph.to_o3d_lineset(colour=(1, 0, 0))
+def test_as_o3d_lineset(sample_graph):
+    lineset = sample_graph.as_o3d_lineset(colour=(1, 0, 0))
 
     # Ensure the returned object is of the correct type
     assert isinstance(lineset, o3d.geometry.LineSet)

@@ -86,11 +86,11 @@ class Cloud:
     def as_o3d_cld(self) -> o3d.geometry.PointCloud:
         return o3d_cloud(self.xyz, self.rgb)
 
-    def view_items(self) -> list[ViewerItem]:
+    def viewer_items(self) -> list[ViewerItem]:
         return [ViewerItem("Cloud", self.as_o3d_cld(), is_visible=True)]
 
     def view(self) -> None:
-        o3d_viewer(self.view_items())
+        o3d_viewer(self.viewer_items())
 
 
 @typechecked
@@ -193,8 +193,8 @@ class LabelledCloud(Cloud):
         branch_dir_cloud = o3d_cloud(self.xyz + (self.branch_direction * view_length))
         return o3d_lines_between_clouds(self.to_o3d_cld(), branch_dir_cloud)
 
-    def view_items(self) -> list[ViewerItem]:
-        items = super().view_items()
+    def viewer_items(self) -> list[ViewerItem]:
+        items = super().viewer_items()
         if self.medial_vector is not None:
             items += [ViewerItem("Medial Vectors", self.as_o3d_medial_vectors())]
         if self.branch_direction is not None:
@@ -207,7 +207,7 @@ class LabelledCloud(Cloud):
         return items
 
     def view(self):
-        o3d_viewer(self.view_items())
+        o3d_viewer(self.viewer_items())
 
 
 class CloudLoader:

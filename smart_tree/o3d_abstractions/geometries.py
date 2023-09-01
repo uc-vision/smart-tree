@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy as np
 import open3d as o3d
 import torch
@@ -13,17 +15,25 @@ def o3d_mesh(verts, tris):
     return mesh.compute_triangle_normals()
 
 
-def o3d_merge_meshes(meshes, colourize=False):
+def o3d_merge_meshes(
+    meshes: List[o3d.geometry.TriangleMesh],
+    colour=None,
+    random_colours=None,
+):
     if len(meshes) < 1:
         raise ValueError("Meshes List is Empty")
 
-    if colourize:
+    if random_colours:
         for m in meshes:
-            m.paint_uniform_color(np.random.rand(3))
+            m.paint_uniform_color(torch.rand(3))
 
     mesh = meshes[0]
     for m in meshes[1:]:
         mesh += m
+
+    if colour:
+        return mesh.paint_uniform_color(colour)
+
     return mesh
 
 

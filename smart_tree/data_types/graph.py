@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import List
 
 import cugraph
@@ -11,6 +11,7 @@ from tqdm import tqdm
 from typeguard import typechecked
 
 from ..o3d_abstractions.geometries import o3d_line_set
+from ..o3d_abstractions.visualizer import ViewerItem, o3d_viewer
 
 patch_typeguard()
 
@@ -34,16 +35,6 @@ class Graph:
             f"{'*' * 80}"
         )
 
-    def to_o3d_lineset(self, colour=(1, 0, 0)) -> o3d.geometry.LineSet:
-        return o3d_line_set(self.vertices, self.edges, colour=colour)
-
-    def to_device(self, device: torch.device):
-        return Graph(
-            self.vertices.to(device),
-            self.edges.to(device),
-            self.edge_weights.to(device),
-        )
-
     def connected_cugraph_components(
         self,
         minimum_vertices: int = 10,
@@ -65,6 +56,41 @@ class Graph:
             components.append(cugraph.subgraph(g, subgraph_vertices))
 
         return sorted(components, key=lambda graph: len(graph.nodes()), reverse=True)
+
+    def to_device(self, device: torch.device):
+        args = asdict(self)
+        for k, v in args.items():
+            if v is not None and isinstance(v, torch.Tensor):
+                args[k] = v.to(device)
+
+        return Graph(**args)
+
+    def as_o3d_lineset(self, colour=(1, 0, 0)) -> o3d.geometry.LineSet:
+        return o3d_line_set(self.vertices, self.edges, colour=colour)
+
+    def viewer_items(self) -> list[ViewerItem]:
+        return [ViewerItem(f"Graph Lineset", self.as_o3d_lineset())]
+
+    def view(self):
+        o3d_viewer(self.viewer_items())
+
+    # def connected_cugraph_components(
+    #     self,
+    #     minimum_vertices: int = 10,
+    # ) -> List[cugraph.Graph]:
+    #     g = cuda_graph(self.edges, self.edge_weights)
+    #     df = cugraph.connected_components(g)
+
+    #     components = [
+    #         cugraph.subgraph(g, subgraph_vertices)
+    #         for _, subgraph_vertices in tqdm(
+    #             df.query(f"vertex >= {minimum_vertices}")["vertex"].unique().to_pandas(),
+    #             desc="Finding Connected Components",
+    #             leave=False,
+    #         )
+    #     ]
+
+    #     return sorted(components, key=lambda graph: len(graph.nodes()), reverse=True)
 
 
 def cuda_graph(edges, edge_weights, renumber=False):

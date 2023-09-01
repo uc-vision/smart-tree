@@ -10,6 +10,7 @@ from torchtyping import TensorType, patch_typeguard
 from typeguard import typechecked
 
 from ..o3d_abstractions.geometries import o3d_path, o3d_tube_mesh
+from ..o3d_abstractions.visualizer import ViewerItem, o3d_viewer
 from .tube import Tube
 
 patch_typeguard()
@@ -20,10 +21,10 @@ patch_typeguard()
 class BranchSkeleton:
     _id: int
     parent_id: int
-    xyz: TensorType["N", 3]
-    radii: TensorType["N", 1]
+    xyz: TensorType["N", 3, float]
+    radii: TensorType["N", 1, float]
 
-    branch_direction: Optional[TensorType["N", 3]] = None
+    branch_direction: Optional[TensorType["N", 3, float]] = None
     child_id: Optional[int] = None
     colour: Optional[TensorType[3]] = torch.rand(3)
 
@@ -50,11 +51,13 @@ class BranchSkeleton:
             args["branch_direction"] = args["branch_direction"][mask]
         return BranchSkeleton(**args)
 
-    def as_o3d_lineset(self) -> o3d.geometry.LineSet:
-        return o3d_path(self.xyz, self.colour)
+    def to_device(self, device: torch.device):
+        args = asdict(self)
+        for k, v in args.items():
+            if v is not None and isinstance(v, torch.Tensor):
+                args[k] = v.to(device)
 
-    def as_o3d_tube(self) -> o3d.geometry.TriangleMesh:
-        return o3d_tube_mesh(self.xyz, self.radii, self.colour)
+        return BranchSkeleton(**args)
 
     @property
     def length(self) -> TensorType[torch.float]:
@@ -63,3 +66,18 @@ class BranchSkeleton:
     @property
     def initial_radius(self) -> TensorType[torch.float]:
         return torch.max(self.radii[0], self.radii[-1])
+
+    def as_o3d_lineset(self) -> o3d.geometry.LineSet:
+        return o3d_path(self.xyz, self.colour)
+
+    def as_o3d_tube(self) -> o3d.geometry.TriangleMesh:
+        return o3d_tube_mesh(self.xyz, self.radii, self.colour)
+
+    def viewer_items(self) -> list[ViewerItem]:
+        items = []
+        items += [ViewerItem(f"Branch {self._id} Lineset", self.as_o3d_lineset())]
+        items += [ViewerItem(f"Branch {self._id} Tube", self.as_o3d_tube())]
+        return items
+
+    def view(self):
+        o3d_viewer(self.viewer_items())
