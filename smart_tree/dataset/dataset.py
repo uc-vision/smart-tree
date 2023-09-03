@@ -5,7 +5,7 @@ from typing import List, Literal, Optional
 import torch
 import torch.utils.data
 from spconv.pytorch.utils import PointToVoxel
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 from typeguard import typechecked
 
@@ -23,16 +23,19 @@ class Dataset:
         json_path: Path | str,
         directory: Path | str,
         mode: Literal["train", "validation", "test", "unlabelled"],
-        transform: Optional[AugmentationPipeline] = None,
+        transform: Optional[callable] = None,
+        augmentation: Optional[AugmentationPipeline] = None,
         cache: bool = False,
         device=torch.device("cuda:0"),
     ):
         self.mode = mode
         self.transform = transform
-        self.directory = directory
+        self.augmentation = augmentation
         self.device = device
 
-        assert Path(json_path).is_file(), f"No json metadata at '{json_path}'"
+        assert Path(json_path).is_file(), f"JSON path is invalid: '{json_path}'"
+        assert Path(directory).is_dir(), "Directory path is invalid: {directory}"
+
         json_data = json.load(open(json_path))
 
         if self.mode == "train":
@@ -42,10 +45,7 @@ class Dataset:
         elif mode == "test":
             tree_paths = json_data["test"]
 
-        # Check the value of self.directory
-        assert Path(self.directory).is_dir(), "Directory path is invalid"
-
-        self.full_paths = [Path(f"{self.directory}/{p}") for p in tree_paths]
+        self.full_paths = [Path(f"{directory}/{p}") for p in tree_paths]
         invalid_paths = [path for path in self.full_paths if not path.exists()]
         assert not invalid_paths, f"Missing {len(invalid_paths)} files: {invalid_paths}"
 
@@ -73,13 +73,17 @@ class Dataset:
     def __len__(self):
         return len(self.full_paths)
 
-    def process_cloud(self, cld: Cloud):
-        sample = cld.to_device(self.device)
+    def process_cloud(self, cld: Cloud | LabelledCloud) -> List[Cloud | LabelledCloud]:
+        cld = cld.to_device(self.device)
+
+        if self.augmentation != None:
+            cld = self.augmentation(cld)
 
         if self.transform != None:
-            sample = self.transform(cld)
+            cld = self.transform(cld)
 
-        return sample
+        return [cld.__dict__]
+
         if cld.input_features is None:
             raise ValueError(f"Missing input features {filename}")
 

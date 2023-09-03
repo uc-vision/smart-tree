@@ -20,12 +20,11 @@ mode = "train"
 
 @pytest.fixture
 def dataset():
-    return Dataset(json_path, directory, mode)
+    return Dataset(json_path=json_path, directory=directory, mode=mode)
 
 
 def test_dataset_initialization(dataset):
-    assert dataset.mode == mode
-    assert dataset.directory == directory
+    assert dataset.full_paths != None
     # Add more assertions for other attributes
 
 
@@ -43,7 +42,7 @@ def test_load_cloud(dataset):
 
 def test_process_cloud(dataset):
     test_cloud = Cloud(xyz=torch.tensor([[1.0, 2.0, 3.0]]), rgb=None, filename=None)
-    processed_cloud = dataset.process_cloud(test_cloud, "test_cloud.ply")
+    processed_cloud = dataset.process_cloud(test_cloud)
 
     assert processed_cloud is not None
 

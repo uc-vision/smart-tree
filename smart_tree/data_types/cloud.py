@@ -257,7 +257,7 @@ class CloudLoader:
             if k in ["class_l", "branch_ids"]:
                 labelled_cloud_fields[k] = torch.from_numpy(v).long().reshape(-1, 1)
 
-            elif k in ["vector"]:
+            elif k in ["medial_vector"]:
                 labelled_cloud_fields["medial_vector"] = torch.from_numpy(v).float()
 
             else:

@@ -19,7 +19,7 @@ def collate(batch):
 def main(cfg: DictConfig):
     ti.init(arch=ti.gpu)
 
-    loader = instantiate(cfg.train_data_loader, collate_fn=collate)
+    loader = instantiate(cfg.train_data_loader)
 
     for cld in loader:
         cld.view()

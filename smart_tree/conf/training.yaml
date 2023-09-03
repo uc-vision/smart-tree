@@ -70,7 +70,7 @@ train_data_loader:
   pin_memory: False
   num_workers: 0
   shuffle: True
-  collate_fn : False
+  # collate_fn : False
   # sampler:
   #   _target_: torch.utils.data.RandomSampler
   #   replacement: True
