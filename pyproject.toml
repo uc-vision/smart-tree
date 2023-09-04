@@ -30,7 +30,7 @@ dependencies = [
     'pycln',
     'isort',
     'pre-commit',
-    'pytest'
+    'pytest',
 ]
 
 [tool.setuptools.packages]

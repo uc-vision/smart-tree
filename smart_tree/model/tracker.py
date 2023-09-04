@@ -1,7 +1,5 @@
 import wandb
 
-# Should be more generalizable ...
-
 
 class Tracker:
     def __init__(self):

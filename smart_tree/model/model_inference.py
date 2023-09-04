@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 from smart_tree.data_types.cloud import Cloud
 from smart_tree.dataset.dataset import load_dataloader
-from smart_tree.model.sparse import sparse_from_batch
+from smart_tree.model.sparse.util import sparse_from_batch
 
 
 def load_model(model_path, weights_path, device=torch.device("cuda:0")):

@@ -16,8 +16,10 @@ from tqdm import tqdm
 
 from smart_tree.data_types.cloud import Cloud
 from smart_tree.o3d_abstractions.camera import Renderer
+from smart_tree.dataset.dataset import Dataset
 
-from .helper import get_batch, model_output_to_labelled_clds
+
+from .sparse.util import get_batch
 from .tracker import Tracker
 
 
@@ -244,18 +246,18 @@ def main(cfg: DictConfig):
                 fp16=cfg.fp16,
             )
 
-            # test_tracker = eval_epoch(
-            #     test_loader,
-            #     model,
-            #     loss_fn,
-            #     fp16=cfg.fp16,
-            # )
+            test_tracker = eval_epoch(
+                test_loader,
+                model,
+                loss_fn,
+                fp16=cfg.fp16,
+            )
 
-            # if (epoch + 1) % cfg.capture_output == 0:
-            #    capture_and_log(test_loader, model, epoch, wandb.run, cfg)
-            # capture_and_log(val_loader, model, epoch, wandb.run, cfg)
+        #     # if (epoch + 1) % cfg.capture_output == 0:
+        #     #    capture_and_log(test_loader, model, epoch, wandb.run, cfg)
+        #     # capture_and_log(val_loader, model, epoch, wandb.run, cfg)
 
-        scheduler.step(val_tracker.total_loss) if cfg.lr_decay else None
+        # scheduler.step(val_tracker.total_loss) if cfg.lr_decay else None
 
         # Save Best Model
         if val_tracker.total_loss < best_val_loss:
@@ -264,8 +266,8 @@ def main(cfg: DictConfig):
             wandb.run.summary["Best Test Loss"] = best_val_loss
             torch.save(model.state_dict(), f"{run_dir}/{run_name}_model_weights.pt")
             log.info(f"Weights Saved at epoch: {epoch}")
-            with amp_ctx:
-                capture_and_log(test_loader, model, epoch, wandb.run, cfg)
+            # with amp_ctx:
+            #     capture_and_log(test_loader, model, epoch, wandb.run, cfg)
             # capture_and_log(val_loader, model, epoch, wandb.run, cfg)
         else:
             epochs_no_improve += 1

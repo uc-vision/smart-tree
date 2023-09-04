@@ -7,10 +7,6 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig
 
 
-def collate(batch):
-    return batch[0]
-
-
 @hydra.main(
     version_base=None,
     config_path="../../smart_tree/conf/",
@@ -22,7 +18,8 @@ def main(cfg: DictConfig):
     loader = instantiate(cfg.train_data_loader)
 
     for cld in loader:
-        cld.view()
+        print(cld)
+        # cld.view()
 
 
 if __name__ == "__main__":

@@ -10,29 +10,6 @@ from smart_tree.data_types.cloud import Cloud
 from .sparse import sparse_from_batch
 
 
-def get_batch(dataloader, device, fp_16=False):
-    for (feats, target_feats), coords, mask, filenames in dataloader:
-        if fp_16:
-            feats = feats.half()
-            target_feats = target_feats.half()
-            coords = coords.half()
-
-        sparse_input = sparse_from_batch(
-            feats,
-            coords,
-            device=device,
-        )
-        targets = map_tensors(
-            target_feats,
-            partial(
-                torch.Tensor.to,
-                device=device,
-            ),
-        )
-
-        yield sparse_input, targets, mask, filenames
-
-
 def model_output_to_labelled_clds(
     sparse_input,
     model_output,

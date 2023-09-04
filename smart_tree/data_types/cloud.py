@@ -176,14 +176,15 @@ class LabelledCloud(Cloud):
 
     @property
     def radius(self) -> TensorType["N", 1]:
-        return self.medial_vector.pow(2).sum(1).sqrt()
+        return self.medial_vector.pow(2).sum(1).sqrt().unsqueeze(1)
 
     @property
     def medial_direction(self) -> torch.Tensor:
         return F.normalize(self.medial_vector)
 
     def as_o3d_segmented_cld(
-        self, cmap: TensorType["N", 3] = None
+        self,
+        cmap: TensorType["N", 3] = None,
     ) -> o3d.geometry.PointCloud:
         if cmap is None:
             cmap = torch.rand(self.number_classes, 3)

@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from .data_types.cloud import Cloud
+from .data_types.cloud import Cloud, CloudLoader
 from .data_types.tree import DisjointTreeSkeleton
 from .o3d_abstractions.visualizer import o3d_viewer
 from .util.file import load_cloud, save_o3d_cloud, save_o3d_lineset, save_o3d_mesh
@@ -53,7 +53,7 @@ class Pipeline:
 
     def process_cloud(self, path: Path):
         # Load point cloud
-        cloud: Cloud = load_cloud(path).to_device(self.device)
+        cloud: Cloud = CloudLoader().load(path).to_device(self.device)
         cloud = self.preprocessing(cloud)
 
         # Run point cloud through model to predict class, radius, direction

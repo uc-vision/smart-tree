@@ -5,7 +5,7 @@ import spconv.pytorch as spconv
 import torch.nn as nn
 import torch.nn.functional as F
 
-from smart_tree.model.model_blocks import MLP, ResidualBlock, UBlock
+from .model_blocks import MLP, ResidualBlock, UBlock
 
 
 class Smart_Tree(nn.Module):
@@ -43,14 +43,9 @@ class Smart_Tree(nn.Module):
 
         self.output_layer = spconv.SparseSequential(norm_fn(unet_planes[0]), nn.ReLU())
 
-        self.radius_head = MLP(unet_planes[0], 1, norm_fn, num_layers=mlp_layers)
-        self.medial_dir_head = MLP(unet_planes[0], 3, norm_fn, num_layers=mlp_layers)
-        self.class_head = MLP(
-            unet_planes[0],
-            num_classes,
-            norm_fn,
-            num_layers=mlp_layers,
-        )
+        self.radius_head = MLP(unet_planes[0], 1, norm_fn, mlp_layers)
+        self.medial_dir_head = MLP(unet_planes[0], 3, norm_fn, mlp_layers)
+        self.class_head = MLP(unet_planes[0], num_classes, norm_fn, mlp_layers)
 
         self.apply(self.set_bn_init)
 

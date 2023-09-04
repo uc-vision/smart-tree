@@ -5,17 +5,19 @@ wandb:
   entity: harry1576
   mode: online
 
-fp16: False
+fp16: True
 num_epoch: 500
 lr_decay: True
-lr: 0.1
+lr: 0.01
 early_stop_epoch: 20
 early_stop: True
 
-batch_size: 0
-directory: /mnt/harry/PhD/smart-tree/data/branches/
-json_path: smart_tree/conf/training-split.json
-voxel_size: 0.01
+batch_size: 16
+directory: /local/UC-10/npz_4mm/
+json_path: /local/smart-tree/smart_tree/conf/trees_II/split.json
+voxel_size: 0.04
+input_features : ['xyz']
+target_features: ['radius', 'medial_direction', 'class_l']
 
 cmap:
   - [0.450, 0.325, 0.164] # Trunk
@@ -25,18 +27,66 @@ cmap:
 capture_output: 1
 
 
-
+# Training dataset...
 train_dataset:
   _target_: smart_tree.dataset.dataset.Dataset
   mode: train
   directory: ${directory}
   json_path: ${json_path}
   cache: True
-  augmentation:
-    _target_:  smart_tree.dataset.augmentations.AugmentationPipeline
-    augmentations:
-      - _target_:  smart_tree.dataset.augmentations.RandomCubicCrop
-        size: 4.0
+  transform: 
+    _target_ : smart_tree.model.sparse.util.sparse_voxelize
+    _partial_ : True
+    input_features: ${input_features}
+    target_features: ${target_features}
+    voxel_size: ${voxel_size}
+
+train_data_loader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: ${batch_size}
+  drop_last: True
+  pin_memory: False
+  num_workers: 0
+  shuffle: False
+  sampler:
+    _target_: torch.utils.data.RandomSampler
+    replacement: True
+    num_samples: 32
+    data_source: ${train_dataset}
+  collate_fn:
+    _target_: smart_tree.model.sparse.collate.batch_collate
+    _partial_: True
+
+  dataset: ${train_dataset}
+
+# Val dataset
+validation_dataset:
+  _target_: smart_tree.dataset.dataset.Dataset
+  mode: validation
+  directory: ${directory}
+  json_path: ${json_path}
+  cache: True
+  transform: 
+    _target_ : smart_tree.model.sparse.util.sparse_voxelize
+    _partial_ : True
+    input_features: ${input_features}
+    target_features: ${target_features}
+    voxel_size: ${voxel_size}
+
+
+validation_data_loader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: ${batch_size}
+  drop_last: True
+  pin_memory: False
+  num_workers: 0
+  shuffle: False
+  collate_fn:
+    _target_: smart_tree.model.sparse.collate.batch_collate
+    _partial_: True
+
+  dataset: ${train_dataset}
+
 
 test_dataset:
   _target_: smart_tree.dataset.dataset.Dataset
@@ -44,78 +94,34 @@ test_dataset:
   directory: ${directory}
   json_path: ${json_path}
   cache: True
-  augmentation:
-    _target_:  smart_tree.dataset.augmentations.AugmentationPipeline
-    augmentations:
-      - _target_:  smart_tree.dataset.augmentations.RandomCubicCrop
-        size: 4.0
+  transform: 
+    _target_ : smart_tree.model.sparse.util.sparse_voxelize
+    _partial_ : True
+    input_features: ${input_features}
+    target_features: ${target_features}
+    voxel_size: ${voxel_size}
 
-validation_dataset:
-  _target_: smart_tree.dataset.dataset.Dataset
-  mode: validation
-  directory: ${directory}
-  json_path: ${json_path}
-  cache: True
-  augmentation:
-    _target_:  smart_tree.dataset.augmentations.AugmentationPipeline
-    augmentations:
-      - _target_:  smart_tree.dataset.augmentations.RandomCubicCrop
-        size: 4.0
-
-
-train_data_loader:
-  _target_: torch.utils.data.DataLoader
-  #batch_size: ${batch_size}
-  drop_last: True
-  pin_memory: False
-  num_workers: 0
-  shuffle: True
-  # collate_fn : False
-  # sampler:
-  #   _target_: torch.utils.data.RandomSampler
-  #   replacement: True
-  #   num_samples: 8
-  #   data_source: ${train_dataset}
-  # collate_fn:
-  #    _target_: smart_tree.dataset.collate.collate_clds_to_spconv_tensors
-  #    _partial_: True
-  #    voxel_size: 0.01
-
-  dataset: ${train_dataset}
-
-validation_data_loader:
-  _target_: torch.utils.data.DataLoader
-  #batch_size: ${batch_size}
-  drop_last: True
-  pin_memory: False
-  num_workers: 0
-  shuffle: True
-  # collate_fn:
-  #   _target_: smart_tree.model.sparse.batch_collate
-  #   _partial_: True
-  dataset: ${validation_dataset}
 
 test_data_loader:
   _target_: torch.utils.data.DataLoader
-  #batch_size: ${batch_size}
+  batch_size: ${batch_size}
   drop_last: True
   pin_memory: False
   num_workers: 0
-  shuffle: True
-  # collate_fn:
-  #    _target_: smart_tree.dataset.collate.collate_clds_to_spconv_tensors
-  #    _partial_: True
-  dataset: ${test_dataset}
+  shuffle: False
+  collate_fn:
+    _target_: smart_tree.model.sparse.collate.batch_collate
+    _partial_: True
+
+  dataset: ${train_dataset}
 
 
 model:
-  _target_: smart_tree.model.model.Smart_Tree
+  _target_: smart_tree.model.sparse.model.Smart_Tree
   input_channels: 3
   unet_planes: [8, 16, 32, 64]
-  radius_fc_planes: [8, 8, 4, 1]
-  direction_fc_planes: [8, 8, 4, 3]
-  class_fc_planes: [8, 8, 4, 2]
-  bias: False
+  mlp_layers: 2
+  num_classes: 2
 
 optimizer:
   _target_: torch.optim.Adam
@@ -140,5 +146,5 @@ loss_fn:
     _partial_: True
 
   class_loss_fn:
-    _target_: smart_tree.model.loss.focal_loss
-    _partial_: True
+    _target_: smart_tree.model.loss.FocalLoss
+    gamma: 2
