@@ -1,18 +1,17 @@
-from smart_tree.data_types.cloud import Cloud, LabelledCloud
-import torch
-
-from typing import Union, List
-from py_structs.torch import map_tensors
 from functools import partial
-from spconv.pytorch.utils import PointToVoxel
-
-from smart_tree.data_types.util import (
-    get_properties,
-    cat_tensor_dict,
-    cat_tensor_properties,
-)
+from typing import List, Union
 
 import spconv.pytorch as spconv
+import torch
+from py_structs.torch import map_tensors
+from spconv.pytorch.utils import PointToVoxel
+
+from smart_tree.data_types.cloud import Cloud, LabelledCloud
+from smart_tree.data_types.util import (
+    cat_tensor_dict,
+    cat_tensor_properties,
+    get_properties,
+)
 
 
 def sparse_from_batch(features, coordinates, device):
@@ -62,16 +61,28 @@ def sparse_voxelize(
 ):
     xyzmin, xyzmax = cld.bounding_box
 
-    input_feats = cat_tensor_properties(cld, input_features)
-    target_feats = cat_tensor_properties(cld, target_features)
+    len_input_feats = 0
+    len_target_feats = 0
+    len_mask_feats = 0
 
-    if target_feats is None:
-        all_feats = input_feats
-    else:
-        all_feats = torch.cat([input_feats, target_feats], dim=1)
+    all_feats = []
 
-    all_feats = all_feats.contiguous()
-    num_point_feats = all_feats.shape[1]
+    masks = ["loss_mask", "vector_mask"]
+
+    for feat in input_features + target_features + masks:
+        assert hasattr(cld, feat), f"Cloud does not have {feat} attribute"
+        assert getattr(cld, feat).dtype == torch.tensor, f"{feat} is not a tensor"
+
+        if feat in input_feats:
+            len_input_feats += getattr(cld, feat).shape[1]
+        if feat in target_features:
+            len_target_feats += getattr(cld, feat).shape[1]
+        if feat in masks:
+            len_mask_feats += getattr(cld, feat).shape[1]
+        all_feats.append(getattr(cld, feat))
+
+    if len(all_feats) > 1:
+        all_feats = torch.cat(all_feats, dim=1).contiguous()
 
     voxel_gen = PointToVoxel(
         vsize_xyz=[voxel_size] * 3,
@@ -83,33 +94,40 @@ def sparse_voxelize(
             xyzmax[1],
             xyzmax[2],
         ],
-        num_point_features=num_point_feats,
+        num_point_features=all_feats.shape[0],
         max_num_voxels=len(cld),
         max_num_points_per_voxel=1,
         device=cld.device,
     )
 
-    (
-        feats,
-        coords,
-        num_pts,
-        voxel_id_tv,
-    ) = voxel_gen.generate_voxel_with_id(all_feats)
+    feats_voxelized, coords, num_pts, voxel_id = voxel_gen.generate_voxel_with_id(
+        all_feats
+    )
 
-    indice = torch.zeros((coords.shape[0], 1), dtype=torch.int32, device=cld.device)
-    coords = torch.cat((indice, coords), dim=1)
-    feats = feats.squeeze(1)
+    feats_voxelized = feats_voxelized.squeeze(1)
     coords = coords.squeeze(1)
 
-    mask = torch.ones((feats.shape[0], 1), dtype=torch.int32)
+    input_feats = feats_voxelized[:, :len_input_feats]
 
-    if target_feats is None:
-        return [feats, coords, mask, cld.filename]
-
-    else:
-        return [
-            (feats[:, : input_feats.shape[1]], feats[:, input_feats.shape[1] :]),
-            coords,
-            mask,
-            cld.filename,
+    if target_features is not None:
+        target_features = feats_voxelized[
+            :, len_input_feats : len_input_feats + len_target_feats
         ]
+
+    # indice = torch.zeros((coords.shape[0], 1), dtype=torch.int32, device=cld.device)
+    # coords = torch.cat((indice, coords), dim=1)
+    # feats = feats.squeeze(1)
+    # coords = coords.squeeze(1)
+
+    # mask = torch.ones((feats.shape[0], 1), dtype=torch.int32)
+
+    # if target_feats is None:
+    #     return [feats, coords, mask, cld.filename]
+
+    # else:
+    #     return [
+    #         (feats[:, : input_feats.shape[1]], feats[:, input_feats.shape[1] :]),
+    #         coords,
+    #         mask,
+    #         cld.filename,
+    #     ]

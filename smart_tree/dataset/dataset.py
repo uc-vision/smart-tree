@@ -33,7 +33,7 @@ class Dataset:
         self.device = device
 
         assert Path(json_path).is_file(), f"JSON path is invalid: '{json_path}'"
-        assert Path(directory).is_dir(), "Directory path is invalid: {directory}"
+        assert Path(directory).is_dir(), f"Directory path is invalid: {directory}"
 
         json_data = json.load(open(json_path))
 
@@ -83,87 +83,87 @@ class Dataset:
         return cld
 
 
-class SingleTreeInference:
-    def __init__(
-        self,
-        cloud: Cloud,
-        device=torch.device("cuda:0"),
-        block_size: float = 1.0,
-        buffer_size: float = 0.4,
-        min_points: int = 20,
-    ):
-        self.cloud = cloud
+# class SingleTreeInference:
+#     def __init__(
+#         self,
+#         cloud: Cloud,
+#         device=torch.device("cuda:0"),
+#         block_size: float = 1.0,
+#         buffer_size: float = 0.4,
+#         min_points: int = 20,
+#     ):
+#         self.cloud = cloud
 
-        xyz_quantized = torch.div(cloud.xyz, block_size, rounding_mode="floor")
-        block_ids, pnt_counts = torch.unique(xyz_quantized, return_counts=True, dim=0)
+#         xyz_quantized = torch.div(cloud.xyz, block_size, rounding_mode="floor")
+#         block_ids, pnt_counts = torch.unique(xyz_quantized, return_counts=True, dim=0)
 
-        valid_block_ids = block_ids[pnt_counts > min_points]
-        self.block_centres = (valid_block_ids * block_size) + (block_size / 2)
+#         valid_block_ids = block_ids[pnt_counts > min_points]
+#         self.block_centres = (valid_block_ids * block_size) + (block_size / 2)
 
-    def __getitem__(self, idx):
-        block_centre = self.block_centres[idx]
-        cloud: Cloud = self.clouds[idx]
+#     def __getitem__(self, idx):
+#         block_centre = self.block_centres[idx]
+#         cloud: Cloud = self.clouds[idx]
 
-        xyzmin, _ = torch.min(cloud.xyz, axis=0)
-        xyzmax, _ = torch.max(cloud.xyz, axis=0)
+#         xyzmin, _ = torch.min(cloud.xyz, axis=0)
+#         xyzmax, _ = torch.max(cloud.xyz, axis=0)
 
-        surface_voxel_generator = PointToVoxel(
-            vsize_xyz=[self.voxel_size] * 3,
-            coors_range_xyz=[
-                xyzmin[0],
-                xyzmin[1],
-                xyzmin[2],
-                xyzmax[0],
-                xyzmax[1],
-                xyzmax[2],
-            ],
-            num_point_features=6,
-            max_num_voxels=len(cloud),
-            max_num_points_per_voxel=1,
-        )
+#         surface_voxel_generator = PointToVoxel(
+#             vsize_xyz=[self.voxel_size] * 3,
+#             coors_range_xyz=[
+#                 xyzmin[0],
+#                 xyzmin[1],
+#                 xyzmin[2],
+#                 xyzmax[0],
+#                 xyzmax[1],
+#                 xyzmax[2],
+#             ],
+#             num_point_features=6,
+#             max_num_voxels=len(cloud),
+#             max_num_points_per_voxel=1,
+#         )
 
-        feats, coords, _, voxel_id_tv = surface_voxel_generator.generate_voxel_with_id(
-            torch.cat((cloud.xyz, cloud.rgb), dim=1).contiguous()
-        )  #
+#         feats, coords, _, voxel_id_tv = surface_voxel_generator.generate_voxel_with_id(
+#             torch.cat((cloud.xyz, cloud.rgb), dim=1).contiguous()
+#         )  #
 
-        indice = torch.zeros((coords.shape[0], 1), dtype=torch.int32)
-        coords = torch.cat((indice, coords), dim=1)
+#         indice = torch.zeros((coords.shape[0], 1), dtype=torch.int32)
+#         coords = torch.cat((indice, coords), dim=1)
 
-        feats = feats.squeeze(1)
-        coords = coords.squeeze(1)
+#         feats = feats.squeeze(1)
+#         coords = coords.squeeze(1)
 
-        mask = cube_filter(feats[:, :3], block_centre, self.block_size)
+#         mask = cube_filter(feats[:, :3], block_centre, self.block_size)
 
-        return feats, coords, mask, self.file_name
+#         return feats, coords, mask, self.file_name
 
-    def __len__(self):
-        return len(self.clouds)
+#     def __len__(self):
+#         return len(self.clouds)
 
-    # def compute_blocks(self):
-    #     self.xyz_quantized = torch.div(
-    #         self.cloud.xyz, self.block_size, rounding_mode="floor"
-    #     )
-    #     self.block_ids, pnt_counts = torch.unique(
-    #         self.xyz_quantized, return_counts=True, dim=0
-    #     )
+# def compute_blocks(self):
+#     self.xyz_quantized = torch.div(
+#         self.cloud.xyz, self.block_size, rounding_mode="floor"
+#     )
+#     self.block_ids, pnt_counts = torch.unique(
+#         self.xyz_quantized, return_counts=True, dim=0
+#     )
 
-    #     # Remove blocks that have less than specified amount of points...
-    #     self.block_ids = self.block_ids[pnt_counts > self.min_points]
-    #     self.block_centres = (self.block_ids * self.block_size) + (self.block_size / 2)
+#     # Remove blocks that have less than specified amount of points...
+#     self.block_ids = self.block_ids[pnt_counts > self.min_points]
+#     self.block_centres = (self.block_ids * self.block_size) + (self.block_size / 2)
 
-    #     self.clouds: List[Cloud] = []
+#     self.clouds: List[Cloud] = []
 
-    #     for centre in tqdm(self.block_centres, desc="Computing blocks...", leave=False):
-    #         mask = cube_filter(
-    #             self.cloud.xyz,
-    #             centre,
-    #             self.block_size + (self.buffer_size * 2),
-    #         )
-    #         block_cloud = self.cloud.filter(mask).to_device(torch.device("cpu"))
+#     for centre in tqdm(self.block_centres, desc="Computing blocks...", leave=False):
+#         mask = cube_filter(
+#             self.cloud.xyz,
+#             centre,
+#             self.block_size + (self.buffer_size * 2),
+#         )
+#         block_cloud = self.cloud.filter(mask).to_device(torch.device("cpu"))
 
-    #         self.clouds.append(block_cloud)
+#         self.clouds.append(block_cloud)
 
-    #     self.block_centres = self.block_centres.to(torch.device("cpu"))
+#     self.block_centres = self.block_centres.to(torch.device("cpu"))
 
 
 def load_dataloader(

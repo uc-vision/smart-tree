@@ -61,12 +61,26 @@ class Cloud:
         filtered_rgb = self.rgb[mask] if self.rgb is not None else None
         return Cloud(xyz=self.xyz[mask], rgb=filtered_rgb, filename=self.filename)
 
+    def filter(self, mask: TensorType["N", torch.bool]) -> Cloud:
+        args = asdict(self)
+        for k, v in args.items():
+            if isinstance(v, torch.Tensor):
+                args[k] = v[mask]
+        return self.__class__(**args)
+
+    def pin_memory(self) -> Cloud:
+        args = asdict(self)
+        for k, v in args.items():
+            if isinstance(v, torch.Tensor):
+                args[k] = v.pin_memory()
+        return self.__class__(**args)
+
     def to_device(self, device: torch.device) -> Cloud:
-        return Cloud(
-            xyz=self.xyz.to(device),
-            rgb=self.rgb.to(device) if self.rgb is not None else None,
-            filename=self.filename,
-        )
+        args = asdict(self)
+        for k, v in args.items():
+            if isinstance(v, torch.Tensor):
+                args[k] = v.to(device)
+        return self.__class__(**args)
 
     @property
     def device(self) -> torch.device:
@@ -143,30 +157,18 @@ class LabelledCloud(Cloud):
             )
         return LabelledCloud(**args)
 
-    def filter(self, mask: TensorType["N", torch.bool]) -> LabelledCloud:
-        args = asdict(self)
-        for k, v in args.items():
-            if isinstance(v, torch.Tensor):
-                args[k] = v[mask]
-        return LabelledCloud(**args)
-
     def filter_by_class(self, classes: TensorType["N"]) -> LabelledCloud:
         mask = torch.isin(self.class_l, classes)
         return self.filter(mask.view(-1))
 
-    def pin_memory(self):
-        args = asdict(self)
-        for k, v in args.items():
-            if isinstance(v, torch.Tensor):
-                args[k] = v.pin_memory()
-        return LabelledCloud(**args)
+    def filter(self, mask: TensorType["N", torch.bool]) -> LabelledCloud:
+        return super().filter(mask)
 
-    def to_device(self, device: torch.device):
-        args = asdict(self)
-        for k, v in args.items():
-            if isinstance(v, torch.Tensor):
-                args[k] = v.to(device)
-        return LabelledCloud(**args)
+    def pin_memory(self) -> LabelledCloud:
+        return super().pin_memory()
+
+    def to_device(self, device: torch.device) -> Cloud:
+        return super().to_device(device)
 
     @property
     def number_classes(self) -> int:
