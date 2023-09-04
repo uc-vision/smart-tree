@@ -1,13 +1,9 @@
-from functools import partial
 from pathlib import Path
 from typing import List
 
 import torch
-from py_structs.torch import map_tensors
 
 from smart_tree.data_types.cloud import Cloud
-
-from .sparse import sparse_from_batch
 
 
 def model_output_to_labelled_clds(

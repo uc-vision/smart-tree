@@ -1,9 +1,6 @@
 import torch
 
 
-from typing import List
-
-
 def batch_collate(batch):
     """Custom Batch Collate Function for Sparse Data..."""
 

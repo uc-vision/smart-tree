@@ -1,5 +1,5 @@
 from functools import partial
-from typing import List, Union
+from typing import List
 
 import spconv.pytorch as spconv
 import torch
@@ -7,11 +7,6 @@ from py_structs.torch import map_tensors
 from spconv.pytorch.utils import PointToVoxel
 
 from smart_tree.data_types.cloud import Cloud, LabelledCloud
-from smart_tree.data_types.util import (
-    cat_tensor_dict,
-    cat_tensor_properties,
-    get_properties,
-)
 
 
 def sparse_from_batch(features, coordinates, device):

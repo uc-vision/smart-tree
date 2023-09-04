@@ -16,8 +16,6 @@ from tqdm import tqdm
 
 from smart_tree.data_types.cloud import Cloud
 from smart_tree.o3d_abstractions.camera import Renderer
-from smart_tree.dataset.dataset import Dataset
-
 
 from .sparse.util import get_batch
 from .tracker import Tracker

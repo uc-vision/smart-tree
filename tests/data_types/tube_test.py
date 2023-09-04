@@ -2,7 +2,7 @@
 import pytest
 import torch
 
-from smart_tree.data_types.tube import CollatedTube, Tube, collate_tubes
+from smart_tree.data_types.tube import Tube, collate_tubes
 
 
 # Create a fixture for a sample Tube instance

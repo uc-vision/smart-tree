@@ -9,7 +9,6 @@ from smart_tree.data_types.cloud import Cloud
 from smart_tree.dataset.augmentations import (
     AugmentationPipeline,
     CentreCloud,
-    Dropout3D,
     FixedRotate,
     FixedTranslate,
     RandomAugmentation,

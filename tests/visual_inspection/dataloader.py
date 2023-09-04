@@ -1,8 +1,6 @@
-import logging
 
 import hydra
 import taichi as ti
-import torch
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 
