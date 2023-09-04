@@ -1,11 +1,15 @@
 import wandb
+import torch
+
+from sklearn.metrics import f1_score
 
 
 class Tracker:
     def __init__(self):
         self.losses = {}
+        self.metrics = {}
 
-    def update(self, loss_dict: dict):
+    def update_losses(self, loss_dict: dict):
         for k, v in loss_dict.items():
             self.losses[k] = self.losses.get(k, []) + [v.item()]
 
@@ -22,4 +26,22 @@ class Tracker:
         for k, v in self.losses.items():
             log_dict[k] = v[-1]
 
+        log_dict.update(self.metrics)
+
         wandb.log(log_dict, epoch)
+
+    def update_metrics(self, outputs, targets, mask):
+        target_class = targets[:, [-1]].long()
+        pred_class = torch.argmax(outputs["class_l"])
+
+        print(torch.argmax(outputs["class_l"], dim=0))
+        # print(target_class.shape)
+        # print(pred_class.shape)
+
+        quit(0)
+
+        self.metrics["f1"] = f1_score(
+            target_class.cpu().view(-1),
+            outputs.cpu().view(-1),
+            average="macro",
+        )

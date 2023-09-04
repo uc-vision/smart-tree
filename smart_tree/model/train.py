@@ -41,7 +41,6 @@ def train_epoch(
         total=len(data_loader),
     ):
         preds = model.forward(sp_input)
-
         loss = loss_fn(preds, targets, mask)
 
         if fp16:
@@ -55,7 +54,8 @@ def train_epoch(
             optimizer.step()
 
         optimizer.zero_grad()
-        tracker.update(loss)
+        tracker.update_losses(loss)
+        tracker.update_metrics(preds, targets, mask)
 
     return tracker, scaler
 
@@ -79,7 +79,8 @@ def eval_epoch(
     ):
         preds = model.forward(sp_input)
         loss = loss_fn(preds, targets, mask)
-        tracker.update(loss)
+        tracker.update_losses(loss)
+        tracker.update_metrics(preds, targets, mask)
 
     model.train()
 

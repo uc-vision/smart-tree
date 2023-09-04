@@ -14,8 +14,18 @@ def compute_loss(
     vector_class=None,
 ):
     losses = {}
-    target_class = targets[:, [-1]].long()
-    losses["class_l"] = class_loss_fn(preds["class_l"], target_class.long())
+    target_class = targets[:, [-1]].long()[mask]
+    pred_class = F.softmax(preds["class_l"][mask], dim=1)
+
+    print(preds["class_l"].shape[0])
+    print(pred_class.shape[0])
+    print(target_class.shape[0])
+
+    quit(0)
+
+    assert target_class.shape[0] == pred_class.shape[0]
+
+    losses["class_l"] = class_loss_fn(pred_class, target_class)
 
     predicted_radius = preds["radius"]  #
     if target_radius_log:
@@ -23,11 +33,20 @@ def compute_loss(
     else:
         target_radius = targets[:, [0]]
 
-    losses["radius"] = radius_loss_fn(predicted_radius, target_radius)
+    vector_mask = torch.isin(
+        target_class,
+        torch.tensor(vector_class, device=target_class.device),
+    )[mask].reshape(-1)
+
+    losses["radius"] = radius_loss_fn(
+        predicted_radius[vector_mask], target_radius[vector_mask]
+    )
 
     pred_medial_dir = preds["medial_direction"]  #
     target_medial_dir = F.normalize(targets[:, 1:4])
-    losses["medial_direction"] = direction_loss_fn(pred_medial_dir, target_medial_dir)
+    losses["medial_direction"] = direction_loss_fn(
+        pred_medial_dir[vector_mask], target_medial_dir[vector_mask]
+    )
 
     return losses
 
@@ -89,20 +108,20 @@ def cosine_similarity_loss(outputs, targets):
     return torch.mean(1 - loss(outputs, targets))
 
 
-def dice_loss(outputs, targets, mask=None):
-    # https://gist.github.com/jeremyjordan/9ea3032a32909f71dd2ab35fe3bacc08
-    smooth = 1
-    outputs = F.softmax(outputs, dim=1)
-    targets = F.one_hot(targets)
+def dice_loss(output, target, smooth=1.0):
+    # Flatten the predictions and targets
+    output = output.view(-1)
+    target = target.view(-1)
 
-    outputs = outputs.view(-1)
-    targets = targets.view(-1)
+    intersection = torch.sum(output * target)
+    union = torch.sum(output) + torch.sum(target)
 
-    intersection = (outputs * targets).sum()
+    dice_coefficient = (2.0 * intersection + smooth) / (union + smooth)
 
-    return 1 - (
-        (2.0 * intersection + smooth) / (outputs.sum() + targets.sum() + smooth)
-    )
+    # The Dice Loss is 1 - Dice Coefficient
+    dice_loss = 1.0 - dice_coefficient
+
+    return dice_loss
 
 
 # def focal_loss(outputs, targets):
