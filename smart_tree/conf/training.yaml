@@ -1,5 +1,9 @@
 # @package: _global_
 
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
 wandb:
   project: tree
   entity: harry1576
@@ -13,8 +17,8 @@ early_stop_epoch: 20
 early_stop: True
 
 batch_size: 16
-directory: /local/UC-10/npz_4mm/
-json_path: /local/smart-tree/smart_tree/conf/trees_II/split.json
+directory: /mnt/harry/PhD/smart-tree/data/npz_4mm
+json_path: /mnt/harry/PhD/smart-tree/smart_tree/conf/trees_II/split.json
 voxel_size: 0.04
 input_features : ['xyz']
 target_features: ['radius', 'medial_direction', 'class_l']
@@ -27,6 +31,7 @@ cmap:
 capture_output: 1
 
 
+
 # Training dataset...
 train_dataset:
   _target_: smart_tree.dataset.dataset.Dataset
@@ -34,8 +39,8 @@ train_dataset:
   directory: ${directory}
   json_path: ${json_path}
   cache: True
-  transform: 
-    _target_ : smart_tree.model.sparse.util.sparse_voxelize
+  transform:
+    _target_ : smart_tree.model.sparse.transform.sparse_voxelize
     _partial_ : True
     input_features: ${input_features}
     target_features: ${target_features}
@@ -66,8 +71,8 @@ validation_dataset:
   directory: ${directory}
   json_path: ${json_path}
   cache: True
-  transform: 
-    _target_ : smart_tree.model.sparse.util.sparse_voxelize
+  transform:
+    _target_ : smart_tree.model.sparse.transform.sparse_voxelize
     _partial_ : True
     input_features: ${input_features}
     target_features: ${target_features}
@@ -94,8 +99,8 @@ test_dataset:
   directory: ${directory}
   json_path: ${json_path}
   cache: True
-  transform: 
-    _target_ : smart_tree.model.sparse.util.sparse_voxelize
+  transform:
+    _target_ : smart_tree.model.sparse.transform.sparse_voxelize
     _partial_ : True
     input_features: ${input_features}
     target_features: ${target_features}
@@ -130,4 +135,3 @@ optimizer:
 scheduler:
   _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
   mode: "min"
-
