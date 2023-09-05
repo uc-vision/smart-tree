@@ -13,6 +13,9 @@ from omegaconf import DictConfig
 )
 def main(cfg: DictConfig):
     pipeline = instantiate(cfg.pipeline)
+
+    quit()
+
     if "path" in dict(cfg):
         pipeline.run(Path(cfg.path))
     elif "directory" in dict(cfg):

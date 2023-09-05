@@ -1,10 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from torchtyping import TensorType, patch_typeguard
-from typeguard import typechecked
-
+from torchtyping import patch_typeguard
 
 patch_typeguard()
 

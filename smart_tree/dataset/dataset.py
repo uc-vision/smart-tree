@@ -1,10 +1,9 @@
 import json
 from pathlib import Path
-from typing import List, Literal, Optional, Any
+from typing import Any, Literal, Optional
 
 import torch
 import torch.utils.data
-from torch.utils.data import DataLoader
 from typeguard import typechecked
 
 from ..data_types.cloud import (

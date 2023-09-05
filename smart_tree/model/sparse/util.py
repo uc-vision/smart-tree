@@ -1,12 +1,8 @@
 from functools import partial
-from typing import List, Union
 
 import spconv.pytorch as spconv
 import torch
 from py_structs.torch import map_tensors
-from spconv.pytorch.utils import PointToVoxel
-
-from smart_tree.data_types.cloud import Cloud, LabelledCloud
 
 
 def batch_collate(batch):

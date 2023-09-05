@@ -1,7 +1,6 @@
-import wandb
 import torch
-
-from sklearn.metrics import f1_score, r2_score, mean_absolute_percentage_error
+import wandb
+from sklearn.metrics import f1_score, mean_absolute_percentage_error
 
 
 class Tracker:

@@ -1,9 +1,7 @@
-import torch
-import torch.nn as nn
-from torch.autograd import Variable
-import torch.nn.functional as F
-from smart_tree.model.loss import FocalLoss
 import pytest
+import torch
+
+from smart_tree.model.loss import FocalLoss
 
 
 @pytest.fixture

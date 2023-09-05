@@ -1,12 +1,9 @@
 import hydra
-import taichi as ti
+import torch
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 
-import torch
-
-from smart_tree.data_types.cloud import Cloud, LabelledCloud
-from smart_tree.o3d_abstractions.visualizer import o3d_viewer, ViewerItem
+from smart_tree.data_types.cloud import LabelledCloud
 
 
 @hydra.main(
