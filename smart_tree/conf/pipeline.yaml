@@ -6,7 +6,26 @@ pipeline:
     augmentations: 
       - _target_:  smart_tree.dataset.augmentations.CentreCloud
 
-  
+  model_inference:
+    _target_: smart_tree.model.model_inference.ModelInference
+    
+    model:
+      _target_: smart_tree.model.model_inference.load_model
+      model_path: smart_tree/model/weights/noble-elevator-58_model.pt
+      weights_path: smart_tree/model/weights/noble-elevator-58_model_weights.pt
+    
+    data_loader:
+      _target_: smart_tree.model.model_inference.load_dataloader
+      _partial_: True
+      block_size: 4.0
+      buffer_size: 0.4
+      num_workers: 0
+      batch_size: 4     
+      transform: 
+        _target_: smart_tree.model.sparse.util.sparse_voxelize
+      collate_fn: 
+        _target_: smart_tree.model.sparse.util.batch_collate
+
 
   # model_inference: 
   #   _target_: smart_tree.model.model_inference.ModelInference

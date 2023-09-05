@@ -1,14 +1,14 @@
 from pathlib import Path
 
+from typing import Optional
+
 import torch
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 
 from smart_tree.data_types.cloud import Cloud
-from smart_tree.dataset.dataset import load_dataloader, SingleTreeInference
+from smart_tree.dataset.dataset import SingleTreeInference
 from smart_tree.model.sparse.util import sparse_from_batch
-
-
 
 
 def load_model(model_path, weights_path, device=torch.device("cuda:0")):
@@ -17,35 +17,43 @@ def load_model(model_path, weights_path, device=torch.device("cuda:0")):
     model.eval()
     return model
 
+
 def load_dataloader(
     cloud: Cloud,
     block_size: float,
     buffer_size: float,
-    transform: Optional[callable] = None,
-    augmentation: Optional[callable] = None,
     num_workers: int,
     batch_size: int,
-    collate_fn: callable
+    collate_fn: callable,
+    transform: Optional[callable] = None,
+    augmentation: Optional[callable] = None,
 ):
-    dataset = SingleTreeInference(cloud, block_size, buffer_size, augmentation, transform)
+    dataset = SingleTreeInference(
+        cloud,
+        block_size,
+        buffer_size,
+        augmentation,
+        transform,
+    )
     return DataLoader(dataset, batch_size, num_workers, collate_fn=collate_fn)
-
-
-
 
 
 class ModelInference:
     def __init__(
         self,
         model,
-        data_loader,
+        dataloader,
         device=torch.device("cuda:0"),
     ):
         self.model = model
         self.data_loader = data_loader
 
     @torch.no_grad()
-    def run(self, path):
+    def forward(self, cloud: Cloud):
+        dataloader = load_dataloader(cloud)
+
+        print("YEYEYYE")
+
         inputs, masks = [], []
         radius, medial_direction, branch_direction, class_l = [], [], [], []
 
