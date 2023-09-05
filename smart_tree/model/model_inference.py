@@ -2,10 +2,36 @@ from pathlib import Path
 
 import torch
 from tqdm import tqdm
+from torch.utils.data import DataLoader
 
 from smart_tree.data_types.cloud import Cloud
 from smart_tree.dataset.dataset import load_dataloader, SingleTreeInference
 from smart_tree.model.sparse.util import sparse_from_batch
+
+
+
+
+def load_model(model_path, weights_path, device=torch.device("cuda:0")):
+    model = torch.load(f"{model_path}", map_location=device)
+    model.load_state_dict(torch.load(f"{weights_path}"))
+    model.eval()
+    return model
+
+def load_dataloader(
+    cloud: Cloud,
+    block_size: float,
+    buffer_size: float,
+    transform: Optional[callable] = None,
+    augmentation: Optional[callable] = None,
+    num_workers: int,
+    batch_size: int,
+    collate_fn: callable
+):
+    dataset = SingleTreeInference(cloud, block_size, buffer_size, augmentation, transform)
+    return DataLoader(dataset, batch_size, num_workers, collate_fn=collate_fn)
+
+
+
 
 
 class ModelInference:

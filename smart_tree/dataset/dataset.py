@@ -89,14 +89,14 @@ class SingleTreeInference:
         self,
         cloud: Cloud,
         block_size: float = 4.0,
-        buffer_region: float = 0.4,
+        buffer_size: float = 0.4,
         min_points: int = 20,
         augmentation: Optional[callable] = None,
         transform: Optional[callable] = None,
     ):
         self.cloud = cloud
         self.block_size = block_size
-        self.buffer_region = buffer_region
+        self.buffer_size = buffer_size
         self.augmentation = augmentation
         self.transform = transform
 
@@ -112,18 +112,16 @@ class SingleTreeInference:
         xyzmin = centre - (self.block_size / 2)
         xyzmax = centre + (self.block_size / 2)
 
-        block_mask = torch.all(
-            (self.cloud.xyz > xyzmin - self.buffer_region)
-            & (self.cloud.xyz < xyzmax + self.buffer_region),
-            dim=1,
-        )
+        block_max_xyz = xyzmax + self.buffer_size
+        block_min_xyz = xyzmin - self.buffer_size
+
+        block_mask = (self.cloud.xyz > block_min_xyz) & (self.cloud.xyz < block_max_xyz)
+        block_mask = torch.all(block_mask, dim=1)
 
         block_cld = self.cloud.filter(block_mask)
 
-        buffer_mask = torch.all(
-            (block_cld.xyz > xyzmin) & (block_cld.xyz < xyzmax),
-            dim=1,
-        ).unsqueeze(1)
+        buffer_mask = (block_cld.xyz > xyzmin) & (block_cld.xyz < xyzmax)
+        buffer_mask = torch.all(buffer_mask, dim=1).unsqueeze(1)
 
         cld = convert_cloud_to_labelled_cloud(block_cld, loss_mask=buffer_mask)
 
@@ -137,16 +135,3 @@ class SingleTreeInference:
 
     def __len__(self):
         return len(self.block_centres)
-
-
-def load_dataloader(
-    cloud: Cloud,
-    voxel_size: float,
-    block_size: float,
-    buffer_size: float,
-    num_workers: float,
-    batch_size: float,
-):
-    dataset = SingleTreeInference(cloud, voxel_size, block_size, buffer_size)
-
-    return DataLoader(dataset, batch_size, num_workers, collate_fn=batch_collate)

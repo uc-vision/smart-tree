@@ -6,6 +6,8 @@ pipeline:
     augmentations: 
       - _target_:  smart_tree.dataset.augmentations.CentreCloud
 
+  
+
   # model_inference: 
   #   _target_: smart_tree.model.model_inference.ModelInference
   #   model_path: smart_tree/model/weights/noble-elevator-58_model.pt
