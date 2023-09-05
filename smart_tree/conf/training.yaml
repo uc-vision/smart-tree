@@ -1,20 +1,17 @@
 # @package: _global_
 
-defaults:
-  - override hydra/job_logging: colorlog
-  - override hydra/hydra_logging: colorlog
-
 wandb:
   project: tree
   entity: harry1576
   mode: disabled
 
-fp16: False
+fp16: True
 num_epoch: 500
 lr_decay: True
 lr: 0.01
 early_stop_epoch: 20
 early_stop: True
+capture_output: 1
 
 batch_size: 16
 directory: /mnt/harry/PhD/smart-tree/data/npz_4mm
@@ -26,10 +23,6 @@ target_features: ['radius', 'medial_direction', 'class_l']
 cmap:
   - [0.450, 0.325, 0.164] # Trunk
   - [0.541, 0.670, 0.164] # Foliage
-
-
-capture_output: 1
-
 
 
 # Training dataset...
@@ -105,7 +98,6 @@ test_dataset:
     input_features: ${input_features}
     target_features: ${target_features}
     voxel_size: ${voxel_size}
-
 
 test_data_loader:
   _target_: torch.utils.data.DataLoader
