@@ -3,9 +3,9 @@
 wandb:
   project: tree
   entity: harry1576
-  mode: disabled
+  mode: online
 
-fp16: True
+fp16: False
 num_epoch: 500
 lr_decay: True
 lr: 0.01
@@ -54,7 +54,7 @@ train_data_loader:
   #   num_samples: 1024
   #   data_source: ${train_dataset}
   collate_fn:
-    _target_: smart_tree.model.sparse.collate.batch_collate
+    _target_: smart_tree.model.sparse.util.batch_collate
     _partial_: True
 
   dataset: ${train_dataset}
@@ -82,7 +82,7 @@ validation_data_loader:
   num_workers: 0
   shuffle: False
   collate_fn:
-    _target_: smart_tree.model.sparse.collate.batch_collate
+    _target_: smart_tree.model.sparse.util.batch_collate
     _partial_: True
 
   dataset: ${validation_dataset}
@@ -110,7 +110,7 @@ test_data_loader:
   num_workers: 0
   shuffle: False
   collate_fn:
-    _target_: smart_tree.model.sparse.collate.batch_collate
+    _target_: smart_tree.model.sparse.util.batch_collate
     _partial_: True
 
   dataset: ${test_dataset}
@@ -131,20 +131,3 @@ scheduler:
   _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
   mode: "min"
 
-loss_fn:
-  _target_: smart_tree.model.loss.compute_loss
-  _partial_: True
-  vector_class: 1
-  target_radius_log: True
-
-  radius_loss_fn:
-    _target_ : smart_tree.model.loss.L1Loss
-    _partial_: True
-
-  direction_loss_fn:
-    _target_: smart_tree.model.loss.cosine_similarity_loss
-    _partial_: True
-
-  class_loss_fn:
-    _target_: smart_tree.model.loss.dice_loss
-    _partial_: True

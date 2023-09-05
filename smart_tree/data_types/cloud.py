@@ -31,7 +31,7 @@ class Cloud:
 
     def __str__(self) -> str:
         return (
-            f"{'*' * 80}"
+            f"{'*' * 80}\n"
             f"Cloud:\n"
             f"Num pts: {self.xyz.shape[0]}\n"
             f"Coloured: {hasattr(self, 'rgb')}\n"
@@ -138,6 +138,15 @@ class LabelledCloud(Cloud):
 
     vector: Optional[TensorType["N", 3]] = None  # Legacy
 
+    def __str__(self):
+        base_str = super().__str__()
+        args = asdict(self)
+        for k, v in args.items():
+            if v is not None:
+                base_str += f"\nContains: {k}"
+        base_str += f"\n{'*' * 80}"
+        return f"{base_str}"
+
     def scale(self, factor: float | TensorType[1]) -> LabelledCloud:
         args = asdict(self)
         args["xyz"] = args["xyz"] * factor
@@ -195,11 +204,16 @@ class LabelledCloud(Cloud):
 
     def as_o3d_trunk_cld(self) -> o3d.geometry.PointCloud:
         trunk_id = self.branch_ids[0]
-        return self.filter(self.branch_ids == trunk_id).as_o3d_cld()
+        return self.filter((self.branch_ids == trunk_id).view(-1)).as_o3d_cld()
 
     def as_o3d_branch_cld(self) -> o3d.geometry.PointCloud:
         trunk_id = self.branch_ids[0]
-        return self.filter(self.branch_ids != trunk_id).as_o3d_cld()
+        return self.filter((self.branch_ids != trunk_id).view(-1)).as_o3d_cld()
+
+    def as_o3d_loss_mask_cld(self) -> o3d.geometry.PointCloud:
+        cmap = torch.tensor([[1, 0, 0], [0, 1, 0]])
+        colours = cmap.to(self.device)[self.loss_mask.view(-1).int()]
+        return o3d_cloud(self.xyz, colours=colours)
 
     def as_o3d_medial_cld(self) -> o3d.geometry.PointCloud:
         return o3d_cloud(self.xyz + self.medial_vector)
@@ -210,11 +224,11 @@ class LabelledCloud(Cloud):
 
     def as_o3d_branch_directions(self, view_length=0.1) -> o3d.geometry.LineSet:
         branch_dir_cloud = o3d_cloud(self.xyz + (self.branch_direction * view_length))
-        return o3d_lines_between_clouds(self.to_o3d_cld(), branch_dir_cloud)
+        return o3d_lines_between_clouds(self.as_o3d_cld(), branch_dir_cloud)
 
     def viewer_items(self) -> list[ViewerItem]:
         items = super().viewer_items()
-        item = partial(ViewerItem, is_visible=False, group=self.group_name)
+        item = partial(ViewerItem, is_visible=False, group=f"{super().group_name}")
         if self.medial_vector is not None:
             items += [item("Medial Vectors", self.as_o3d_medial_vectors())]
         if self.branch_direction is not None:
@@ -224,10 +238,15 @@ class LabelledCloud(Cloud):
             items += [item("Branches", self.as_o3d_branch_cld())]
         if self.class_l is not None:
             items += [item("Segmented", self.as_o3d_segmented_cld())]
+        if self.loss_mask is not None:
+            items += [item("Loss Mask", self.as_o3d_loss_mask_cld())]
         return items
 
     def view(self):
         o3d_viewer(self.viewer_items())
+
+
+""" TODO: REWRITE THIS """
 
 
 class CloudLoader:
@@ -267,3 +286,28 @@ class CloudLoader:
                 labelled_cloud_fields[k] = torch.from_numpy(v).float()
         labelled_cloud_fields["filename"] = Path(fn)
         return LabelledCloud(**labelled_cloud_fields)
+
+
+def convert_cloud_to_labelled_cloud(
+    cloud: Cloud,
+    medial_vector: Optional[TensorType["N", 3]] = None,
+    branch_direction: Optional[TensorType["N", 3]] = None,
+    branch_ids: Optional[TensorType["N", 1]] = None,
+    class_l: Optional[TensorType["N", 1]] = None,
+    loss_mask: Optional[TensorType["N", 1]] = None,
+    vector_loss_mask: Optional[TensorType["N", 1]] = None,
+    vector: Optional[TensorType["N", 3]] = None,
+) -> LabelledCloud:
+    cloud_dict = asdict(cloud)
+
+    cloud_dict["medial_vector"] = medial_vector
+    cloud_dict["branch_direction"] = branch_direction
+    cloud_dict["branch_ids"] = branch_ids
+    cloud_dict["class_l"] = class_l
+    cloud_dict["loss_mask"] = loss_mask
+    cloud_dict["vector_loss_mask"] = vector_loss_mask
+    cloud_dict["vector"] = vector
+
+    labelled_cloud = LabelledCloud(**cloud_dict)
+
+    return labelled_cloud

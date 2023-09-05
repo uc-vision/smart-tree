@@ -25,21 +25,20 @@ def train_epoch(
     data_loader,
     model,
     optimizer,
-    loss_fn,
     fp16=False,
     scaler=None,
     device=torch.device("cuda"),
 ):
     tracker = Tracker()
 
-    for sp_input, targets, mask, fn in tqdm(
+    for model_input, targets, mask, fn in tqdm(
         get_batch(data_loader, device, fp16),
         desc="Training",
         leave=False,
         total=len(data_loader),
     ):
-        preds = model.forward(sp_input)
-        loss = loss_fn(preds, targets, mask)
+        preds = model.forward(model_input)
+        loss = model.compute_loss(preds, targets, mask)
 
         if fp16:
             assert sum(loss.values()).dtype is torch.float32
@@ -62,21 +61,20 @@ def train_epoch(
 def eval_epoch(
     data_loader,
     model,
-    loss_fn,
     fp16=False,
     device=torch.device("cuda"),
 ):
     tracker = Tracker()
     model.eval()
 
-    for sp_input, targets, mask, fn in tqdm(
+    for model_input, targets, mask, fn in tqdm(
         get_batch(data_loader, device, fp16),
         desc="Evaluating",
         leave=False,
         total=len(data_loader),
     ):
-        preds = model.forward(sp_input)
-        loss = loss_fn(preds, targets, mask)
+        preds = model.forward(model_input)
+        loss = model.compute_loss(preds, targets, mask)
         tracker.update_losses(loss)
         tracker.update_metrics(preds, targets, mask)
 
@@ -96,16 +94,16 @@ def capture_epoch(
     model.eval()
     captures = []
 
-    for sp_input, targets, mask, fn in tqdm(
+    for model_input, targets, mask, fn in tqdm(
         get_batch(data_loader, device, fp16),
         desc="Capturing Outputs",
         leave=False,
         total=len(data_loader),
     ):
-        model_output = model.forward(sp_input)
+        model_output = model.forward(model_input)
 
         labelled_clouds = model_output_to_labelled_clds(
-            sp_input,
+            model_input,
             model_output,
             cmap,
             fn,
@@ -126,16 +124,16 @@ def capture_clouds(
     model.eval()
     clouds = []
 
-    for sp_input, targets, mask, filenames in tqdm(
+    for model_input, targets, mask, filenames in tqdm(
         get_batch(data_loader, device, fp16),
         desc="Capturing Outputs",
         leave=False,
         total=len(data_loader),
     ):
-        model_output = model.forward(sp_input)
+        model_output = model.forward(model_input)
         clouds.extend(
             model_output_to_labelled_clds(
-                sp_input,
+                model_input,
                 model_output,
                 cmap,
                 filenames,
@@ -217,7 +215,6 @@ def main(cfg: DictConfig):
     # Optimizer / Scheduler
     optimizer = instantiate(cfg.optimizer, params=model.parameters())
     scheduler = instantiate(cfg.scheduler, optimizer=optimizer)
-    loss_fn = instantiate(cfg.loss_fn)
 
     # FP-16
     amp_ctx = torch.cuda.amp.autocast() if cfg.fp16 else contextlib.nullcontext()
@@ -233,7 +230,6 @@ def main(cfg: DictConfig):
                 train_loader,
                 model,
                 optimizer,
-                loss_fn,
                 scaler=scaler,
                 fp16=cfg.fp16,
             )
@@ -241,14 +237,12 @@ def main(cfg: DictConfig):
             val_tracker = eval_epoch(
                 val_loader,
                 model,
-                loss_fn,
                 fp16=cfg.fp16,
             )
 
             test_tracker = eval_epoch(
                 test_loader,
                 model,
-                loss_fn,
                 fp16=cfg.fp16,
             )
 

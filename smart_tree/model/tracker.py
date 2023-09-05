@@ -1,7 +1,7 @@
 import wandb
 import torch
 
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, r2_score, mean_absolute_percentage_error
 
 
 class Tracker:
@@ -30,18 +30,28 @@ class Tracker:
 
         wandb.log(log_dict, epoch)
 
+    @torch.no_grad()
     def update_metrics(self, outputs, targets, mask):
-        target_class = targets[:, [-1]].long()
-        pred_class = torch.argmax(outputs["class_l"])
+        target_class = targets[:, [-1]].long().cpu()
+        predicted_class = torch.argmax(outputs["class_l"], dim=1).cpu()
 
-        print(torch.argmax(outputs["class_l"], dim=0))
-        # print(target_class.shape)
-        # print(pred_class.shape)
+        if (
+            not torch.isnan(predicted_class).all()
+            and torch.isfinite(predicted_class).all()
+        ):
+            self.metrics["f1"] = f1_score(
+                target_class.view(-1),
+                predicted_class.view(-1),
+                average="macro",
+            )
 
-        quit(0)
-
-        self.metrics["f1"] = f1_score(
-            target_class.cpu().view(-1),
-            outputs.cpu().view(-1),
-            average="macro",
-        )
+        target_radius = targets[:, [0]].cpu()
+        predicted_radius = torch.exp(outputs["radius"].float().cpu())
+        if (
+            not torch.isnan(predicted_radius).all()
+            and torch.isfinite(predicted_radius).all()
+        ):
+            self.metrics["radius_mape"] = mean_absolute_percentage_error(
+                target_radius.view(-1),
+                predicted_radius.view(-1),
+            )

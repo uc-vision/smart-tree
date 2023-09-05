@@ -147,6 +147,7 @@ FRNN/
 
 smart_tree/conf
 test_data/
+experiments/
 
 !smart_tree/conf/pipeline.yaml
 !smart_tree/conf/training.yaml
