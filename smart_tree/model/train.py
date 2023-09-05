@@ -250,13 +250,13 @@ def main(cfg: DictConfig):
         #     #    capture_and_log(test_loader, model, epoch, wandb.run, cfg)
         #     # capture_and_log(val_loader, model, epoch, wandb.run, cfg)
 
-        # scheduler.step(val_tracker.total_loss) if cfg.lr_decay else None
+        scheduler.step(val_tracker.total_loss) if cfg.lr_decay else None
 
         # Save Best Model
         if val_tracker.total_loss < best_val_loss:
             epochs_no_improve = 0
             best_val_loss = val_tracker.total_loss
-            wandb.run.summary["Best Test Loss"] = best_val_loss
+            wandb.run.summary["Best Val Loss"] = best_val_loss
             torch.save(model.state_dict(), f"{run_dir}/{run_name}_model_weights.pt")
             log.info(f"Weights Saved at epoch: {epoch}")
             # with amp_ctx:

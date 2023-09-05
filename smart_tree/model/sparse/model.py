@@ -2,13 +2,12 @@ import functools
 from typing import List
 
 import spconv.pytorch as spconv
-import torch.nn as nn
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
+from ..loss import DirectionLoss, FocalLoss
 from .model_blocks import MLP, ResidualBlock, UBlock
-
-from ..loss import FocalLoss, DirectionLoss
 
 
 class Smart_Tree(nn.Module):
@@ -122,6 +121,11 @@ class Smarter_Tree(Smart_Tree):
         num_classes=1,
     ):
         super().__init__(input_channels, unet_planes, mlp_layers, num_classes)
+        norm_fn = functools.partial(
+            nn.BatchNorm1d,
+            eps=1e-4,
+            momentum=0.1,
+        )
 
         self.branch_direction_head = MLP(unet_planes[0], 3, norm_fn, mlp_layers)
 
@@ -143,7 +147,7 @@ class Smarter_Tree(Smart_Tree):
         losses = super().compute_loss(predictions, targets, mask)
 
         mask = mask.reshape(-1)
-        target_direction = targets[:, -3:]
+        target_direction = targets[:, 4:7]
         pred_direction = predictions["branch_direction"]
         losses["branch_direction"] = self.direction_loss(
             pred_direction[mask],
