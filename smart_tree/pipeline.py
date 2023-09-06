@@ -3,115 +3,70 @@ from pathlib import Path
 import torch
 
 from .data_types.cloud import Cloud, CloudLoader, LabelledCloud
+from .data_types.tree import DisjointTreeSkeleton
+from .model.model_inference import ModelInference
+from .o3d_abstractions.visualizer import o3d_viewer
+from .skeleton.skeletonize import Skeletonizer
+from .util.file import save_o3d_cloud, save_o3d_lineset, save_o3d_mesh
 
 
 class Pipeline:
     def __init__(
         self,
         preprocessing,
-        # model_inference,
-        # skeletonizer,
-        # repair_skeletons=False,
-        # smooth_skeletons=False,
-        # smooth_kernel_size=0,
-        # prune_skeletons=False,
-        # min_skeleton_radius=0.0,
-        # min_skeleton_length=1000,
-        # view_model_output=False,
-        # view_skeletons=False,
-        # save_outputs=False,
-        # save_path="/",
-        # branch_classes=[0],
-        # cmap=[[1, 0, 0], [0, 1, 0]],
+        model_inference: ModelInference,
+        skeletonizer: Skeletonizer,
+        view_model_output=False,
+        view_skeletons=True,
+        save_outputs=False,
+        save_path="/",
+        branch_classes=[0],
+        cmap=[[1, 0, 0], [0, 1, 0]],
         device=torch.device("cuda:0"),
     ):
         self.preprocessing = preprocessing
         self.model_inference = model_inference
+        self.skeletonizer = skeletonizer
 
-        # self.skeletonizer = skeletonizer
+        self.view_model_output = view_model_output
+        self.view_skeletons = view_skeletons
 
-        # self.repair_skeletons = repair_skeletons
-        # self.smooth_skeletons = smooth_skeletons
-        # self.smooth_kernel_size = smooth_kernel_size
-        # self.prune_skeletons = prune_skeletons
+        self.cmap = torch.tensor(cmap, device=device)
+        self.save_outputs = save_outputs
+        self.save_path = save_path
 
-        # self.min_skeleton_radius = min_skeleton_radius
-        # self.min_skeleton_length = min_skeleton_length
-
-        # self.view_model_output = view_model_output
-        # self.view_skeletons = view_skeletons
-
-        # self.save_outputs = save_outputs
-        # self.save_path = save_path
-
-        # self.branch_classes = branch_classes
-        # self.cmap = np.asarray(cmap)
+        self.branch_classes = torch.tensor(branch_classes, device=device)
         self.device = device
 
     def run(self, path: Path):
+        # Load point cloud and do any required preprocessing
         cloud: Cloud = CloudLoader().load(path).to_device(self.device)
         cloud = self.preprocessing(cloud)
 
+        # Run cloud through network
         cloud: LabelledCloud = self.model_inference.forward(cloud)
+        if self.view_model_output:
+            cloud.view()
 
-        cloud.view()
+        # Filter only the branch points for skeletonizaiton
+        branch_cloud: LabelledCloud = cloud.filter_by_class(self.branch_classes)
 
-        # dataset =
+        # Run the branch cloud through skeletonization algorithm, then post process
+        skeleton: DisjointTreeSkeleton = self.skeletonizer.forward(branch_cloud)
 
-        # labelled_cloud = self.model_inference.run()
+        #     self.post_process(skeleton)
 
-        # labelled_cloud.view()
-        # pass
+        #     # View skeletonization results
+        if self.view_skeletons:
+            o3d_viewer(skeleton.viewer_items() + cloud.viewer_items(), line_width=5)
 
-    #     # Load point cloud
-    #     cloud: Cloud = CloudLoader().load(path).to_device(self.device)
-    #     cloud = self.preprocessing(cloud)
-
-    #     # Run point cloud through model to predict class, radius, direction
-    #     lc: Cloud = self.model_inference.forward(cloud).to_device(self.device)
-    #     if self.view_model_output:
-    #         lc.view(self.cmap)
-
-    #     # Filter only the branch points for skeletonizaiton
-    #     branch_cloud: Cloud = lc.filter_by_class(self.branch_classes)
-
-    #     # Run the branch cloud through skeletonization algorithm, then post process
-    #     skeleton: DisjointTreeSkeleton = self.skeletonizer.forward(branch_cloud)
-
-    #     self.post_process(skeleton)
-
-    #     # View skeletonization results
-    #     if self.view_skeletons:
-    #         o3d_viewer(
-    #             [
-    #                 skeleton.to_o3d_tube(),
-    #                 skeleton.to_o3d_lineset(),
-    #                 skeleton.to_o3d_tube(colour=False),
-    #                 cloud.to_o3d_cld(),
-    #             ],
-    #             line_width=5,
-    #         )
-
-    #     if self.save_outputs:
-    #         print("Saving Outputs")
-    #         sp = self.save_path
-    #         save_o3d_lineset(f"{sp}/skeleton.ply", skeleton.to_o3d_lineset())
-    #         save_o3d_mesh(f"{sp}/mesh.ply", skeleton.to_o3d_tube())
-    #         save_o3d_cloud(f"{sp}/cloud.ply", lc.to_o3d_cld())
-    #         save_o3d_cloud(f"{sp}/seg_cld.ply", lc.to_o3d_seg_cld(self.cmap))
-
-    # def post_process(self, skeleton: DisjointTreeSkeleton):
-    #     if self.prune_skeletons:
-    #         skeleton.prune(
-    #             min_length=self.min_skeleton_length,
-    #             min_radius=self.min_skeleton_radius,
-    #         )
-
-    #     if self.repair_skeletons:
-    #         skeleton.repair()
-
-    #     if self.smooth_skeletons:
-    #         skeleton.smooth(self.smooth_kernel_size)
+        if self.save_outputs:
+            print("Saving Outputs")
+            sp = self.save_path
+            save_o3d_lineset(f"{sp}/skeleton.ply", skeleton.as_o3d_lineset())
+            save_o3d_mesh(f"{sp}/mesh.ply", skeleton.as_o3d_tube())
+            save_o3d_cloud(f"{sp}/cloud.ply", cloud.as_o3d_cld())
+            save_o3d_cloud(f"{sp}/seg_cld.ply", cloud.as_o3d_segmented_cld(self.cmap))
 
     # @staticmethod
     # def from_cfg(inferer, skeletonizer, cfg):

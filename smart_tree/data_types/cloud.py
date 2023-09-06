@@ -57,11 +57,9 @@ class Cloud:
     def voxel_downsample(self, voxel_size: float | TensorType[1]) -> Cloud:
         return self.filter(voxel_filter(self.xyz, voxel_size))
 
-    def filter(self, mask: TensorType["N"]) -> Cloud:
-        filtered_rgb = self.rgb[mask] if self.rgb is not None else None
-        return Cloud(xyz=self.xyz[mask], rgb=filtered_rgb, filename=self.filename)
-
-    def filter(self, mask: TensorType["N", torch.bool]) -> Cloud:
+    def filter(
+        self, mask: TensorType["N", torch.bool] | TensorType["N", torch.int32]
+    ) -> Cloud:
         args = asdict(self)
         for k, v in args.items():
             if isinstance(v, torch.Tensor):
@@ -103,17 +101,22 @@ class Cloud:
         return self.min_xyz, self.max_xyz
 
     @property
+    def root_idx(self) -> int:
+        return torch.argmin(self.xyz[:, 1]).item()
+
+    @property
     def group_name(self) -> str:
         return f"{self.filename.stem}" if self.filename != None else ""
 
     def as_o3d_cld(self) -> o3d.geometry.PointCloud:
         return o3d_cloud(self.xyz, colours=self.rgb)
 
+    @property
     def viewer_items(self) -> list[ViewerItem]:
         return [ViewerItem("Cloud", self.as_o3d_cld(), False, group=self.group_name)]
 
     def view(self) -> None:
-        o3d_viewer(self.viewer_items())
+        o3d_viewer(self.viewer_items)
 
 
 @typechecked
@@ -170,7 +173,7 @@ class LabelledCloud(Cloud):
         mask = torch.isin(self.class_l, classes)
         return self.filter(mask.view(-1))
 
-    def filter(self, mask: TensorType["N", torch.bool]) -> LabelledCloud:
+    def filter(self, mask: TensorType) -> LabelledCloud:
         return super().filter(mask)
 
     def pin_memory(self) -> LabelledCloud:
@@ -183,7 +186,7 @@ class LabelledCloud(Cloud):
     def number_classes(self) -> int:
         if not hasattr(self, "class_l"):
             return 1
-        return torch.unique(self.class_l).shape[0]
+        return torch.max(self.class_l).item() + 1
 
     @property
     def radius(self) -> TensorType["N", 1]:
@@ -193,12 +196,17 @@ class LabelledCloud(Cloud):
     def medial_direction(self) -> torch.Tensor:
         return F.normalize(self.medial_vector)
 
+    @property
+    def medial_pts(self) -> TensorType["N", 3]:
+        return self.xyz + self.medial_vector
+
     def as_o3d_segmented_cld(
         self,
         cmap: TensorType["N", 3] = None,
     ) -> o3d.geometry.PointCloud:
         if cmap is None:
             cmap = torch.rand(self.number_classes, 3)
+        print(cmap)
         colours = cmap.to(self.device)[self.class_l.view(-1).int()]
         return o3d_cloud(self.xyz, colours=colours)
 
@@ -227,7 +235,7 @@ class LabelledCloud(Cloud):
         return o3d_lines_between_clouds(self.as_o3d_cld(), branch_dir_cloud)
 
     def viewer_items(self) -> list[ViewerItem]:
-        items = super().viewer_items()
+        items = super().viewer_items
         item = partial(ViewerItem, is_visible=False, group=f"{super().group_name}")
         if self.medial_vector is not None:
             items += [item("Medial Vectors", self.as_o3d_medial_vectors())]

@@ -41,7 +41,7 @@ def nn_graph(points: TensorType["N", 3], radii: TensorType["N", 1], K=40):
     idxs, dists, _ = knn(points, points, K=K, r=radii.max().item())
     idxs[dists > radii] = -1
     edges, edge_weights = make_edges(dists, idxs)
-    return Graph(points, edges, edge_weights)
+    return Graph(points, edges, edge_weights.reshape(-1, 1))
 
 
 def medial_nn_graph(points: torch.Tensor, radii, medial_dist, K=40):

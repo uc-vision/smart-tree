@@ -70,7 +70,7 @@ def sparse_voxelize(
     indice = torch.zeros((coords.shape[0], 1), dtype=torch.int32, device=cld.device)
     coords = torch.cat((indice, coords), dim=1)
 
-    if target_feats != []:
+    if target_feats.shape[1] != 0:
         return ((input_feats, target_feats), coords, mask, cld.filename)
 
     return input_feats, coords, mask, cld.filename

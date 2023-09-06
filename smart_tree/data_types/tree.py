@@ -118,18 +118,19 @@ class TreeSkeleton:
         return BranchSkeleton(self._id, new_branches, self.colour)
 
     def as_o3d_linesets(self) -> List[o3d.geometry.LineSet]:
-        return [b.to_o3d_lineset() for b in self.branches.values()]
+        return [b.as_o3d_lineset() for b in self.branches.values()]
 
     def as_o3d_lineset(self) -> o3d.geometry.LineSet:
-        return o3d_merge_linesets(self.to_o3d_linesets(), colour=self.colour)
+        return o3d_merge_linesets(self.as_o3d_linesets(), colour=self.colour)
 
     def as_o3d_tubes(self) -> List[o3d.geometry.TriangleMesh]:
-        return [b.to_o3d_tube() for b in self.branches.values()]
+        return [b.as_o3d_tube() for b in self.branches.values()]
 
     def as_o3d_tube(self, colour=None) -> o3d.geometry.TriangleMesh:
-        return o3d_merge_meshes(self.to_o3d_tubes(), colour)
+        return o3d_merge_meshes(self.as_o3d_tubes(), colour)
 
-    def view_items(self) -> List[ViewerItem]:
+    @property
+    def viewer_items(self) -> List[ViewerItem]:
         items = []
         items += [ViewerItem(f"Tree {self._id} Lineset", self.as_o3d_lineset())]
         items += [ViewerItem(f"Tree {self._id} Tube", self.as_o3d_tube())]
@@ -159,24 +160,24 @@ class DisjointTreeSkeleton:
 
     def as_o3d_lineset(self):
         return o3d_merge_linesets(
-            [s.to_o3d_lineset().paint_uniform_color(s.colour) for s in self.skeletons]
+            [s.as_o3d_lineset().paint_uniform_color(s.colour) for s in self.skeletons]
         )
 
     def as_o3d_tube(self, colour=True) -> o3d.geometry.TriangleMesh:
         if colour:
             skeleton_tubes = [
-                skel.to_o3d_tube().paint_uniform_color(skel.colour)
-                for skel in self.skeletons
+                skel.as_o3d_tube(colour=skel.colour) for skel in self.skeletons
             ]
         else:
-            skeleton_tubes = [s.to_o3d_tube() for s in self.skeletons]
+            skeleton_tubes = [s.as_o3d_tube() for s in self.skeletons]
 
         return o3d_merge_meshes(skeleton_tubes)
 
     def viewer_items(self) -> list[ViewerItem]:
         items = []
-        items += [ViewerItem(f"DisjointTreeSkeleton Lineset", self.as_o3d_tube())]
-        items += [ViewerItem(f"DisjointTreeSkeleton Tube", self.as_o3d_tube())]
+        items += [ViewerItem(f"Skeleton Lineset", self.as_o3d_lineset())]
+        items += [ViewerItem(f"Skeleton Tube", self.as_o3d_tube())]
+        items += [ViewerItem(f"Skeleton Coloured Tube", self.as_o3d_tube(colour=True))]
         return items
 
     def view(self):

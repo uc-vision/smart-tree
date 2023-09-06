@@ -33,7 +33,7 @@ def o3d_merge_meshes(
     for m in meshes[1:]:
         mesh += m
 
-    if colour:
+    if colour != None:
         return mesh.paint_uniform_color(colour)
 
     return mesh

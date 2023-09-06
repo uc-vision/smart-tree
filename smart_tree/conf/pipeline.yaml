@@ -10,11 +10,11 @@ pipeline:
     _target_: smart_tree.model.model_inference.ModelInference
 
     model:
-      _target_: smart_tree.model.util.load_model
-      model_path: smart_tree/model/weights/noble-elevator-58_model.pt
-      weights_path: smart_tree/model/weights/noble-elevator-58_model_weights.pt
+      _target_: smart_tree.model.model_inference.load_model
+      model_path: /mnt/harry/PhD/smart-tree/smart_tree/model/weights/iconic-violet-252_model.pt
+      weights_path: /mnt/harry/PhD/smart-tree/smart_tree/model/weights/iconic-violet-252_model_weights.pt
 
-    data_loader:
+    dataloader:
       _target_: smart_tree.model.model_inference.load_dataloader
       _partial_: True
       block_size: 4.0
@@ -22,40 +22,33 @@ pipeline:
       num_workers: 0
       batch_size: 4
       transform:
-        _target_: smart_tree.model.sparse.util.sparse_voxelize
+        _target_: smart_tree.model.sparse.transform.sparse_voxelize
+        _partial_: True
+        voxel_size: 0.04
+        input_features: ['xyz']
       collate_fn:
         _target_: smart_tree.model.sparse.util.batch_collate
+        _partial_: True
+
+  skeletonizer:
+    _target_: smart_tree.skeleton.skeletonize.Skeletonizer
+    K: 16
+    min_connection_length: 0.08
+    minimum_graph_vertices: 4
+
+    repair_skeletons : False
+    smooth_skeletons : False
+    smooth_kernel_size: 11 # Needs to be odd
+    prune_skeletons : False
+    min_skeleton_radius : 0.01
+    min_skeleton_length : 0.02
 
 
-  # model_inference:
-  #   _target_: smart_tree.model.model_inference.ModelInference
-  #   model_path: smart_tree/model/weights/noble-elevator-58_model.pt
-  #   weights_path: smart_tree/model/weights/noble-elevator-58_model_weights.pt
-  #   voxel_size: 0.01
-  #   block_size: 4
-  #   buffer_size: 0.4
-  #   num_workers : 8
-  #   batch_size : 4
-
-  # skeletonizer:
-  #   _target_: smart_tree.skeleton.skeletonize.Skeletonizer
-  #   K: 16
-  #   min_connection_length: 0.02
-  #   minimum_graph_vertices: 32
-
-  # view_model_output : False
-  # view_skeletons : True
-  # save_path: /
-  # save_outputs : False
-
-  # branch_classes: [0]
-  # cmap:
-  #   - [0.450, 0.325, 0.164] # Trunk
-  #   - [0.541, 0.670, 0.164] # Foliage
-
-  # repair_skeletons : True
-  # smooth_skeletons : True
-  # smooth_kernel_size: 11 # Needs to be odd
-  # prune_skeletons : True
-  # min_skeleton_radius : 0.01
-  # min_skeleton_length : 0.02
+  view_model_output : False
+  view_skeletons : True
+  save_path: /mnt/harry/PhD/smart-tree/data/wtf
+  save_outputs : True
+  branch_classes: [1]
+  cmap:
+    - [0.541, 0.670, 0.164] # Foliage
+    - [0.450, 0.325, 0.164] # Trunk

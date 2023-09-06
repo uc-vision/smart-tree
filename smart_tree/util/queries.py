@@ -46,43 +46,43 @@ def pts_to_nearest_tube(pts: np.array, tubes: List[Tube]):
     )  # N x M x 3
 
 
-def pts_to_nearest_tube_keops(pts: np.array, tubes: List[Tube]):
-    """Vectors from pt to the nearest tube"""
+# def pts_to_nearest_tube_keops(pts: np.array, tubes: List[Tube]):
+#     """Vectors from pt to the nearest tube"""
 
-    distances, idx, r = points_to_tube_distance_keops(pts, tubes)  # N x M x 3
+#     distances, idx, r = points_to_tube_distance_keops(pts, tubes)  # N x M x 3
 
-    return distances.reshape(-1), idx, rce_matrix(projections, pts)  # N x M
+#     return distances.reshape(-1), idx, rce_matrix(projections, pts)  # N x M
 
-    distances = distances - r
-    idx = np.argmin(distances, 1)  # N
+#     distances = distances - r
+#     idx = np.argmin(distances, 1)  # N
 
-    # assert idx.shape[0] == pts.shape[0]
+#     # assert idx.shape[0] == pts.shape[0]
 
-    return (
-        projections[np.arange(pts.shape[0]), idx] - pts,
-        idx,
-        r[np.arange(pts.shape[0]), idx],
-    )  # vector, idx , radius
+#     return (
+#         projections[np.arange(pts.shape[0]), idx] - pts,
+#         idx,
+#         r[np.arange(pts.shape[0]), idx],
+#     )  # vector, idx , radius
 
 
-def pairwise_pts_to_nearest_tube(pts: np.array, tubes: List[Tube]):
-    collated_tube = collate_tubes(tubes)
+# def pairwise_pts_to_nearest_tube(pts: np.array, tubes: List[Tube]):
+#     collated_tube = collate_tubes(tubes)
 
-    ab = collated_tube.b - collated_tube.a  # M x 3
-    ap = (
-        pts - collated_tube.a
-    )  # N def pts_to_nearest_tube_keops(pts: np.array, tubes: List[Tube]):
-    """Vectors from pt to the nearest tube"""
+#     ab = collated_tube.b - collated_tube.a  # M x 3
+#     ap = (
+#         pts - collated_tube.a
+#     )  # N def pts_to_nearest_tube_keops(pts: np.array, tubes: List[Tube]):
+#     """Vectors from pt to the nearest tube"""
 
-    distances, idx, r = points_to_tube_distance_keops(pts, tubes)  # N x M x 3
+#     distances, idx, r = points_to_tube_distance_keops(pts, tubes)  # N x M x 3
 
-    return distances.reshape(-1), idx, r + t * collated_tube.r2
+#     return distances.reshape(-1), idx, r + t * collated_tube.r2
 
-    distances = np.sqrt(np.sum(np.square(proj - pts), 1))
+#     distances = np.sqrt(np.sum(np.square(proj - pts), 1))
 
-    distances = distances - r
+#     distances = distances - r
 
-    return distances, r  # vector, idx , radius
+#     return distances, r  # vector, idx , radius
 
 
 # GPU
@@ -110,7 +110,7 @@ def pts_to_nearest_tube_gpu(
     """Vectors from pt to the nearest tube"""
 
     collated_tube_gpu = collate_tubes(tubes)
-    collated_tube_gpu.to_gpu()
+    collated_tube_gpu.to_device(device)
 
     pts = pts.float().to(device)
 

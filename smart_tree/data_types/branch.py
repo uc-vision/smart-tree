@@ -71,6 +71,7 @@ class BranchSkeleton:
     def as_o3d_tube(self) -> o3d.geometry.TriangleMesh:
         return o3d_tube_mesh(self.xyz, self.radii, self.colour)
 
+    @property
     def viewer_items(self) -> list[ViewerItem]:
         items = []
         items += [ViewerItem(f"Branch {self._id} Lineset", self.as_o3d_lineset())]
@@ -78,4 +79,4 @@ class BranchSkeleton:
         return items
 
     def view(self):
-        o3d_viewer(self.viewer_items())
+        o3d_viewer(self.viewer_items)

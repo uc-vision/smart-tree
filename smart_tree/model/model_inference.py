@@ -1,10 +1,10 @@
-
 from typing import Optional
 
 import torch
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
-from smart_tree.data_types.cloud import Cloud
+from smart_tree.data_types.cloud import Cloud, LabelledCloud
 from smart_tree.dataset.dataset import SingleTreeInference
 from smart_tree.model.sparse.util import sparse_from_batch
 
@@ -28,10 +28,10 @@ def load_dataloader(
 ):
     dataset = SingleTreeInference(
         cloud,
-        block_size,
-        buffer_size,
-        augmentation,
-        transform,
+        block_size=block_size,
+        buffer_size=buffer_size,
+        augmentation=augmentation,
+        transform=transform,
     )
     return DataLoader(dataset, batch_size, num_workers, collate_fn=collate_fn)
 
@@ -44,48 +44,48 @@ class ModelInference:
         device=torch.device("cuda:0"),
     ):
         self.model = model
-        self.data_loader = data_loader
+        self.dataloader = dataloader
+        self.device = device
 
     @torch.no_grad()
     def forward(self, cloud: Cloud):
-        dataloader = load_dataloader(cloud)
-
-        print("YEYEYYE")
-
         inputs, masks = [], []
         radius, medial_direction, branch_direction, class_l = [], [], [], []
 
-        for input_feats, coords, mask, filename in self.data_loader:
+        for input_feats, coords, mask, filename in tqdm(
+            self.dataloader(cloud), leave=False, desc="Model Inference"
+        ):
             sparse_input = sparse_from_batch(
-                input_feats[:, :3],
+                input_feats,
                 coords,
                 device=self.device,
             )
 
             preds = self.model.forward(sparse_input)
 
-            radius.append(preds["radius"].cpu())
-            medial_direction.append(preds["medial_direction"]).cpu()
-            class_l.append(preds["class_l"].cpu())
+            mask = mask.view(-1)
 
-            inputs.append(features.cpu())
-            masks.append(mask.cpu())
+            radius.append(preds["radius"][mask])
+            medial_direction.append(preds["medial_direction"][mask])
+            branch_direction.append(preds["branch_direction"][mask])
+            class_l.append(preds["class_l"][mask])
+
+            inputs.append(input_feats[mask])
 
         radius = torch.cat(radius)
         medial_direction = torch.cat(medial_direction)
         class_l = torch.cat(class_l)
-
+        branch_direction = torch.cat(branch_direction)
         inputs = torch.cat(inputs)
-        mask = torch.cat(masks)
 
         medial_vector = torch.exp(radius) * medial_direction
+
         class_l = torch.argmax(class_l, dim=1, keepdim=True)
 
-        lc = LabelledCloud(
+        return LabelledCloud(
             xyz=inputs[:, :3],
-            rgb=inputs[:, 3:6],
+            # rgb=inputs[:, 3:6],
+            branch_direction=branch_direction,
             medial_vector=medial_vector,
             class_l=class_l,
-        ).filter(mask)
-
-        return lc
+        )

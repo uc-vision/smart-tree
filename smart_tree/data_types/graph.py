@@ -19,7 +19,7 @@ patch_typeguard()
 @typechecked
 @dataclass
 class Graph:
-    vertices: TensorType["N", 3]
+    vertices: TensorType["M", 3]
     edges: TensorType["N", 2]
     edge_weights: TensorType["N", 1]
 
@@ -68,11 +68,12 @@ class Graph:
     def as_o3d_lineset(self, colour=(1, 0, 0)) -> o3d.geometry.LineSet:
         return o3d_line_set(self.vertices, self.edges, colour=colour)
 
+    @property
     def viewer_items(self) -> list[ViewerItem]:
         return [ViewerItem(f"Graph Lineset", self.as_o3d_lineset())]
 
     def view(self):
-        o3d_viewer(self.viewer_items())
+        o3d_viewer(self.viewer_items)
 
     # def connected_cugraph_components(
     #     self,
