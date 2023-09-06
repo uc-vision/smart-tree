@@ -206,7 +206,6 @@ class LabelledCloud(Cloud):
     ) -> o3d.geometry.PointCloud:
         if cmap is None:
             cmap = torch.rand(self.number_classes, 3)
-        print(cmap)
         colours = cmap.to(self.device)[self.class_l.view(-1).int()]
         return o3d_cloud(self.xyz, colours=colours)
 
@@ -258,8 +257,25 @@ class LabelledCloud(Cloud):
 
 
 class CloudLoader:
-    def load(self, npz_file: str | Path):
-        data = np.load(npz_file)
+    def load(self, file: str | Path):
+        if Path(file).suffix == ".npz":
+            return self.load_numpy(file)
+
+        else:
+            return self.load_o3d(file)
+
+    def load_o3d(self, file: str):
+        try:
+            pcd = o3d.io.read_point_cloud(filename=str(file))
+
+            return self._load_as_cloud(
+                {"xyz": np.asarray(pcd.points), "rgb": np.asarray(pcd.colors)}, file
+            )
+        except:
+            raise ValueError(f"File type {Path(file).suffix} not supported")
+
+    def load_numpy(self, file: str | Path):
+        data = np.load(file)
 
         optional_params = [
             f.name for f in fields(LabelledCloud) if f.default is not None
@@ -267,9 +283,9 @@ class CloudLoader:
 
         for param in optional_params:
             if param in data:
-                return self._load_as_labelled_cloud(data, npz_file)
+                return self._load_as_labelled_cloud(data, file)
 
-        return self._load_as_cloud(data, npz_file)
+        return self._load_as_cloud(data, file)
 
     def _load_as_cloud(self, data, fn) -> Cloud:
         cloud_fields = {f.name: data[f.name] for f in fields(Cloud) if f.name in data}

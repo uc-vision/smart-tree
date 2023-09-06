@@ -35,7 +35,7 @@ class CollatedTube:
         for k, v in args.items():
             args[k] = v.to(device)
 
-        return Tube(**args)
+        return CollatedTube(**args)
 
 
 def collate_tubes(tubes: List[Tube]) -> CollatedTube:

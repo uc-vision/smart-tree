@@ -15,35 +15,35 @@ For the following :
 """
 
 
-def points_to_collated_tube_projections(
-    pts: np.array, collated_tube: CollatedTube, eps=1e-12
-):  # N x 3, M x 2
-    ab = collated_tube.b - collated_tube.a  # M x 3
+# def points_to_collated_tube_projections(
+#     pts: np.array, collated_tube: CollatedTube, eps=1e-12
+# ):  # N x 3, M x 2
+#     ab = collated_tube.b - collated_tube.a  # M x 3
 
-    ap = pts[:, np.newaxis] - collated_tube.a[np.newaxis, ...]  # N x M x 3
+#     ap = pts[:, np.newaxis] - collated_tube.a[np.newaxis, ...]  # N x M x 3
 
-    t = np.clip(
-        np.einsum("nmd,md->nm", ap, ab) / (np.einsum("md,md->m", ab, ab) + eps),
-        0.0,
-        1.0,
-    )  # N x M
-    proj = collated_tube.a[np.newaxis, ...] + np.einsum(
-        "nm,md->nmd", t, ab
-    )  # N x M x 3
-    return proj, t
-
-
-def projection_to_distance_matrix(projections, pts):  # N x M x 3
-    return np.sqrt(np.sum(np.square(projections - pts[:, np.newaxis, :]), 2))  # N x M
+#     t = np.clip(
+#         np.einsum("nmd,md->nm", ap, ab) / (np.einsum("md,md->m", ab, ab) + eps),
+#         0.0,
+#         1.0,
+#     )  # N x M
+#     proj = collated_tube.a[np.newaxis, ...] + np.einsum(
+#         "nm,md->nmd", t, ab
+#     )  # N x M x 3
+#     return proj, t
 
 
-def pts_to_nearest_tube(pts: np.array, tubes: List[Tube]):
-    """Vectors from pt to the nearest tube"""
+# def projection_to_distance_matrix(projections, pts):  # N x M x 3
+#     return np.sqrt(np.sum(np.square(projections - pts[:, np.newaxis, :]), 2))  # N x M
 
-    collated_tube = collate_tubes(tubes)
-    projections, t = points_to_collated_tube_projections(
-        pts, collated_tube
-    )  # N x M x 3
+
+# def pts_to_nearest_tube(pts: np.array, tubes: List[Tube]):
+#     """Vectors from pt to the nearest tube"""
+
+#     collated_tube = collate_tubes(tubes)
+#     projections, t = points_to_collated_tube_projections(
+#         pts, collated_tube
+#     )  # N x M x 3
 
 
 # def pts_to_nearest_tube_keops(pts: np.array, tubes: List[Tube]):
@@ -86,9 +86,7 @@ def pts_to_nearest_tube(pts: np.array, tubes: List[Tube]):
 
 
 # GPU
-def points_to_collated_tube_projections_gpu(
-    pts: np.array, collated_tube: CollatedTube, device=torch.device("cuda")
-):
+def points_to_collated_tube_projections(pts: np.array, collated_tube: CollatedTube):
     ab = collated_tube.b - collated_tube.a  # M x 3
 
     ap = pts.unsqueeze(1) - collated_tube.a.unsqueeze(0)  # N x M x 3
@@ -105,17 +103,19 @@ def projection_to_distance_matrix_gpu(projections, pts):  # N x M x 3
 
 
 def pts_to_nearest_tube_gpu(
-    pts: torch.tensor, tubes: List[Tube], device=torch.device("cuda")
+    pts: torch.tensor,
+    tubes: List[Tube],
+    device=torch.device("cuda"),
 ):
     """Vectors from pt to the nearest tube"""
 
-    collated_tube_gpu = collate_tubes(tubes)
-    collated_tube_gpu.to_device(device)
+    collated_tube = collate_tubes(tubes)
+    collated_tube_gpu = collated_tube.to_device(device)
 
     pts = pts.float().to(device)
 
-    projections, t = points_to_collated_tube_projections_gpu(
-        pts, collated_tube_gpu, device=torch.device("cuda")
+    projections, t = points_to_collated_tube_projections(
+        pts, collated_tube_gpu
     )  # N x M x 3
     r = (1 - t) * collated_tube_gpu.r1 + t * collated_tube_gpu.r2
 
@@ -124,7 +124,10 @@ def pts_to_nearest_tube_gpu(
     distances = torch.abs(distances - r)
     idx = torch.argmin(distances, 1)  # N
 
-    assert idx.shape[0] == pts.shape[0]
+    # print(idx.shape)
+    # print(pts.shape)
+
+    # assert idx.shape[0] == pts.shape[0]
 
     return (
         projections[torch.arange(pts.shape[0]), idx] - pts,

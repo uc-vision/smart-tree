@@ -12,7 +12,7 @@ from ..data_types.graph import Graph
 patch_typeguard()
 
 
-def knn(src, dest, K=50, r=1.0, grid=None):
+def knn(src, dest, K=50, r=1.0, eps=1e-12, grid=None):
     src_lengths = src.new_tensor([src.shape[0]], dtype=torch.long)
     dest_lengths = src.new_tensor([dest.shape[0]], dtype=torch.long)
     dists, idxs, grid, _ = frnn.frnn_grid_points(
@@ -21,7 +21,7 @@ def knn(src, dest, K=50, r=1.0, grid=None):
         src_lengths,
         dest_lengths,
         K,
-        r,
+        r + eps,
         return_nn=False,
         return_sorted=True,
     )

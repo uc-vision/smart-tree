@@ -5,6 +5,10 @@ pipeline:
     _target_: smart_tree.dataset.augmentations.AugmentationPipeline
     augmentations:
       - _target_:  smart_tree.dataset.augmentations.CentreCloud
+      - _target_:  smart_tree.dataset.augmentations.Scale
+        min_scale: 0.75
+        max_scale: 0.75
+
 
   model_inference:
     _target_: smart_tree.model.model_inference.ModelInference
@@ -32,11 +36,11 @@ pipeline:
 
   skeletonizer:
     _target_: smart_tree.skeleton.skeletonize.Skeletonizer
-    K: 16
-    min_connection_length: 0.08
-    minimum_graph_vertices: 4
+    K: 8
+    min_connection_length: 0.04
+    minimum_graph_vertices: 512
 
-    repair_skeletons : False
+    repair_skeletons : True
     smooth_skeletons : False
     smooth_kernel_size: 11 # Needs to be odd
     prune_skeletons : False

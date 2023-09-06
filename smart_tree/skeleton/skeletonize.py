@@ -68,13 +68,15 @@ class Skeletonizer:
         pbar = tqdm(subgraphs, desc="Skeletonizing", leave=False)
         for subgraph_id, subgraph in enumerate(pbar):
             skeleton = self.process_subgraph(cloud, subgraph, subgraph_id)
-            skeletons.append(skeleton)
+            if len(skeleton.branches) != 0:
+                skeletons.append(skeleton)
 
         skeleton = DisjointTreeSkeleton(skeletons)
 
         if self.prune_skeletons:
             skeleton.prune(
-                min_length=self.min_skeleton_length, min_radius=self.min_skeleton_radius
+                min_length=self.min_skeleton_length,
+                min_radius=self.min_skeleton_radius,
             )
 
         if self.repair_skeletons:

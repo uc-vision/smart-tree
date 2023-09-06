@@ -60,7 +60,6 @@ def sample_tree(
     cloud: Cloud,
     preds,
     distances,
-    root_idx=0,
 ):
     """
     Medial Points: NN estimated medial points
