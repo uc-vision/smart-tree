@@ -12,6 +12,7 @@ from smart_tree.data_types.cloud import LabelledCloud
     config_name="pipeline.yaml",
 )
 def main(cfg: DictConfig):
+    cfg.batch_size = 1
     pipeline = instantiate(cfg.pipeline)
 
     clds = []

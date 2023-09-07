@@ -66,21 +66,3 @@ def get_batch(dataloader, device, fp_16=False):
         )
 
         yield sparse_input, targets, mask, filenames
-
-    # indice = torch.zeros((coords.shape[0], 1), dtype=torch.int32, device=cld.device)
-    # coords = torch.cat((indice, coords), dim=1)
-    # feats = feats.squeeze(1)
-    # coords = coords.squeeze(1)
-
-    # mask = torch.ones((feats.shape[0], 1), dtype=torch.int32)
-
-    # if target_feats is None:
-    #     return [feats, coords, mask, cld.filename]
-
-    # else:
-    #     return [
-    #         (feats[:, : input_feats.shape[1]], feats[:, input_feats.shape[1] :]),
-    #         coords,
-    #         mask,
-    #         cld.filename,
-    #     ]

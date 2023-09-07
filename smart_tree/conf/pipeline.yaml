@@ -5,9 +5,7 @@ pipeline:
     _target_: smart_tree.dataset.augmentations.AugmentationPipeline
     augmentations:
       - _target_:  smart_tree.dataset.augmentations.CentreCloud
-      - _target_:  smart_tree.dataset.augmentations.Scale
-        min_scale: 0.75
-        max_scale: 0.75
+
 
 
   model_inference:
@@ -15,8 +13,8 @@ pipeline:
 
     model:
       _target_: smart_tree.model.model_inference.load_model
-      model_path: /mnt/harry/PhD/smart-tree/smart_tree/model/weights/iconic-violet-252_model.pt
-      weights_path: /mnt/harry/PhD/smart-tree/smart_tree/model/weights/iconic-violet-252_model_weights.pt
+      model_path: /local/smart-tree/smart_tree/model/weights/iconic-violet-252_model.pt
+      weights_path: /local/smart-tree/smart_tree/model/weights/iconic-violet-252_model_weights.pt
 
     dataloader:
       _target_: smart_tree.model.model_inference.load_dataloader
@@ -36,9 +34,9 @@ pipeline:
 
   skeletonizer:
     _target_: smart_tree.skeleton.skeletonize.Skeletonizer
-    K: 8
+    K: 32
     min_connection_length: 0.04
-    minimum_graph_vertices: 512
+    minimum_graph_vertices: 0
 
     repair_skeletons : True
     smooth_skeletons : False

@@ -4,6 +4,7 @@ import torch
 
 from .data_types.cloud import Cloud, CloudLoader, LabelledCloud
 from .data_types.tree import DisjointTreeSkeleton
+from .dataset.augmentations import AugmentationPipeline
 from .model.model_inference import ModelInference
 from .o3d_abstractions.visualizer import o3d_viewer
 from .skeleton.skeletonize import Skeletonizer
@@ -13,11 +14,11 @@ from .util.file import save_o3d_cloud, save_o3d_lineset, save_o3d_mesh
 class Pipeline:
     def __init__(
         self,
-        preprocessing,
+        preprocessing: AugmentationPipeline,
         model_inference: ModelInference,
         skeletonizer: Skeletonizer,
         view_model_output=False,
-        view_skeletons=True,
+        view_skeletons=False,
         save_outputs=False,
         save_path="/",
         branch_classes=[0],
@@ -54,35 +55,17 @@ class Pipeline:
         # Run the branch cloud through skeletonization algorithm, then post process
         skeleton: DisjointTreeSkeleton = self.skeletonizer.forward(branch_cloud)
 
-        #     self.post_process(skeleton)
+        skeleton.to_pickle(
+            "/local/smart-tree/data/pickled_unconnected_skeletons/apple_10.pkl"
+        )
 
-        #     # View skeletonization results
+        # View skeletonization results
         if self.view_skeletons:
             o3d_viewer(skeleton.viewer_items() + cloud.viewer_items(), line_width=5)
 
         if self.save_outputs:
-            print("Saving Outputs")
             sp = self.save_path
             save_o3d_lineset(f"{sp}/skeleton.ply", skeleton.as_o3d_lineset())
             save_o3d_mesh(f"{sp}/mesh.ply", skeleton.as_o3d_tube())
             save_o3d_cloud(f"{sp}/cloud.ply", cloud.as_o3d_cld())
             save_o3d_cloud(f"{sp}/seg_cld.ply", cloud.as_o3d_segmented_cld(self.cmap))
-
-    # @staticmethod
-    # def from_cfg(inferer, skeletonizer, cfg):
-    #     return Pipeline(
-    #         inferer,
-    #         skeletonizer,
-    #         preprocessing_cfg=cfg.preprocessing,
-    #         repair_skeletons=cfg.repair_skeletons,
-    #         smooth_skeletons=cfg.smooth_skeletons,
-    #         smooth_kernel_size=cfg.smooth_kernel_size,
-    #         prune_skeletons=cfg.prune_skeletons,
-    #         min_skeleton_radius=cfg.min_skeleton_radius,
-    #         min_skeleton_length=cfg.min_skeleton_length,
-    #         view_model_output=cfg.view_model_output,
-    #         view_skeletons=cfg.view_skeletons,
-    #         save_outputs=cfg.save_outputs,
-    #         branch_classes=cfg.branch_classes,
-    #         cmap=cfg.cmap,
-    #     )

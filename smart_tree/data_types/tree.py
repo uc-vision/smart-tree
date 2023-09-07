@@ -13,7 +13,7 @@ from typeguard import typechecked
 from ..o3d_abstractions.geometries import o3d_merge_linesets, o3d_merge_meshes
 from ..o3d_abstractions.visualizer import ViewerItem, o3d_viewer
 from ..util.misc import flatten_list
-from ..util.queries import pts_to_nearest_tube_gpu
+from ..util.queries import pts_to_nearest_tube
 from .branch import BranchSkeleton
 from .tube import Tube
 
@@ -36,7 +36,7 @@ class TreeSkeleton:
             f"{'*' * 80}"
         )
 
-    def repair(self) -> None:
+    def repair(self):
         """skeletons are not connected between branches.
         this function connects the branches to their parent branches by finding
         the nearest point on the parent branch."""
@@ -50,7 +50,9 @@ class TreeSkeleton:
             parent_branch = self.branches[branch.parent_id]
             tubes = parent_branch.to_tubes()
 
-            v, idx, _ = pts_to_nearest_tube_gpu(branch.xyz[0].reshape(-1, 3), tubes)
+            v, idx, _ = pts_to_nearest_tube(
+                branch.xyz[0].reshape(-1, 3), tubes, device=torch.device("cuda")
+            )
 
             connection_pt = branch.xyz[0].reshape(-1, 3).cpu() + v[0].cpu()
 
