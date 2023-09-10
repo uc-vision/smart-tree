@@ -86,21 +86,22 @@ For the following :
 
 
 # GPU
+
+
+def pts_to_pts_squared_distances(pts1, pts2):
+    return torch.sum((pts1.unsqueeze(1) - pts2.unsqueeze(0)) ** 2, dim=2)
+
+
 def points_to_collated_tube_projections(pts: torch.tensor, collated_tube: CollatedTube):
     ab = collated_tube.b - collated_tube.a  # M x 3
 
-    print(f"ab shape {ab.shape}")
-
     ap = pts.unsqueeze(1) - collated_tube.a.unsqueeze(0)  # N x M x 3
-    print(f"ap shape {ap.shape}")
 
     t = (torch.einsum("nmd,md->nm", ap, ab) / torch.einsum("md,md->m", ab, ab)).clip(
         0.0, 1.0
     )  # N x M
-    print(f"t shape {t.shape}")
 
     proj = collated_tube.a.unsqueeze(0) + torch.einsum("nm,md->nmd", t, ab)  # N x M x 3
-    print(f"proj shape {proj.shape}")
     return proj, t
 
 
@@ -123,21 +124,11 @@ def pts_to_nearest_tube(
     projections, t = points_to_collated_tube_projections(
         pts, collated_tube_gpu
     )  # N x M x 3
-    print(f"t shape {t.shape}")
     r = (1 - t) * collated_tube_gpu.r1.squeeze(1) + t * collated_tube_gpu.r2.squeeze(1)
-    print(f"r shape {r.shape}")
-
     distances = projection_to_distance_matrix(projections, pts)  # N x M
-
-    print(f"distances shape {distances.shape}")
-    print(f"r shape {r.shape}")
-
     distances = torch.abs(distances - r)
-    print(distances.shape)
-
     idx = torch.argmin(distances, 1)  # N
 
-    print(idx.shape, pts.shape)
     assert idx.shape[0] == pts.shape[0]
 
     return (

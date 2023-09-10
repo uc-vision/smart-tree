@@ -51,10 +51,12 @@ class TreeSkeleton:
             tubes = parent_branch.to_tubes()
 
             v, idx, _ = pts_to_nearest_tube(
-                branch.xyz[0].reshape(-1, 3), tubes, device=torch.device("cuda")
+                branch.xyz[[0]],
+                tubes,
+                device=torch.device("cuda"),
             )
 
-            connection_pt = branch.xyz[0].reshape(-1, 3).cpu() + v[0].cpu()
+            connection_pt = branch.xyz[[0]].cpu() + v[0].cpu()
 
             branch.xyz = torch.cat((connection_pt, branch.xyz))
             branch.radii = torch.cat((branch.radii[[0]], branch.radii))
@@ -98,8 +100,8 @@ class TreeSkeleton:
                 ).view(-1)
 
     @property
-    def length(self) -> TensorType[1]:
-        return torch.sum(torch.cat([b.length for b in self.branches.values()]))
+    def length(self) -> TensorType:
+        return torch.sum(torch.tensor([b.length for b in self.branches.values()]))
 
     @property
     def biggest_radius_idx(self) -> TensorType[1]:
@@ -108,6 +110,15 @@ class TreeSkeleton:
     @property
     def max_branch_id(self) -> int:
         return max(self.branches.keys())
+
+    @property
+    def xyz(self) -> TensorType["N", 3]:
+        xyz = []
+        for branch in self.branches.values():
+            xyz.append(branch.xyz)
+        if len(xyz) == 0:
+            return torch.tensor(xyz)
+        return torch.cat(xyz, dim=0)
 
     def to_tubes(self) -> List[Tube]:
         return flatten_list([b.to_tubes() for b in self.branches.values()])
@@ -139,7 +150,7 @@ class TreeSkeleton:
         return items
 
     def view(self):
-        o3d_viewer(self.view_items)
+        o3d_viewer(self.viewer_items)
 
 
 @dataclass
