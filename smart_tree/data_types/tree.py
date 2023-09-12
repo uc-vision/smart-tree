@@ -16,6 +16,8 @@ from ..util.misc import flatten_list
 from ..util.queries import pts_to_nearest_tube
 from .branch import BranchSkeleton
 from .tube import Tube
+from .line import LineSegment
+from .graph import join_graphs, Graph
 
 
 @typechecked
@@ -122,6 +124,48 @@ class TreeSkeleton:
 
     def to_tubes(self) -> List[Tube]:
         return flatten_list([b.to_tubes() for b in self.branches.values()])
+
+    def to_line_segments(self) -> List[LineSegment]:
+        return flatten_list([b.to_line_segments() for b in self.branches.values()])
+
+    def to_graph(self) -> Graph:
+        graphs = []
+
+        offsets = {}
+        offset = 0
+
+        for branch_id, branch in self.branches.items():
+            offsets[branch_id] = offset
+            branch_graph = branch.to_graph()
+
+            if branch.parent_id != -1:
+                parent_branch = self.branches[branch.parent_id]
+                parent_tubes = parent_branch.to_tubes()
+                parent_offset = torch.tensor(offsets[branch.parent_id])
+
+                _, idx, _ = pts_to_nearest_tube(
+                    branch.xyz[[0]],
+                    parent_tubes,
+                    device=torch.device("cuda"),
+                )
+
+                branch_graph.edges += offsets[branch_id]
+
+                parent_edge_idx = (idx + parent_offset).cpu()
+
+                new_edge = torch.hstack(
+                    (parent_edge_idx, torch.tensor(offset))
+                ).reshape(-1, 2)
+
+                branch_graph.edges = torch.cat((branch_graph.edges, new_edge))
+                branch_graph.edge_weights = torch.cat(
+                    (branch_graph.edge_weights, torch.tensor([[1]]))
+                )
+
+            graphs.append(branch_graph)
+            offset += len(branch)
+
+        return join_graphs(graphs, offset_edges=False)
 
     def to_device(self, device: torch.device):
         new_branches = {}

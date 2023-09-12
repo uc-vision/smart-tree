@@ -7,6 +7,7 @@ import torch
 from tqdm import tqdm
 
 from smart_tree.data_types.tube import CollatedTube, Tube, collate_tubes
+from smart_tree.data_types.line import collates_line_segments
 
 """
 For the following :
@@ -171,3 +172,68 @@ def skeleton_to_points(pcd, skeleton, chunk_size=4096, device="gpu"):
     vectors_ = np.concatenate(vectors_)
 
     return distances, radii, vectors_
+
+
+def distance_between_line_segments_and_tubes(
+    line_segments: List[LineSegment], tubes: List[Tube], device=torch.device("cuda")
+):
+    tubes: CollatedTube = collate_tubes(tubes)
+    lines: CollatedLineSegment = collates_line_segments(line_segments)
+
+    tubes.to_device(device)
+    lines.to_device(device)
+
+    line_directions = lines.b - lines.a
+    line_lengths = torch.norm(lines.b - lines.a)
+    line_directions /= line_lengths  # Nx3
+
+    # N x 3 - M X 3 -> N x M X 3
+    a_diff = lines.a[:, None, :] - tubes.a[None, :, :]
+
+    # Projection of tube onto line
+    ## N x M -> Dot product ->
+    t = torch.clip(
+        torch.sum(a_diff * line_directions.unsqueeze(1), axis=2),
+        0,
+        1,
+    )
+
+    ## N X M x 3 -> closest point on line
+    closest_pt_on_lines = lines.a.unsqueeze(1) + t.unsqueeze(2) * line_lengths.reshape(
+        1, 1, -1
+    )
+
+    distance_vectors = closest_pt_on_lines - tubes.a.unsqueeze(0)
+
+    ## N x M
+    distance_along_axis = torch.clip(
+        torch.sum(distance_vectors * tubes.b.unsqueeze(0) - tubes.a.unsqueeze(0), 2)
+        / line_lengths,
+        0,
+        1,
+    )
+
+    # N x 3 + N x M * N x 3
+    closest_pts_on_tube_axes = tubes.a.unsqueeze(0) + distance_along_axis.unsqueeze(
+        2
+    ) * (tubes.b - tubes.a).unsqueeze(0)
+
+    distances_to_tube_axes = torch.norm(
+        closest_pt_on_lines - closest_pts_on_tube_axes,
+        dim=2,
+    )
+
+    r = (1 - t) * tubes.r1.squeeze(1) + t * tubes.r2.squeeze(1)
+
+    return (distances_to_tube_axes - r).cpu()
+
+
+def skeleton_to_skeleton_distance(
+    skel1: TreeSkeleton,
+    skel2: TreeSkeleton,
+    device=torch.device("cuda"),
+):
+    skel1_line = skel1.to_line_segments()
+    skel2_tubes = skel2.to_tubes()
+
+    return distance_between_line_segments_and_tubes(skel1_line, skel2_tubes)

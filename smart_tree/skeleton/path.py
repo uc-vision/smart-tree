@@ -69,6 +69,8 @@ def sample_tree(
     Surface Points: The point the medial pts got projected from..
     """
 
+    assert (cloud.xyz.shape) == (cloud.branch_direction.shape)
+
     branch_id = 0
 
     branches = {}
@@ -135,6 +137,7 @@ def sample_tree(
             xyz=cloud.medial_pts[path_vertices_idx].cpu(),
             radii=cloud.radius[path_vertices_idx].cpu(),
             parent_id=int(branch_ids[termination_idx].item()),
+            branch_direction=cloud.branch_direction[path_vertices_idx].cpu(),
         )
 
         branch_ids[path_vertices_idx] = branch_id

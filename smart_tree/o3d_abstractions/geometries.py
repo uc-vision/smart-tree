@@ -67,12 +67,16 @@ def o3d_spheres(xyzs, radii, colour=None, colours=None):
 
 
 @move_to_cpu
-def o3d_line_set(vertices, edges, colour=None):
+def o3d_line_set(vertices, edges, colour=None, colours=None):
     line_set = o3d.geometry.LineSet(
         o3d.utility.Vector3dVector(vertices), o3d.utility.Vector2iVector(edges)
     )
     if colour is not None:
-        return line_set.paint_uniform_color(colour)
+        line_set = line_set.paint_uniform_color(colour)
+
+    if colours is not None:
+        line_set.colors = o3d.utility.Vector3dVector(colours * 255)
+
     return line_set
 
 

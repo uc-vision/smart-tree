@@ -38,7 +38,7 @@ pipeline:
     min_connection_length: 0.04
     minimum_graph_vertices: 0
 
-    repair_skeletons : True
+    repair_skeletons : False
     smooth_skeletons : False
     smooth_kernel_size: 11 # Needs to be odd
     prune_skeletons : False
@@ -47,7 +47,7 @@ pipeline:
 
 
   view_model_output : False
-  view_skeletons : True
+  view_skeletons : False
   save_path: /mnt/harry/PhD/smart-tree/data/wtf
   save_outputs : True
   branch_classes: [1]

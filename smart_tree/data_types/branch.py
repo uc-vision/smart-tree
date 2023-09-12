@@ -11,6 +11,9 @@ from typeguard import typechecked
 from ..o3d_abstractions.geometries import o3d_path, o3d_tube_mesh
 from ..o3d_abstractions.visualizer import ViewerItem, o3d_viewer
 from .tube import Tube
+from .line import LineSegment
+from .graph import Graph
+from ..util.maths import magnitudes
 
 patch_typeguard()
 
@@ -41,6 +44,16 @@ class BranchSkeleton:
 
     def to_tubes(self) -> List[Tube]:
         return list(map(Tube, self.xyz, self.xyz[1:], self.radii, self.radii[1:]))
+
+    def to_line_segments(self) -> List[LineSegment]:
+        return list(map(LineSegment, self.xyz, self.xyz[1:]))
+
+    def to_graph(self) -> Graph:
+        edge_idx = [torch.arange(len(self.xyz) - 1), torch.arange(1, len(self.xyz))]
+        edge_weights = magnitudes(self.xyz[1:] - self.xyz[:-1])
+        return Graph(
+            self.xyz, torch.stack(edge_idx).T, edge_weights, self.branch_direction
+        )
 
     def filter(self, mask: TensorType["N", torch.bool]) -> BranchSkeleton:
         args = asdict(self)

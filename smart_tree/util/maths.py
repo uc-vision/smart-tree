@@ -16,6 +16,14 @@ def torch_normalized(v):
     return F.normalize(v), v.pow(2).sum(1).sqrt().unsqueeze(1)
 
 
+def torch_dot(a, b, keepdim=True):
+    return torch.sum(a * b, 1, keepdim=keepdim)
+
+
+def magnitudes(v):
+    return v.pow(2).sum(1).sqrt().unsqueeze(1)
+
+
 def euler_angles_to_rotation(xyz: List) -> torch.tensor:
     x, y, z = xyz
 
