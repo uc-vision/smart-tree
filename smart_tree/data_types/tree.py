@@ -15,9 +15,9 @@ from ..o3d_abstractions.visualizer import ViewerItem, o3d_viewer
 from ..util.misc import flatten_list
 from ..util.queries import pts_to_nearest_tube
 from .branch import BranchSkeleton
-from .tube import Tube
+from .graph import Graph, join_graphs
 from .line import LineSegment
-from .graph import join_graphs, Graph
+from .tube import Tube
 
 
 @typechecked
@@ -248,6 +248,49 @@ class DisjointTreeSkeleton:
     def from_pickle(path):
         with open(f"{path}", "rb") as pickle_file:
             return pickle.load(pickle_file)
+
+
+def generate_new_branch_ids(tree: TreeSkeleton, offset: int):
+    # Generate new branch IDs starting from 'offset'
+    new_branch_ids = {}
+    for branch_id in tree.branches.keys():
+        new_branch_ids[branch_id] = branch_id + offset
+    return new_branch_ids
+
+
+def merge_trees(tree1: TreeSkeleton, tree2: TreeSkeleton):
+    # Generate new branch IDs for tree2 branches
+    max_branch_id = max(tree1.branches.keys())
+    new_branch_ids = generate_new_branch_ids(tree2, max_branch_id + 1)
+
+    # Merge tree2 branches into tree1 while updating IDs
+    merged_branches = {}
+    for branch_id, branch in tree1.branches.items():
+        merged_branches[branch_id] = branch
+    for branch_id, branch in tree2.branches.items():
+        merged_branch = branch
+        # Update branch ID and parent ID
+        merged_branch._id = new_branch_ids[branch_id]
+        merged_branch.parent_id = new_branch_ids.get(branch.parent_id, branch.parent_id)
+        merged_branches[new_branch_ids[branch_id]] = merged_branch
+
+    # Create a new TreeSkeleton instance with merged branches
+    merged_tree = TreeSkeleton(
+        _id=tree1._id, branches=merged_branches, colour=tree1.colour
+    )
+    return merged_tree
+
+
+def merge_trees_in_list(tree_list):
+    if not tree_list:
+        return None
+
+    merged_tree = tree_list[0]
+
+    for tree in tree_list[1:]:
+        merged_tree = merge_trees(merged_tree, tree)
+
+    return merged_tree
 
 
 # def connect(

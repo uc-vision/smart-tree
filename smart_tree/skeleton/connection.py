@@ -1,27 +1,15 @@
-import torch
 from typing import List
-import cugraph
-import cudf
-import open3d as o3d
+
+import torch
+from torch.nn import functional as F
 from tqdm import tqdm
+
+from smart_tree.data_types.cloud import Cloud
 from smart_tree.data_types.tree import DisjointTreeSkeleton, TreeSkeleton
 from smart_tree.o3d_abstractions.visualizer import o3d_viewer
-from smart_tree.util.queries import (
-    pts_to_pts_squared_distances,
-    skeleton_to_skeleton_distance,
-    skeleton_to_points,
-    pts_to_nearest_tube,
-)
-
-from torch.nn import functional as F
-from smart_tree.util.maths import torch_dot
-
 from smart_tree.skeleton.shortest_path import shortest_paths
-from smart_tree.data_types.graph import Graph
-from smart_tree.data_types.cloud import Cloud
-
-
-from tqdm import tqdm
+from smart_tree.util.maths import torch_dot
+from smart_tree.util.queries import skeleton_to_points, skeleton_to_skeleton_distance
 
 
 def find_closest_skeleton_idx(
@@ -56,7 +44,7 @@ def find_skeleton_base(skeleton: TreeSkeleton):
     branch_direction = F.normalize(graph.branch_direction[verts[1:]])
 
     new_edge_weights = (
-        torch_dot(path_direction, -branch_direction).clamp(min=1e-16) ** 2
+        torch_dot(path_direction, -branch_direction).clamp(min=1e-15) ** 2
     )
 
     verts, preds, distance = shortest_paths(
@@ -69,14 +57,28 @@ def find_skeleton_base(skeleton: TreeSkeleton):
     return distance.argmax()
 
 
+def rectify_skeleton(skeleton: TreeSkeleton):
+    # we want it as a graph format at some point either start or end?
+
+    skeleton_base_idx = find_skeleton_base(skeleton)
+    graph = skeleton.to_graph()
+
+    verts, preds, distance = shortest_paths(
+        skeleton_base_idx,
+        graph.edges,
+        graph.edge_weights,
+        renumber=False,
+    )
+
+
 def find_closest_skeleton_base(skeleton: TreeSkeleton, cld: Cloud):
-    print(skeleton_to_points(cld, skeleton))
+    distances, radii, vectors_ = skeleton_to_points(cld, skeleton)
 
 
 if __name__ == "__main__":
     print("loading")
     disjoint_skeleton = DisjointTreeSkeleton.from_pickle(
-        "/local/smart-tree/data/pickled_unconnected_skeletons/apple_10.pkl"
+        "/mnt/harry/PhD/smart-tree/data/pickled_unconnected_skeletons/apple_10.pkl"
     )
     print("loaded")
 
@@ -88,10 +90,15 @@ if __name__ == "__main__":
     )
     print("sorted")
 
+    # tree = merge_trees_in_list(skeletons_sorted)
+
+    # tree.repair()
+    # tree.view()
+
     skeleton = skeletons_sorted.pop(0)
 
     print("finding bases")
-    skeleton_base_idx = [find_skeleton_base(s) for s in skeletons_sorted]
+    skeleton_base_idx = [find_skeleton_base(s) for s in tqdm(skeletons_sorted)]
     print("found bases")
 
     skeleton_base_verts = torch.stack(
@@ -100,15 +107,15 @@ if __name__ == "__main__":
 
     cld = Cloud(skeleton_base_verts)
 
-    while len(skeletons_sorted) > 0:
-        vectors, idxs, radiuses = pts_to_nearest_tube(cld.xyz, skeleton.to_tubes())
-        closest_skeleton = skeletons_sorted.pop(torch.argmin(radiuses))
+    # while len(skeletons_sorted) > 0:
+    #    vectors, idxs, radiuses = pts_to_nearest_tube(cld.xyz, skeleton.to_tubes())
+    #    closest_skeleton = skeletons_sorted.pop(torch.argmin(radiuses))
 
-    print(radiuses)
+    # print(radiuses)
 
-    # o3d_viewer([disjoint_skeleton.as_o3d_tube(), cld.as_o3d_cld()])
+    o3d_viewer([disjoint_skeleton.as_o3d_tube(), cld.as_o3d_cld()])
 
-    # find_closest_skeleton_base(skeleton, cld)
+    find_closest_skeleton_base(skeleton, cld)
 
     quit()
 

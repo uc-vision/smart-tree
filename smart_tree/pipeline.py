@@ -55,9 +55,9 @@ class Pipeline:
         # Run the branch cloud through skeletonization algorithm, then post process
         skeleton: DisjointTreeSkeleton = self.skeletonizer.forward(branch_cloud)
 
-        skeleton.to_pickle(
-            "/local/smart-tree/data/pickled_unconnected_skeletons/apple_10.pkl"
-        )
+        # skeleton.to_pickle(
+        #    "/mnt/harry/PhD/smart-tree/data/pickled_unconnected_skeletons/apple_10.pkl"
+        # )
 
         # View skeletonization results
         if self.view_skeletons:

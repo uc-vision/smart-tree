@@ -103,7 +103,7 @@ class Skeletonizer:
             device=self.device,
         )
 
-        verts, preds, distance = shortest_paths(
+        verts, preds, distances = shortest_paths(
             subgraph_cloud.root_idx,
             edges,
             edge_weights,
