@@ -36,7 +36,7 @@ pipeline:
     _target_: smart_tree.skeleton.skeletonize.Skeletonizer
     K: 32
     min_connection_length: 0.04
-    minimum_graph_vertices: 0
+    minimum_graph_vertices: 3
 
     repair_skeletons : False
     smooth_skeletons : False

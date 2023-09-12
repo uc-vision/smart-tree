@@ -9,6 +9,8 @@ from smart_tree.o3d_abstractions.visualizer import o3d_viewer
 from smart_tree.util.queries import (
     pts_to_pts_squared_distances,
     skeleton_to_skeleton_distance,
+    skeleton_to_points,
+    pts_to_nearest_tube,
 )
 
 from torch.nn import functional as F
@@ -16,32 +18,32 @@ from smart_tree.util.maths import torch_dot
 
 from smart_tree.skeleton.shortest_path import shortest_paths
 from smart_tree.data_types.graph import Graph
+from smart_tree.data_types.cloud import Cloud
 
 
-def find_closest_skeleton(skeleton: TreeSkeleton, query_skeletons: List[TreeSkeleton]):
+from tqdm import tqdm
+
+
+def find_closest_skeleton_idx(
+    skeleton: TreeSkeleton,
+    query_skeletons: List[TreeSkeleton],
+) -> int:
     min_dist = torch.inf
 
-    for query_skeleton in tqdm(query_skeletons):
+    for idx, query_skeleton in tqdm(enumerate(query_skeletons)):
         dist = torch.min(skeleton_to_skeleton_distance(skeleton, query_skeleton))
 
         if dist < min_dist:
             min_dist = dist
-            closest_skeleton = query_skeleton
+            closest_skeleton_idx = idx
 
-    return closest_skeleton
+    return closest_skeleton_idx
 
 
 def find_skeleton_base(skeleton: TreeSkeleton):
     graph = skeleton.to_graph()
 
-    # graph.view()
-
-    # graph_cuda = graph.as_cugraph()
-    # initial_root_idx = 0
-
-    # paths = cugraph.sssp(graph_cuda, initial_root_idx)
-
-    start_idx = 150
+    start_idx = graph.vertices.shape[0] // 2
 
     verts, preds, distance = shortest_paths(
         start_idx,
@@ -50,49 +52,12 @@ def find_skeleton_base(skeleton: TreeSkeleton):
         renumber=False,
     )
 
-    print(f"xyz {graph.vertices.shape}")
-    print(f"edges {graph.edges.shape}")
-    print(f"ew {graph.edge_weights.shape}")
-
-    print(f"verts {verts.shape}")
-    print(f"preds {preds.shape}")
-    print(f"distance {distance.shape}")
-
     path_direction = F.normalize(graph.vertices[verts[1:]] - graph.vertices[preds[1:]])
     branch_direction = F.normalize(graph.branch_direction[verts[1:]])
-
-    print(torch_dot(path_direction, -branch_direction))
 
     new_edge_weights = (
         torch_dot(path_direction, -branch_direction).clamp(min=1e-16) ** 2
     )
-
-    graph = Graph(graph.vertices, graph.edges, new_edge_weights)
-    graph2 = Graph(
-        graph.vertices.cpu(),
-        graph.edges[(new_edge_weights.cpu() > 0.5).reshape(-1)],
-        new_edge_weights[(new_edge_weights.cpu() > 0.5).reshape(-1)],
-    )
-    start_sphere = (
-        o3d.geometry.TriangleMesh.create_sphere(radius=0.1)
-        .translate(graph.vertices[start_idx].cpu())
-        .paint_uniform_color((1, 0, 0))
-    )
-
-    # graph.view()
-
-    # graph2.view()
-
-    og_graph = graph.as_o3d_lineset()
-    og_graph2 = graph2.as_o3d_lineset()
-
-    o3d_viewer([og_graph, og_graph2.paint_uniform_color((1, 0, 0)), start_sphere])
-
-    # ear
-    # new_edge_weights = torch.ones(graph.edges.shape[1], 1).cuda()
-
-    print(new_edge_weights.shape)
-    print(graph.edges.shape)
 
     verts, preds, distance = shortest_paths(
         start_idx,
@@ -101,21 +66,11 @@ def find_skeleton_base(skeleton: TreeSkeleton):
         renumber=False,
     )
 
-    print(distance)
+    return distance.argmax()
 
-    base_idx = distance.argmax()
 
-    base_sphere = [
-        o3d.geometry.TriangleMesh.create_sphere(radius=0.1)
-        .translate(graph.vertices[base_idx].cpu())
-        .paint_uniform_color((0, 1, 0))
-    ]
-
-    print(f"base idx is {base_idx}")
-    o3d_viewer(graph.viewer_items + base_sphere + [start_sphere])
-
-    # graph_v1 = graph.xyz[self.edges[0]]
-    # graph_v2 = graph.xyz[self.edges[1]]
+def find_closest_skeleton_base(skeleton: TreeSkeleton, cld: Cloud):
+    print(skeleton_to_points(cld, skeleton))
 
 
 if __name__ == "__main__":
@@ -130,12 +85,41 @@ if __name__ == "__main__":
         disjoint_skeleton.skeletons,
         key=lambda x: x.length,
         reverse=True,
-    )[0:2]
+    )
     print("sorted")
 
-    main_skeleton = skeletons_sorted[0]
+    skeleton = skeletons_sorted.pop(0)
 
-    find_skeleton_base(main_skeleton)
+    print("finding bases")
+    skeleton_base_idx = [find_skeleton_base(s) for s in skeletons_sorted]
+    print("found bases")
+
+    skeleton_base_verts = torch.stack(
+        [skel.xyz[i] for skel, i in zip(skeletons_sorted, skeleton_base_idx)]
+    ).cpu()
+
+    cld = Cloud(skeleton_base_verts)
+
+    while len(skeletons_sorted) > 0:
+        vectors, idxs, radiuses = pts_to_nearest_tube(cld.xyz, skeleton.to_tubes())
+        closest_skeleton = skeletons_sorted.pop(torch.argmin(radiuses))
+
+    print(radiuses)
+
+    # o3d_viewer([disjoint_skeleton.as_o3d_tube(), cld.as_o3d_cld()])
+
+    # find_closest_skeleton_base(skeleton, cld)
+
+    quit()
+
+    while len(skeletons_sorted) != 0:
+        idx = find_closest_skeleton_idx(skeleton, skeletons_sorted)
+        base_vert_idx = find_skeleton_base(skeletons_sorted.pop(idx))
+
+    # for skeleton in tqdm(skeletons_sorted[1:], desc="Find bases"):
+    #     base_idx = find_skeleton_base(skeleton)
+
+    # find_skeleton_base(main_skeleton)
 
     quit()
 

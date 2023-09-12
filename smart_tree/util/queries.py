@@ -153,7 +153,7 @@ def skeleton_to_points(pcd, skeleton, chunk_size=4096, device="gpu"):
 
     for pts in tqdm(pts_chunks, desc="Labelling Chunks", leave=False):
         if device == "gpu":
-            vectors, idxs, radiuses = pts_to_nearest_tube_gpu(
+            vectors, idxs, radiuses = pts_to_nearest_tube(
                 pts, tubes
             )  # vector to nearest skeleton...
         else:
@@ -229,8 +229,8 @@ def distance_between_line_segments_and_tubes(
 
 
 def skeleton_to_skeleton_distance(
-    skel1: TreeSkeleton,
-    skel2: TreeSkeleton,
+    skel1: "TreeSkeleton",
+    skel2: "TreeSkeleton",
     device=torch.device("cuda"),
 ):
     skel1_line = skel1.to_line_segments()
