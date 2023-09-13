@@ -144,10 +144,11 @@ if __name__ == "__main__":
         "/local/smart-tree/data/pickled_unconnected_skeletons/apple_10.pkl"
     )
 
-    graphs = [s.to_graph() for s in disjoint_skeleton.skeletons[0:2]]
+    graphs = [s.to_graph() for s in disjoint_skeleton.skeletons]
     root_idxs = torch.tensor(find_graph_root_nodes(graphs))
     roots_verts = torch.cat(
-        [g.vertices[[idx.item()]] for idx, g in zip(root_idxs, graphs)], dim=0
+        [g.vertices[[idx.item()]] for idx, g in zip(root_idxs, graphs)],
+        dim=0,
     )
 
     g1_connection_idx = find_nearest_graph_point(graphs[0], graphs[1], root_idxs[1])
