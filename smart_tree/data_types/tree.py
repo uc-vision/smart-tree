@@ -101,6 +101,17 @@ class TreeSkeleton:
                     padding="same",
                 ).view(-1)
 
+    def branch_from_tube_idx(self, idx):
+        return self.branches[int(self.find_branch_id_from_tube_idx(idx))]
+
+    def find_branch_id_from_tube_idx(self, idx):
+        number_verts = torch.tensor([len(b.to_tubes()) for b in self.branches.values()])
+        number_verts = torch.cumsum(number_verts, dim=0)
+        branch_id = list(self.branches.keys())[
+            torch.searchsorted(number_verts, idx).cpu()
+        ]
+        return branch_id
+
     @property
     def length(self) -> TensorType:
         return torch.sum(torch.tensor([b.length for b in self.branches.values()]))
@@ -195,6 +206,9 @@ class TreeSkeleton:
 
     def view(self):
         o3d_viewer(self.viewer_items)
+
+    def add_branches(self, branches: dict):
+        pass
 
 
 @dataclass
@@ -291,32 +305,3 @@ def merge_trees_in_list(tree_list):
         merged_tree = merge_trees(merged_tree, tree)
 
     return merged_tree
-
-
-# def connect(
-#     skeleton_1: TreeSkeleton,
-#     skeleton_1_parent_branch_key: int,
-#     skeleton_1_parent_vert_idx: int,
-#     skeleton_2: TreeSkeleton,
-#     skeleton_2_child_branch_key: int,
-#     skeleton_2_child_vert_idx: int,
-# ) -> TreeSkeleton:
-#     # This is bundy, only visually gives appearance of connection...
-#     # Need to do some more processing to actually connect the skeletons...
-
-#     parent_branch = skeleton_1.branches[skeleton_1_parent_branch_key]
-#     child_branch = skeleton_2.branches[skeleton_2_child_branch_key]
-
-#     child_branch.parent_id = skeleton_1_parent_branch_key
-#     connection_pt = parent_branch.xyz[skeleton_1_parent_vert_idx]
-
-#     child_branch.xyz = torch.cat((connection_pt.unsqueeze(0), child_branch.xyz))
-#     child_branch.radii = torch.cat((child_branch.radii[[0]], child_branch.radii))
-
-#     for key, branch in skeleton_2.branches.items():
-#         branch._id += skeleton_1.max_branch_id
-
-#         if branch.parent_id != -1:
-#             branch.parent_id += skeleton_1.max_branch_id
-
-#     return TreeSkeleton(0, merge_dictionaries(skeleton_1.branches, skeleton_2.branches))

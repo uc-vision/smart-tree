@@ -51,8 +51,13 @@ class BranchSkeleton:
     def to_graph(self) -> Graph:
         edge_idx = [torch.arange(len(self.xyz) - 1), torch.arange(1, len(self.xyz))]
         edge_weights = magnitudes(self.xyz[1:] - self.xyz[:-1])
+
         return Graph(
-            self.xyz, torch.stack(edge_idx).T, edge_weights, self.branch_direction
+            self.xyz,
+            torch.stack(edge_idx).T,
+            edge_weights,
+            radius=self.radii,
+            branch_direction=self.branch_direction,
         )
 
     def filter(self, mask: TensorType["N", torch.bool]) -> BranchSkeleton:

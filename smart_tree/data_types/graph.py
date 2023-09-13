@@ -23,7 +23,9 @@ class Graph:
     edges: TensorType["N", 2]
     edge_weights: TensorType["N", 1]
 
+    radius: Optional[TensorType["M", 1, float]] = None
     branch_direction: Optional[TensorType["M", 3, float]] = None
+    root_idx: TensorType[1, int] = None
 
     def __len__(self) -> int:
         return self.vertices.shape[0]
@@ -36,6 +38,10 @@ class Graph:
             f"Num Vertices: {self.vertices.shape[0]}\n"
             f"{'*' * 80}"
         )
+
+    def add_edge(self, edge: TensorType[1, 2, int], weight: TensorType[1, 1, float]):
+        self.edges = torch.cat([self.edges, edge], dim=0)
+        self.edge_weights = torch.cat([self.edge_weights, weight], dim=0)
 
     def connected_cugraph_components(
         self,
@@ -76,7 +82,6 @@ class Graph:
         if heat_map:
             colours = torch.rand(self.vertices.shape)
 
-        print(colours)
         return o3d_line_set(self.vertices, self.edges, colour=colour, colours=colours)
 
     def as_cugraph(self):

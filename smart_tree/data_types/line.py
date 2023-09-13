@@ -2,8 +2,11 @@ from dataclasses import asdict, dataclass
 from typing import List
 
 import torch
-from torchtyping import TensorType
+from torchtyping import TensorType, patch_typeguard
 from typeguard import typechecked
+
+
+patch_typeguard()
 
 
 @typechecked
@@ -17,7 +20,7 @@ class LineSegment:
         for k, v in args.items():
             args[k] = v.to(device)
 
-        return Tube(**args)
+        return LineSegment(**args)
 
 
 @typechecked

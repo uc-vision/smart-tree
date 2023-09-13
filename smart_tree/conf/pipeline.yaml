@@ -13,8 +13,8 @@ pipeline:
 
     model:
       _target_: smart_tree.model.model_inference.load_model
-      model_path: /mnt/harry/PhD/smart-tree/smart_tree/model/weights/iconic-violet-252_model.pt
-      weights_path: /mnt/harry/PhD/smart-tree/smart_tree/model/weights/iconic-violet-252_model_weights.pt
+      model_path: /local/smart-tree/smart_tree/model/weights/iconic-violet-252_model.pt
+      weights_path: /local/smart-tree/smart_tree/model/weights/iconic-violet-252_model_weights.pt
 
     dataloader:
       _target_: smart_tree.model.model_inference.load_dataloader
