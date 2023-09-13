@@ -108,11 +108,13 @@ def connect_graphs(
     g2_vert_idx: int,
     edge_weight: float,
 ):
-    new_edge = g1_vert_idx, g2_vert_idx + g1.vertices.shape[0]
+    new_edge = torch.tensor([g1_vert_idx, g2_vert_idx + g1.vertices.shape[0]]).reshape(
+        -1, 2
+    )
 
-    g1.add_edge(new_edge, edge_weight)
+    g1.add_edge(new_edge, torch.tensor(edge_weight).reshape(-1, 1))
 
-    return join_graphs(g1, g2, offset_edges=True)
+    return join_graphs([g1, g2], offset_edges=True)
 
 
 def find_nearest_graph_point(graph1: Graph, graph2: Graph, graph_2_root_idx):
@@ -130,7 +132,7 @@ def find_nearest_graph_point(graph1: Graph, graph2: Graph, graph_2_root_idx):
 
     distance = magnitudes(graph1_verts - graph2_root_vert)
 
-    edge_weighting = distance * direction_weighting
+    edge_weighting = distance  # * -direction_weighting
 
     return edge_weighting.argmin()
 
@@ -142,7 +144,7 @@ if __name__ == "__main__":
         "/local/smart-tree/data/pickled_unconnected_skeletons/apple_10.pkl"
     )
 
-    graphs = [s.to_graph() for s in disjoint_skeleton.skeletons]
+    graphs = [s.to_graph() for s in disjoint_skeleton.skeletons[0:2]]
     root_idxs = torch.tensor(find_graph_root_nodes(graphs))
     roots_verts = torch.cat(
         [g.vertices[[idx.item()]] for idx, g in zip(root_idxs, graphs)], dim=0
@@ -151,6 +153,8 @@ if __name__ == "__main__":
     g1_connection_idx = find_nearest_graph_point(graphs[0], graphs[1], root_idxs[1])
 
     graph = connect_graphs(graphs[0], graphs[1], g1_connection_idx, root_idxs[1], 1.0)
+
+    graph.view()
 
     # graphs[0].add_edge(root_idxs + max_idx, connect_idx)
 
