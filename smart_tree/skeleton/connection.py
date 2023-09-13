@@ -137,12 +137,18 @@ def find_nearest_graph_point(graph1: Graph, graph2: Graph, graph_2_root_idx):
     return edge_weighting.argmin()
 
 
-if __name__ == "__main__":
-    viewer_items = []
+def graph_to_pcd_distance(graph: Graph, cloud: Cloud):
+    graph_verts = graph.vertices
+    print(f"graph verst shape {graph_verts.shape}")
+    return torch.norm(graph_verts.unsqueeze(0) - cloud.xyz.unsqueeze(1), dim=2)
 
+
+if __name__ == "__main__":
     disjoint_skeleton = DisjointTreeSkeleton.from_pickle(
         "/local/smart-tree/data/pickled_unconnected_skeletons/apple_10.pkl"
     )
+
+    viewer_items = disjoint_skeleton.viewer_items
 
     graphs = [s.to_graph() for s in disjoint_skeleton.skeletons]
     root_idxs = torch.tensor(find_graph_root_nodes(graphs))
@@ -150,20 +156,45 @@ if __name__ == "__main__":
         [g.vertices[[idx.item()]] for idx, g in zip(root_idxs, graphs)],
         dim=0,
     )
+    root_cld = Cloud(roots_verts)
+    cld_viewer_items = root_cld.viewer_items
 
-    g1_connection_idx = find_nearest_graph_point(graphs[0], graphs[1], root_idxs[1])
+    main_graph = graphs.pop(0)
 
-    graph = connect_graphs(graphs[0], graphs[1], g1_connection_idx, root_idxs[1], 1.0)
+    while len(graphs) != 0:
+        distances = graph_to_pcd_distance(main_graph, root_cld)
 
-    graph.view()
+        closest_graph_idx = distances.min(dim=1)[0].argmin(0)
+
+        g1_connection_idx = find_nearest_graph_point(
+            main_graph, graphs[closest_graph_idx], root_idxs[closest_graph_idx]
+        )
+
+        main_graph = connect_graphs(
+            main_graph,
+            graphs[closest_graph_idx],
+            g1_connection_idx,
+            root_idxs[closest_graph_idx],
+            1.0,
+        )
+
+        root_cld = root_cld.delete(closest_graph_idx)
+
+        graphs.pop(closest_graph_idx)
+
+    o3d_viewer(viewer_items + main_graph.viewer_items + cld_viewer_items)
+
+    # g1_connection_idx = find_nearest_graph_point(graphs[0], graphs[1], root_idxs[1])
+
+    # graph = connect_graphs(graphs[0], graphs[1], g1_connection_idx, root_idxs[1], 1.0)
 
     # graphs[0].add_edge(root_idxs + max_idx, connect_idx)
 
     # print(roots_verts)
 
-    quit()
+    # quit()
 
-    main_graph = graphs.pop(0)
+    # main_graph = graphs.pop(0)
 
     # graphs[0].view()
 

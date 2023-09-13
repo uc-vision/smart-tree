@@ -244,6 +244,7 @@ class DisjointTreeSkeleton:
 
         return o3d_merge_meshes(skeleton_tubes)
 
+    @property
     def viewer_items(self) -> list[ViewerItem]:
         items = []
         items += [ViewerItem(f"Skeleton Lineset", self.as_o3d_lineset())]
