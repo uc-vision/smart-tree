@@ -27,8 +27,7 @@ def o3d_viewer(
             items[i] = ViewerItem(f"item{i}", item, is_visible=False)
 
     def material(item):
-        return mat
-        # return line_mat if isinstance(item.geometry, o3d.geometry.LineSet) else mat
+        return line_mat if isinstance(item.geometry, o3d.geometry.LineSet) else mat
 
     geometries = [dict(**asdict(item), material=material(item)) for item in items]
 

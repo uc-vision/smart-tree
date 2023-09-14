@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import torch
 from torch.nn import functional as F
 from tqdm import tqdm
+from pathlib import Path
 
 from smart_tree.data_types.cloud import Cloud
 from smart_tree.data_types.tree import DisjointTreeSkeleton, TreeSkeleton
@@ -14,26 +15,6 @@ from smart_tree.util.maths import torch_dot, magnitudes
 from smart_tree.util.queries import skeleton_to_points, skeleton_to_skeleton_distance
 from smart_tree.data_types.graph import join_graphs, Graph
 from smart_tree.data_types.branch import BranchSkeleton
-
-
-@dataclass
-class SkeletonBase:
-    idx: int
-    vertice: torch.Tensor
-
-
-@dataclass
-class SkeletonBases:
-    bases: List[SkeletonBase]
-
-    def __len__(self):
-        return len(self.bases)
-
-    def as_cloud(self):
-        return Cloud(torch.stack([b.vertice for b in self.bases]))
-
-    def pop(self, idx):
-        return self.bases.pop(idx)
 
 
 def find_closest_skeleton(
@@ -108,13 +89,13 @@ def connect_graphs(
     g2_vert_idx: int,
     edge_weight: float,
 ):
-    new_edge = torch.tensor([g1_vert_idx, g2_vert_idx + g1.vertices.shape[0]]).reshape(
-        -1, 2
-    )
+    graph = join_graphs([g1, g2], offset_edges=True)
 
-    g1.add_edge(new_edge, torch.tensor(edge_weight).reshape(-1, 1))
+    new_edge = torch.tensor([[g1_vert_idx, g2_vert_idx + g1.vertices.shape[0]]])
 
-    return join_graphs([g1, g2], offset_edges=True)
+    graph.add_edge(new_edge, torch.tensor(edge_weight).reshape(-1, 1))
+
+    return graph
 
 
 def find_nearest_graph_point(graph1: Graph, graph2: Graph, graph_2_root_idx):
@@ -123,16 +104,25 @@ def find_nearest_graph_point(graph1: Graph, graph2: Graph, graph_2_root_idx):
 
     graph1_verts = graph1.vertices
 
-    potential_connection_dirs = F.normalize(graph1_verts - graph2_root_vert)
+    potential_connection_dirs = F.normalize(graph2_root_vert - graph1_verts)
 
-    direction_weighting = torch_dot(
-        potential_connection_dirs,
-        graph2_root_branch_direction,
-    )
+    direction_weighting = (
+        (
+            -torch_dot(
+                potential_connection_dirs,
+                graph2_root_branch_direction,
+            )
+        )
+        + 1.0
+    ) / 2
 
     distance = magnitudes(graph1_verts - graph2_root_vert)
 
-    edge_weighting = distance  # * -direction_weighting
+    print(distance.shape)
+    print(direction_weighting.shape)
+    print(direction_weighting)
+
+    edge_weighting = distance + (distance * direction_weighting**2)
 
     return edge_weighting.argmin()
 
@@ -151,38 +141,60 @@ if __name__ == "__main__":
     viewer_items = disjoint_skeleton.viewer_items
 
     graphs = [s.to_graph() for s in disjoint_skeleton.skeletons]
+    main_graph = graphs.pop(0)
+
     root_idxs = torch.tensor(find_graph_root_nodes(graphs))
+
     roots_verts = torch.cat(
         [g.vertices[[idx.item()]] for idx, g in zip(root_idxs, graphs)],
         dim=0,
     )
     root_cld = Cloud(roots_verts)
-    cld_viewer_items = root_cld.viewer_items
+    # cld_viewer_items =
 
-    main_graph = graphs.pop(0)
+    # o3d_viewer(root_cld.viewer_items + disjoint_skeleton.viewer_items)
 
     while len(graphs) != 0:
         distances = graph_to_pcd_distance(main_graph, root_cld)
 
+        # print(f"Distances Shape {distances.shape}")
+        # print(f"Main Graph {main_graph.vertices.shape}")
+
         closest_graph_idx = distances.min(dim=1)[0].argmin(0)
+
+        # print(f"Closest Graph IDX Shape {closest_graph_idx.shape}")
 
         g1_connection_idx = find_nearest_graph_point(
             main_graph, graphs[closest_graph_idx], root_idxs[closest_graph_idx]
         )
 
+        closest_vert = Cloud(
+            root_cld.xyz[closest_graph_idx].reshape(-1, 3),
+            filename=Path("ye.npz"),
+        )
+        # o3d_viewer(
+        #     disjoint_skeleton.viewer_items
+        #     + main_graph.viewer_items
+        #     + closest_vert.viewer_items
+        # )
+
         main_graph = connect_graphs(
-            main_graph,
-            graphs[closest_graph_idx],
-            g1_connection_idx,
-            root_idxs[closest_graph_idx],
-            1.0,
+            g1=main_graph,
+            g2=graphs[closest_graph_idx],
+            g1_vert_idx=g1_connection_idx,
+            g2_vert_idx=root_idxs[closest_graph_idx],
+            edge_weight=1.0,
+        )
+
+        root_idxs = torch.cat(
+            (root_idxs[:closest_graph_idx], root_idxs[closest_graph_idx + 1 :]), dim=0
         )
 
         root_cld = root_cld.delete(closest_graph_idx)
 
         graphs.pop(closest_graph_idx)
 
-    o3d_viewer(viewer_items + main_graph.viewer_items + cld_viewer_items)
+    o3d_viewer(disjoint_skeleton.viewer_items + main_graph.viewer_items, line_width=5)
 
     # g1_connection_idx = find_nearest_graph_point(graphs[0], graphs[1], root_idxs[1])
 

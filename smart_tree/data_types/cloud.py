@@ -80,7 +80,7 @@ class Cloud:
                 args[k] = v.to(device)
         return self.__class__(**args)
 
-    def delete(self, delete_idx):
+    def delete(self, delete_idx) -> Cloud:
         return self.filter(
             (
                 torch.arange(self.xyz.shape[0], device=self.device)
