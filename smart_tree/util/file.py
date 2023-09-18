@@ -10,6 +10,8 @@ from smart_tree.data_types.branch import BranchSkeleton
 from smart_tree.data_types.cloud import Cloud
 from smart_tree.data_types.tree import TreeSkeleton
 
+import torch
+
 
 def unpackage_data(data: dict) -> Tuple[Cloud, TreeSkeleton]:
     tree_id = data["tree_id"]
@@ -19,14 +21,12 @@ def unpackage_data(data: dict) -> Tuple[Cloud, TreeSkeleton]:
     skeleton_radii = data["skeleton_radii"]
     sizes = data["branch_num_elements"]
 
-    cld = Cloud.from_numpy(
-        xyz=data["xyz"],
-        rgb=data["rgb"],
-        vector=data["vector"],
-        class_l=data["class_l"],
+    cld = Cloud(
+        xyz=torch.tensor(data["xyz"]),
+        rgb=torch.tensor(data["rgb"]),
+        # medial_vector=data["medial_vector"],
+        # class_l=data["class_l"],
     )
-
-    return cld, None
 
     offsets = np.cumsum(np.append([0], sizes))
 
@@ -155,7 +155,7 @@ def load_o3d_mesh(path: Path):
 
 def load_cloud(path: Path):
     if path.suffix == ".npz":
-        return Cloud.from_numpy(**np.load(path))
+        return Cloud(**np.load(path))
 
     data = o3d.io.read_point_cloud(str(path))
     xyz = np.asarray(data.points)

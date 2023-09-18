@@ -8,7 +8,12 @@ from tqdm import tqdm
 import math
 
 from smart_tree.data_types.tube import CollatedTube, Tube, collate_tubes
-from smart_tree.data_types.line import collates_line_segments
+from smart_tree.data_types.line import (
+    collates_line_segments,
+    LineSegment,
+    CollatedLineSegment,
+)
+
 
 """
 For the following :
@@ -30,7 +35,8 @@ def points_to_collated_tube_projections(pts: torch.tensor, collated_tube: Collat
     ap = pts.unsqueeze(1) - collated_tube.a.unsqueeze(0)  # N x M x 3
 
     t = (torch.einsum("nmd,md->nm", ap, ab) / torch.einsum("md,md->m", ab, ab)).clip(
-        0.0, 1.0
+        0.0,
+        1.0,
     )  # N x M
 
     proj = collated_tube.a.unsqueeze(0) + torch.einsum("nm,md->nmd", t, ab)  # N x M x 3
@@ -158,8 +164,8 @@ def distance_between_line_segments_and_tubes(
 
 
 def skeleton_to_skeleton_distance(
-    skel1: "TreeSkeleton",
-    skel2: "TreeSkeleton",
+    skel1: TreeSkeleton,
+    skel2: TreeSkeleton,
     device=torch.device("cuda"),
 ):
     skel1_line = skel1.to_line_segments()

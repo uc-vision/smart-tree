@@ -42,6 +42,13 @@ class Pipeline:
     def run(self, path: Path):
         # Load point cloud and do any required preprocessing
         cloud: Cloud = CloudLoader().load(path).to_device(self.device)
+        return self.process_cloud(cloud)
+
+    def process_cloud(self, cloud: Cloud):
+        print(cloud)
+
+        cloud.translate(0.01)
+
         cloud = self.preprocessing(cloud)
 
         # Run cloud through network
@@ -55,10 +62,6 @@ class Pipeline:
         # Run the branch cloud through skeletonization algorithm, then post process
         skeleton: DisjointTreeSkeleton = self.skeletonizer.forward(branch_cloud)
 
-        skeleton.to_pickle(
-            "/local/smart-tree/data/pickled_unconnected_skeletons/apple_10.pkl"
-        )
-
         # View skeletonization results
         if self.view_skeletons:
             o3d_viewer(skeleton.viewer_items() + cloud.viewer_items(), line_width=5)
@@ -69,3 +72,5 @@ class Pipeline:
             save_o3d_mesh(f"{sp}/mesh.ply", skeleton.as_o3d_tube())
             save_o3d_cloud(f"{sp}/cloud.ply", cloud.as_o3d_cld())
             save_o3d_cloud(f"{sp}/seg_cld.ply", cloud.as_o3d_segmented_cld(self.cmap))
+
+        return skeleton

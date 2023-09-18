@@ -253,7 +253,7 @@ class DisjointTreeSkeleton:
         return items
 
     def view(self):
-        o3d_viewer(self.viewer_items())
+        o3d_viewer(self.viewer_items)
 
     def to_pickle(self, path):
         with open(f"{path}", "wb") as pickle_file:

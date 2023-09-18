@@ -87,7 +87,12 @@ class Skeletonizer:
 
         return skeleton
 
-    def process_subgraph(self, cloud, subgraph, skeleton_id=0) -> TreeSkeleton:
+    def process_subgraph(
+        self,
+        cloud: LabelledCloud,
+        subgraph,
+        skeleton_id=0,
+    ) -> TreeSkeleton:
         """Extract skeleton for connected component"""
 
         subgraph_vertice_idx = torch.tensor(

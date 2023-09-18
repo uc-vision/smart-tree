@@ -22,8 +22,8 @@ patch_typeguard()
 @typechecked
 @dataclass
 class Cloud:
-    xyz: TensorType["N", 3, float]
-    rgb: Optional[TensorType["N", 3, float]] = None
+    xyz: TensorType["N", 3]
+    rgb: Optional[TensorType["N", 3]] = None
     filename: Optional[Path] = None
 
     def __len__(self) -> int:
@@ -55,10 +55,11 @@ class Cloud:
         return Cloud(xyz=rotated_xyz, rgb=self.rgb, filename=self.filename)
 
     def voxel_downsample(self, voxel_size: float | TensorType[1]) -> Cloud:
-        return self.filter(voxel_filter(self.xyz, voxel_size))
+        return self.filter(voxel_filter(self.xyz, voxel_size).reshape(-1))
 
     def filter(
-        self, mask: TensorType["N", torch.bool] | TensorType["N", torch.int32]
+        self,
+        mask: TensorType["N", torch.bool] | TensorType["N", torch.int32] | torch.tensor,
     ) -> Cloud:
         args = asdict(self)
         for k, v in args.items():

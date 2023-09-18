@@ -8,13 +8,14 @@ from tqdm import tqdm
 from pathlib import Path
 
 from smart_tree.data_types.cloud import Cloud
-from smart_tree.data_types.tree import DisjointTreeSkeleton, TreeSkeleton
 from smart_tree.o3d_abstractions.visualizer import o3d_viewer
+from smart_tree.util.file import save_o3d_lineset, load_o3d_lineset
 from smart_tree.skeleton.shortest_path import shortest_paths
 from smart_tree.util.maths import torch_dot, magnitudes
 from smart_tree.util.queries import skeleton_to_points, skeleton_to_skeleton_distance
 from smart_tree.data_types.graph import join_graphs, Graph
 from smart_tree.data_types.branch import BranchSkeleton
+from smart_tree.data_types.tree import TreeSkeleton, DisjointTreeSkeleton
 
 
 def find_closest_skeleton(
@@ -59,13 +60,9 @@ def find_graph_root_idx(graph: Graph):
     )
     return distance.argmax()
 
-    # return SkeletonBase(idx, graph.vertices[idx])
-
 
 def find_graph_root_nodes(graphs: List[Graph]):
     return [find_graph_root_idx(g) for g in tqdm(graphs)]
-
-    # return SkeletonBases([find_skeleton_base(s) for s in tqdm(skeleton)])
 
 
 def sort_skeletons_by_length(skeletons: List[TreeSkeleton]):
@@ -98,6 +95,31 @@ def connect_graphs(
     return graph
 
 
+# def find_nearest_graph_point(graph1: Graph, graph2: Graph, graph_2_root_idx):
+#     graph2_root_vert = graph2.vertices[graph_2_root_idx]
+#     graph2_root_branch_direction = graph2.branch_direction[graph_2_root_idx]
+
+#     graph1_verts = graph1.vertices
+
+#     potential_connection_dirs = F.normalize(graph2_root_vert - graph1_verts)
+
+#     direction_weighting = (
+#         (
+#             -torch_dot(
+#                 potential_connection_dirs,
+#                 graph2_root_branch_direction,
+#             )
+#         )
+#         + 1.0
+#     ) / 2
+
+#     distance = magnitudes(graph1_verts - graph2_root_vert)
+
+#     edge_weighting = distance + (distance * direction_weighting**2)
+
+#     return edge_weighting.argmin()
+
+
 def find_nearest_graph_point(graph1: Graph, graph2: Graph, graph_2_root_idx):
     graph2_root_vert = graph2.vertices[graph_2_root_idx]
     graph2_root_branch_direction = graph2.branch_direction[graph_2_root_idx]
@@ -118,9 +140,7 @@ def find_nearest_graph_point(graph1: Graph, graph2: Graph, graph_2_root_idx):
 
     distance = magnitudes(graph1_verts - graph2_root_vert)
 
-    print(distance.shape)
-    print(direction_weighting.shape)
-    print(direction_weighting)
+    # edge_weighting = distance * direction_weighting
 
     edge_weighting = distance + (distance * direction_weighting**2)
 
@@ -134,6 +154,12 @@ def graph_to_pcd_distance(graph: Graph, cloud: Cloud):
 
 
 if __name__ == "__main__":
+    ls1 = load_o3d_lineset("/local/smart-tree/data/angle/main.ply")
+    ls2 = load_o3d_lineset("/local/smart-tree/data/reconnect/main.ply")
+
+    o3d_viewer([ls1, ls2], line_width=5)
+
+    quit()
     disjoint_skeleton = DisjointTreeSkeleton.from_pickle(
         "/local/smart-tree/data/pickled_unconnected_skeletons/apple_10.pkl"
     )
@@ -150,22 +176,18 @@ if __name__ == "__main__":
         dim=0,
     )
     root_cld = Cloud(roots_verts)
-    # cld_viewer_items =
-
-    # o3d_viewer(root_cld.viewer_items + disjoint_skeleton.viewer_items)
 
     while len(graphs) != 0:
         distances = graph_to_pcd_distance(main_graph, root_cld)
-
-        # print(f"Distances Shape {distances.shape}")
-        # print(f"Main Graph {main_graph.vertices.shape}")
 
         closest_graph_idx = distances.min(dim=1)[0].argmin(0)
 
         # print(f"Closest Graph IDX Shape {closest_graph_idx.shape}")
 
         g1_connection_idx = find_nearest_graph_point(
-            main_graph, graphs[closest_graph_idx], root_idxs[closest_graph_idx]
+            main_graph,
+            graphs[closest_graph_idx],
+            root_idxs[closest_graph_idx],
         )
 
         closest_vert = Cloud(
@@ -187,14 +209,19 @@ if __name__ == "__main__":
         )
 
         root_idxs = torch.cat(
-            (root_idxs[:closest_graph_idx], root_idxs[closest_graph_idx + 1 :]), dim=0
+            (root_idxs[:closest_graph_idx], root_idxs[closest_graph_idx + 1 :]),
+            dim=0,
         )
 
         root_cld = root_cld.delete(closest_graph_idx)
 
         graphs.pop(closest_graph_idx)
 
-    o3d_viewer(disjoint_skeleton.viewer_items + main_graph.viewer_items, line_width=5)
+    # o3d_viewer(disjoint_skeleton.viewer_items + main_graph.viewer_items, line_width=5)
+
+    save_o3d_lineset(
+        "/local/smart-tree/data/angle/main.ply", main_graph.as_o3d_lineset()
+    )
 
     # g1_connection_idx = find_nearest_graph_point(graphs[0], graphs[1], root_idxs[1])
 
