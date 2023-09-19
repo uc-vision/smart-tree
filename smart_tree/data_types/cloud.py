@@ -46,7 +46,7 @@ class Cloud:
         scaled_xyz = self.xyz * factor
         return Cloud(xyz=scaled_xyz, rgb=self.rgb, filename=self.filename)
 
-    def translate(self, translation_vector: TensorType[3, float]) -> Cloud:
+    def translate(self, translation_vector: TensorType[3]) -> Cloud:
         translated_xyz = self.xyz + translation_vector
         return Cloud(xyz=translated_xyz, rgb=self.rgb, filename=self.filename)
 
@@ -88,6 +88,9 @@ class Cloud:
                 != delete_idx.to(self.device)
             ).reshape(-1)
         )
+
+    def with_xyz(self, new_xyz):
+        return Cloud(new_xyz, self.rgb, self.filename)
 
     @property
     def device(self) -> torch.device:
@@ -242,6 +245,7 @@ class LabelledCloud(Cloud):
         branch_dir_cloud = o3d_cloud(self.xyz + (self.branch_direction * view_length))
         return o3d_lines_between_clouds(self.as_o3d_cld(), branch_dir_cloud)
 
+    @property
     def viewer_items(self) -> list[ViewerItem]:
         items = super().viewer_items
         item = partial(ViewerItem, is_visible=False, group=f"{super().group_name}")

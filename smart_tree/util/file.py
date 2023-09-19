@@ -4,13 +4,12 @@ from typing import Tuple
 
 import numpy as np
 import open3d as o3d
+import torch
 import yaml
 
 from smart_tree.data_types.branch import BranchSkeleton
-from smart_tree.data_types.cloud import Cloud
+from smart_tree.data_types.cloud import Cloud, LabelledCloud
 from smart_tree.data_types.tree import TreeSkeleton
-
-import torch
 
 
 def unpackage_data(data: dict) -> Tuple[Cloud, TreeSkeleton]:
@@ -21,11 +20,11 @@ def unpackage_data(data: dict) -> Tuple[Cloud, TreeSkeleton]:
     skeleton_radii = data["skeleton_radii"]
     sizes = data["branch_num_elements"]
 
-    cld = Cloud(
+    cld = LabelledCloud(
         xyz=torch.tensor(data["xyz"]),
         rgb=torch.tensor(data["rgb"]),
         # medial_vector=data["medial_vector"],
-        # class_l=data["class_l"],
+        class_l=torch.tensor(data["class_l"]).int().reshape(-1, 1),
     )
 
     offsets = np.cumsum(np.append([0], sizes))
@@ -34,11 +33,14 @@ def unpackage_data(data: dict) -> Tuple[Cloud, TreeSkeleton]:
     branches = {}
 
     for idx, _id, parent_id in zip(branch_idx, branch_id, branch_parent_id):
-        branches[_id] = BranchSkeleton(
-            _id, parent_id, skeleton_xyz[idx], skeleton_radii[idx]
+        branches[int(_id)] = BranchSkeleton(
+            int(_id),
+            int(parent_id),
+            torch.tensor(skeleton_xyz[idx]).float(),
+            torch.tensor(skeleton_radii[idx]).float(),
         )
 
-    return cld, TreeSkeleton(tree_id, branches)
+    return cld, TreeSkeleton(int(tree_id), branches)
 
 
 def package_data(skeleton: TreeSkeleton, pointcloud: Cloud) -> dict:

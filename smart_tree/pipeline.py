@@ -36,7 +36,7 @@ class Pipeline:
         self.save_outputs = save_outputs
         self.save_path = save_path
 
-        self.branch_classes = torch.tensor(branch_classes, device=device)
+        self.branch_classes = torch.tensor(branch_classes)
         self.device = device
 
     def run(self, path: Path):
@@ -45,11 +45,7 @@ class Pipeline:
         return self.process_cloud(cloud)
 
     def process_cloud(self, cloud: Cloud):
-        print(cloud)
-
-        cloud.translate(0.01)
-
-        cloud = self.preprocessing(cloud)
+        cloud = self.preprocessing(cloud).to_device(self.device)
 
         # Run cloud through network
         cloud: LabelledCloud = self.model_inference.forward(cloud)
@@ -57,14 +53,16 @@ class Pipeline:
             cloud.view()
 
         # Filter only the branch points for skeletonizaiton
-        branch_cloud: LabelledCloud = cloud.filter_by_class(self.branch_classes)
+        branch_cloud: LabelledCloud = cloud.filter_by_class(
+            self.branch_classes.to(cloud.device)
+        )
 
         # Run the branch cloud through skeletonization algorithm, then post process
         skeleton: DisjointTreeSkeleton = self.skeletonizer.forward(branch_cloud)
 
         # View skeletonization results
         if self.view_skeletons:
-            o3d_viewer(skeleton.viewer_items() + cloud.viewer_items(), line_width=5)
+            o3d_viewer(skeleton.viewer_items + cloud.viewer_items, line_width=5)
 
         if self.save_outputs:
             sp = self.save_path
