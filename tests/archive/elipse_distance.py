@@ -70,7 +70,7 @@ def debug():
 
 
 if __name__ == "__main__":
-    cld = load_cloud(Path("/local/UC-10/npz_4mm/apple/apple_1.npz"))
+    cld = load_cloud(Path("/local/UC-10/npz_4mm/apple_1.npz"))
     print("cloud loaded")
 
     g = ellipsoid_graph(

@@ -88,4 +88,4 @@ class ModelInference:
             branch_direction=branch_direction,
             medial_vector=medial_vector,
             class_l=class_l,
-        )
+        ).to_device(self.device)

@@ -234,6 +234,9 @@ class DisjointTreeSkeleton:
             [s.as_o3d_lineset().paint_uniform_color(s.colour) for s in self.skeletons]
         )
 
+    def to_tubes(self) -> List[Tube]:
+        return flatten_list([s.to_tubes() for s in self.skeletons])
+
     def as_o3d_tube(self, colour=True) -> o3d.geometry.TriangleMesh:
         if colour:
             skeleton_tubes = [

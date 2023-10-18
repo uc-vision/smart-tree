@@ -5,16 +5,19 @@ pipeline:
     _target_: smart_tree.dataset.augmentations.AugmentationPipeline
     augmentations:
       - _target_:  smart_tree.dataset.augmentations.CentreCloud
-
-
+#      - _target_:  smart_tree.dataset.augmentations.Scale
+#        min_scale: 0.5
+#        max_scale: 0.5
+#      - _target_:  smart_tree.dataset.augmentations.FixedRotate
+#        xyz: [1.57, 0.0, 0.0]
 
   model_inference:
     _target_: smart_tree.model.model_inference.ModelInference
 
     model:
       _target_: smart_tree.model.model_inference.load_model
-      model_path: /local/smart-tree/smart_tree/model/weights/iconic-violet-252_model.pt
-      weights_path: /local/smart-tree/smart_tree/model/weights/iconic-violet-252_model_weights.pt
+      model_path: /local/smart-tree/outputs/2023-09-20/12-36-34/dandy-lion-53_model.pt
+      weights_path: /local/smart-tree/outputs/2023-09-20/12-36-34/dandy-lion-53_model_weights.pt
 
     dataloader:
       _target_: smart_tree.model.model_inference.load_dataloader
@@ -26,7 +29,7 @@ pipeline:
       transform:
         _target_: smart_tree.model.sparse.transform.sparse_voxelize
         _partial_: True
-        voxel_size: 0.04
+        voxel_size: 0.01
         input_features: ['xyz']
       collate_fn:
         _target_: smart_tree.model.sparse.util.batch_collate
@@ -34,11 +37,11 @@ pipeline:
 
   skeletonizer:
     _target_: smart_tree.skeleton.skeletonize.Skeletonizer
-    K: 32
+    K: 8
     min_connection_length: 0.04
-    minimum_graph_vertices: 3
+    minimum_graph_vertices: 12
 
-    repair_skeletons : False
+    repair_skeletons : True
     smooth_skeletons : False
     smooth_kernel_size: 11 # Needs to be odd
     prune_skeletons : False
@@ -46,11 +49,11 @@ pipeline:
     min_skeleton_length : 0.02
 
 
-  view_model_output : False
+  view_model_output : True
   view_skeletons : True
   save_path: /mnt/harry/PhD/smart-tree/data/wtf
   save_outputs : True
-  branch_classes: [1]
+  branch_classes: [0,1]
   cmap:
     - [0.541, 0.670, 0.164] # Foliage
     - [0.450, 0.325, 0.164] # Trunk

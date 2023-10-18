@@ -25,8 +25,8 @@ def unpackage_data(data: dict) -> Tuple[Cloud, TreeSkeleton]:
         rgb=torch.tensor(data["rgb"]),
         # medial_vector=data["medial_vector"],
         class_l=torch.tensor(data["class_l"]).int().reshape(-1, 1),
+        branch_ids=torch.tensor(data["branch_ids"]).int().reshape(-1, 1),
     )
-
     offsets = np.cumsum(np.append([0], sizes))
 
     branch_idx = [np.arange(size) + offset for size, offset in zip(sizes, offsets)]

@@ -3,12 +3,14 @@ from typing import List, Optional
 
 import cugraph
 import cupy
+import networkx as nx
 import open3d as o3d
 import torch
 from cudf import DataFrame
 from torchtyping import TensorType, patch_typeguard
 from tqdm import tqdm
 from typeguard import typechecked
+import numpy as np
 
 from ..o3d_abstractions.geometries import o3d_line_set
 from ..o3d_abstractions.visualizer import ViewerItem, o3d_viewer
@@ -86,6 +88,13 @@ class Graph:
 
     def as_cugraph(self):
         return cuda_graph(self.edges, self.edge_weights)
+
+    def as_networkx_graph(self):
+        G = nx.Graph()
+
+        weighted_edges = np.hstack((self.edges, self.edge_weights))
+        G.add_weighted_edges_from(weighted_edges)
+        return G
 
     @property
     def edge_vertices(self) -> TensorType["N", 2, 3, float]:

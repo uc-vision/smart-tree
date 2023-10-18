@@ -15,6 +15,7 @@ from typeguard import typechecked
 from ..o3d_abstractions.geometries import o3d_cloud, o3d_lines_between_clouds
 from ..o3d_abstractions.visualizer import ViewerItem, o3d_viewer
 from ..util.misc import voxel_filter
+from copy import deepcopy
 
 patch_typeguard()
 
@@ -188,6 +189,11 @@ class LabelledCloud(Cloud):
     def filter(self, mask: TensorType) -> LabelledCloud:
         return super().filter(mask)
 
+    def with_xyz(self, new_xyz):
+        new_cld = deepcopy(self)
+        new_cld.xyz = new_xyz
+        return new_cld
+
     def pin_memory(self) -> LabelledCloud:
         return super().pin_memory()
 
@@ -235,11 +241,11 @@ class LabelledCloud(Cloud):
         return o3d_cloud(self.xyz, colours=colours)
 
     def as_o3d_medial_cld(self) -> o3d.geometry.PointCloud:
-        return o3d_cloud(self.xyz + self.medial_vector)
+        return o3d_cloud(self.medial_pts)
 
     def as_o3d_medial_vectors(self) -> o3d.geometry.LineSet:
-        medial_cloud = o3d_cloud(self.xyz + self.medial_vector)
-        return o3d_lines_between_clouds(self.as_o3d_cld(), medial_cloud)
+        medial_cloud = o3d_cloud(self.medial_pts)
+        return o3d_lines_between_clouds(self.as_o3d_cld(), self.as_o3d_medial_cld())
 
     def as_o3d_branch_directions(self, view_length=0.1) -> o3d.geometry.LineSet:
         branch_dir_cloud = o3d_cloud(self.xyz + (self.branch_direction * view_length))
@@ -251,6 +257,7 @@ class LabelledCloud(Cloud):
         item = partial(ViewerItem, is_visible=False, group=f"{super().group_name}")
         if self.medial_vector is not None:
             items += [item("Medial Vectors", self.as_o3d_medial_vectors())]
+            items += [item("Medial Cloud", self.as_o3d_medial_cld())]
         if self.branch_direction is not None:
             items += [item("Branch Directions", self.as_o3d_branch_directions())]
         if self.branch_ids is not None:
@@ -263,7 +270,7 @@ class LabelledCloud(Cloud):
         return items
 
     def view(self):
-        o3d_viewer(self.viewer_items())
+        o3d_viewer(self.viewer_items)
 
 
 """ TODO: REWRITE THIS """

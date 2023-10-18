@@ -9,6 +9,7 @@ from .model.model_inference import ModelInference
 from .o3d_abstractions.visualizer import o3d_viewer
 from .skeleton.skeletonize import Skeletonizer
 from .util.file import save_o3d_cloud, save_o3d_lineset, save_o3d_mesh
+from .connect.connection import SkeletonConnector
 
 
 class Pipeline:
@@ -17,6 +18,7 @@ class Pipeline:
         preprocessing: AugmentationPipeline,
         model_inference: ModelInference,
         skeletonizer: Skeletonizer,
+        connector: SkeletonConnector = None,
         view_model_output=False,
         view_skeletons=False,
         save_outputs=False,
@@ -28,6 +30,7 @@ class Pipeline:
         self.preprocessing = preprocessing
         self.model_inference = model_inference
         self.skeletonizer = skeletonizer
+        self.connector = connector
 
         self.view_model_output = view_model_output
         self.view_skeletons = view_skeletons
@@ -59,6 +62,9 @@ class Pipeline:
 
         # Run the branch cloud through skeletonization algorithm, then post process
         skeleton: DisjointTreeSkeleton = self.skeletonizer.forward(branch_cloud)
+
+        if self.connector != None:
+            skeleton = self.connector.foward(skeleton)
 
         # View skeletonization results
         if self.view_skeletons:

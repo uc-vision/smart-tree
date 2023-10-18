@@ -9,7 +9,7 @@ from smart_tree.util.file import load_cloud
 from smart_tree.util.maths import rotation_matrix_from_vectors_np
 
 if __name__ == "__main__":
-    cld = load_cloud(Path("/local/UC-10/npz_4mm/london/london_10.npz"))
+    cld = load_cloud(Path("/local/UC-10/npz_4mm/london_10.npz"))
 
     centres = cld.medial_pts[::200]
     directions = cld.branch_direction[::200]
