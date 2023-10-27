@@ -52,6 +52,7 @@ class Pipeline:
 
         # Run cloud through network
         cloud: LabelledCloud = self.model_inference.forward(cloud)
+        
         if self.view_model_output:
             cloud.view()
 

@@ -59,7 +59,6 @@ class RandomFlips(Augmentation):
             .to(dtype=cloud.xyz.dtype, device=cloud.device)
             .view(1, 3)
         )
-
         return cloud.scale(-flips * 2.0 + 1.0)
 
 
@@ -113,6 +112,24 @@ class RandomCubicCrop(Augmentation):
         return cloud.filter(mask)
 
 
+
+class RandomGaussianNoise(Augmentation):
+    def __init__(self, mean=0.0, std=0.01, prob=0.0, magnitude=1.0):
+        self.mean = mean
+        self.std = std
+        self.prob = prob
+        self.magnitude = magnitude
+
+    def __call__(self, cloud):
+        mask = torch.rand(cloud.xyz.shape[0]) < self.prob
+        noise = (
+            torch.randn(cloud.xyz.shape, device=cloud.xyz.device) * self.std + self.mean
+        ).float()
+        noise *= self.magnitude
+        cloud.xyz[mask] += noise[mask]
+        return cloud.with_xyz(cloud.xyz)
+
+
 class RandomRotate(Augmentation):
     def __init__(self, max_x, max_y, max_z):
         self.max_rots = torch.tensor([max_x, max_y, max_z])
@@ -151,17 +168,17 @@ class Dropout3D(Augmentation):
         return cloud.filter(mask).with_xyz(points)
 
 
-class RandomDropout(Augmentation):
+class RandomDropout:
     def __init__(self, probability: float):
         self.probability = probability
 
     def __call__(self, cloud: Cloud) -> Cloud:
         mask = torch.rand(cloud.xyz.shape[0]) < self.probability
-        return cloud.filter(mask.to(bool))
+        return cloud.filter(~mask)
+
 
 
 class RandomAugmentation(Augmentation):
-    @beartype
     def __init__(
         self,
         shuffle: bool,
@@ -186,7 +203,6 @@ class RandomAugmentation(Augmentation):
 
 
 class AugmentationPipeline(Augmentation):
-    @beartype
     def __init__(self, augmentations: Sequence[Augmentation]):
         self.augmentations = augmentations
 

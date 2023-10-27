@@ -6,6 +6,7 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig
 from hydra import initialize, compose
 
+from .pipeline import Pipeline
 
 @hydra.main(
     version_base=None,

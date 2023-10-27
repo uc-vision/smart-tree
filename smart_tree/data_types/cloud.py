@@ -42,8 +42,9 @@ class Cloud:
 
     def scale(
         self,
-        factor: float | TensorType[1, float] | TensorType[1, 3, float],
+        factor,
     ) -> Cloud:
+    
         scaled_xyz = self.xyz * factor
         return Cloud(xyz=scaled_xyz, rgb=self.rgb, filename=self.filename)
 
@@ -52,7 +53,7 @@ class Cloud:
         return Cloud(xyz=translated_xyz, rgb=self.rgb, filename=self.filename)
 
     def rotate(self, rotation_matrix: TensorType[3, 3, float]) -> Cloud:
-        rotated_xyz = torch.matmul(self.xyz, rotation_matrix.T)
+        rotated_xyz = torch.matmul(self.xyz, rotation_matrix.T.to(self.xyz.device))
         return Cloud(xyz=rotated_xyz, rgb=self.rgb, filename=self.filename)
 
     def voxel_downsample(self, voxel_size: float | TensorType[1]) -> Cloud:
@@ -163,7 +164,7 @@ class LabelledCloud(Cloud):
         base_str += f"\n{'*' * 80}"
         return f"{base_str}"
 
-    def scale(self, factor: float | TensorType[1]) -> LabelledCloud:
+    def scale(self, factor: float | TensorType[1] | torch.tensor) -> LabelledCloud:
         args = asdict(self)
         args["xyz"] = args["xyz"] * factor
         if args["medial_vector"] is not None:
