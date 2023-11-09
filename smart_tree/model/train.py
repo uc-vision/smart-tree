@@ -17,8 +17,8 @@ from tqdm import tqdm
 from smart_tree.data_types.cloud import Cloud
 from smart_tree.o3d_abstractions.camera import Renderer
 
-from .sparse.util import get_batch
-from .tracker import Tracker
+from smart_tree.model.sparse.util import get_batch
+from smart_tree.model.tracker import Tracker
 
 
 def train_epoch(

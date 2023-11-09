@@ -3,7 +3,7 @@
 wandb:
   project: tree
   entity: harry1576
-  mode: online
+  mode: disabled
 
 fp16: True
 num_epoch: 500

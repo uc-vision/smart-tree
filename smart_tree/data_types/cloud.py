@@ -44,7 +44,6 @@ class Cloud:
         self,
         factor,
     ) -> Cloud:
-    
         scaled_xyz = self.xyz * factor
         return Cloud(xyz=scaled_xyz, rgb=self.rgb, filename=self.filename)
 
