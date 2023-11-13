@@ -1,30 +1,13 @@
 import argparse
 from pathlib import Path
-from typing import List, Tuple
 
 import torch
 
 from smart_tree.data_types.cloud import Cloud, CloudLoader
 from smart_tree.data_types.tree import TreeSkeleton
 from smart_tree.o3d_abstractions.visualizer import ViewerItem, o3d_viewer
-from smart_tree.util.file import load_cloud
-
-
-def view_synthetic_data(data: List[Tuple[Cloud, TreeSkeleton]], line_width=1):
-    geometries = []
-    for i, item in enumerate(data):
-        cloud, path = item
-
-        tree_name = path.stem
-        visible = i == 0
-
-        geometries += (
-            cloud.translate(-cloud.centre)
-            # .translate(torch.tensor([0, 0, -cloud.max_y / 2]))
-            .viewer_items
-        )
-
-    o3d_viewer(geometries, line_width=line_width)
+from smart_tree.util.file import load_cloud, save_cloud
+from smart_tree.util.maths import euler_angles_to_rotation
 
 
 def parse_args():
@@ -67,9 +50,23 @@ def main():
     args = parse_args()
 
     loader = CloudLoader()
+    clouds = [loader.load(filename) for filename in paths_from_args(args)]
 
-    data = [(loader.load(filename), filename) for filename in paths_from_args(args)]
-    view_synthetic_data(data, args.line_width)
+    rotation_mat = euler_angles_to_rotation(torch.tensor([1.57, 0.0, 0.0])).float()
+
+    # rotated_clouds = [cloud.rotate(rotation_mat) for cloud in clouds]
+
+    # translated_cloud = [cloud.translate(-cloud.centre) for cloud in rotated_clouds]
+
+    for cloud in clouds:
+        cloud = cloud.rotate(rotation_mat)
+
+        save_name = cloud.filename.name
+        save_cloud(
+            cloud,
+            f"/mnt/harry/PhD/smart-tree/data/synthetic-vine-pcds-3-rotated/{save_name}",
+        )
+        # cloud.view()
 
 
 if __name__ == "__main__":

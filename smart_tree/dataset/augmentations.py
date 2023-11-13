@@ -4,7 +4,6 @@ from typing import Sequence
 
 import numpy as np
 import torch
-from beartype import beartype
 from taichi_perlin import dropout_3d
 
 from ..data_types.cloud import Cloud
@@ -75,7 +74,7 @@ class FixedTranslate(Augmentation):
         self.xyz = torch.tensor(xyz)
 
     def __call__(self, cloud: Cloud) -> Cloud:
-        return cloud.translate(self.xyz)
+        return cloud.translate(self.xyz.to(cloud.device))
 
 
 class RandomCrop(Augmentation):
@@ -110,7 +109,6 @@ class RandomCubicCrop(Augmentation):
         ).all(dim=1)
 
         return cloud.filter(mask)
-
 
 
 class RandomGaussianNoise(Augmentation):
@@ -175,7 +173,6 @@ class RandomDropout:
     def __call__(self, cloud: Cloud) -> Cloud:
         mask = torch.rand(cloud.xyz.shape[0]) < self.probability
         return cloud.filter(~mask)
-
 
 
 class RandomAugmentation(Augmentation):

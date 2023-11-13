@@ -4,21 +4,19 @@ pipeline:
   preprocessing:
     _target_: smart_tree.dataset.augmentations.AugmentationPipeline
     augmentations:
-      - _target_:  smart_tree.dataset.augmentations.Scale
-        min_scale: 0.5
-        max_scale: 0.5
-      # - _target_:  smart_tree.dataset.augmentations.FixedRotate
-      #   xyz: [-1.57, 0.0, 0.0]
+      - _target_:  smart_tree.dataset.augmentations.FixedRotate
+        xyz: [-1.57, 0.0, 0.0]
       - _target_:  smart_tree.dataset.augmentations.CentreCloud
 
 
   model_inference:
+
     _target_: smart_tree.model.model_inference.ModelInference
 
     model:
       _target_: smart_tree.model.model_inference.load_model
-      model_path: /local/smart-tree/outputs/2023-10-24/17-20-22/hardy-bird-278_model.pt # /local/smart-tree/outputs/2023-10-26/11-28-57/crimson-morning-296_model.pt #
-      weights_path: /local/smart-tree/outputs/2023-10-24/17-20-22/hardy-bird-278_model_weights.pt # /local/smart-tree/outputs/2023-10-26/11-28-57/crimson-morning-296_model_weights.pt #
+      model_path:  /mnt/harry/PhD/smart-tree/smart_tree/model/weights/hardy-bird-278_model.pt
+      weights_path: /mnt/harry/PhD/smart-tree/smart_tree/model/weights/hardy-bird-278_model_weights.pt
 
     dataloader:
       _target_: smart_tree.model.model_inference.load_dataloader
@@ -26,7 +24,7 @@ pipeline:
       block_size: 4.0
       buffer_size: 0.4
       num_workers: 0
-      batch_size: 4
+      batch_size: 8
       transform:
         _target_: smart_tree.model.sparse.transform.sparse_voxelize
         _partial_: True
@@ -40,12 +38,12 @@ pipeline:
     _target_: smart_tree.skeleton.skeletonize.Skeletonizer
     K: 8
     min_connection_length: 0.04
-    minimum_graph_vertices: 5000
+    minimum_graph_vertices: 64
 
-    repair_skeletons : False
-    smooth_skeletons : False
+    repair_skeletons : True
+    smooth_skeletons : True
     smooth_kernel_size: 11 #Needs to be odd
-    prune_skeletons : False
+    prune_skeletons : True
     min_skeleton_radius : 0.01
     min_skeleton_length : 0.02
 

@@ -1,4 +1,5 @@
 import json
+from dataclasses import asdict
 from pathlib import Path
 from typing import Tuple
 
@@ -93,6 +94,22 @@ def save_skeleton(skeleton: TreeSkeleton, save_location):
     )
 
     np.savez(save_location, **data)
+
+
+def save_cloud(cloud: Cloud | LabelledCloud, save_path):
+    cloud_dict = asdict(cloud)
+    np_dict = {}
+    for key, value in cloud_dict.items():
+        if isinstance(value, np.ndarray):
+            np_dict[key] = value
+        elif isinstance(value, torch.Tensor):
+            np_dict[key] = value.numpy()
+        # elif isinstance(value, Path):
+        #     np_dict[key] = str(value)
+        # else:
+        #     np_dict[key] = value
+
+    np.savez(save_path, **np_dict)
 
 
 def load_skeleton(path):

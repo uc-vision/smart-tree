@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import asdict, dataclass, fields
 from functools import partial
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import numpy as np
 import open3d as o3d
@@ -15,7 +16,6 @@ from typeguard import typechecked
 from ..o3d_abstractions.geometries import o3d_cloud, o3d_lines_between_clouds
 from ..o3d_abstractions.visualizer import ViewerItem, o3d_viewer
 from ..util.misc import voxel_filter
-from copy import deepcopy
 
 patch_typeguard()
 
@@ -44,7 +44,6 @@ class Cloud:
         self,
         factor,
     ) -> Cloud:
-    
         scaled_xyz = self.xyz * factor
         return Cloud(xyz=scaled_xyz, rgb=self.rgb, filename=self.filename)
 
@@ -111,6 +110,10 @@ class Cloud:
         return torch.mean(self.xyz, dim=0)
 
     @property
+    def max_y(self) -> TensorType:
+        return self.max_xyz[2]
+
+    @property
     def bounding_box(self) -> tuple[TensorType[3], TensorType[3]]:
         return self.min_xyz, self.max_xyz
 
@@ -127,7 +130,14 @@ class Cloud:
 
     @property
     def viewer_items(self) -> list[ViewerItem]:
-        return [ViewerItem("Cloud", self.as_o3d_cld(), False, group=self.group_name)]
+        return [
+            ViewerItem(
+                f"Cloud_{self.filename}",
+                self.as_o3d_cld(),
+                False,
+                group=self.group_name,
+            )
+        ]
 
     def view(self) -> None:
         o3d_viewer(self.viewer_items)
@@ -163,6 +173,12 @@ class LabelledCloud(Cloud):
                 base_str += f"\nContains: {k}"
         base_str += f"\n{'*' * 80}"
         return f"{base_str}"
+
+    def translate(self, translation_vector: TensorType[3]) -> Cloud:
+        args = asdict(self)
+        args["xyz"] = args["xyz"] + translation_vector
+        args["medial_vector"] = args["medial_vector"] + translation_vector
+        return LabelledCloud(**args)
 
     def scale(self, factor: float | TensorType[1] | torch.tensor) -> LabelledCloud:
         args = asdict(self)
@@ -205,7 +221,7 @@ class LabelledCloud(Cloud):
     def number_classes(self) -> int:
         if not hasattr(self, "class_l"):
             return 1
-        return torch.max(self.class_l).item() + 1
+        return torch.max(self.class_l).item() - torch.min(self.class_l).item() + 1
 
     @property
     def radius(self) -> TensorType["N", 1]:
@@ -225,7 +241,8 @@ class LabelledCloud(Cloud):
     ) -> o3d.geometry.PointCloud:
         if cmap is None:
             cmap = torch.rand(self.number_classes, 3)
-        colours = cmap.to(self.device)[self.class_l.view(-1).int()]
+
+        colours = cmap.to(self.device)[self.class_l.view(-1).long()]
         return o3d_cloud(self.xyz, colours=colours)
 
     def as_o3d_trunk_cld(self) -> o3d.geometry.PointCloud:
@@ -245,7 +262,6 @@ class LabelledCloud(Cloud):
         return o3d_cloud(self.medial_pts)
 
     def as_o3d_medial_vectors(self) -> o3d.geometry.LineSet:
-        medial_cloud = o3d_cloud(self.medial_pts)
         return o3d_lines_between_clouds(self.as_o3d_cld(), self.as_o3d_medial_cld())
 
     def as_o3d_branch_directions(self, view_length=0.1) -> o3d.geometry.LineSet:
@@ -272,9 +288,6 @@ class LabelledCloud(Cloud):
 
     def view(self):
         o3d_viewer(self.viewer_items)
-
-
-""" TODO: REWRITE THIS """
 
 
 class CloudLoader:
@@ -320,17 +333,21 @@ class CloudLoader:
         labelled_cloud_fields = {
             f.name: data[f.name] for f in fields(LabelledCloud) if f.name in data
         }
+        cloud_data = {}
         for k, v in labelled_cloud_fields.items():
+            if type(v) == np.ndarray:
+                if v.any() == None:
+                    continue
             if k in ["class_l", "branch_ids"]:
-                labelled_cloud_fields[k] = torch.from_numpy(v).long().reshape(-1, 1)
-
-            elif k in ["medial_vector"]:
-                labelled_cloud_fields["medial_vector"] = torch.from_numpy(v).float()
-
+                cloud_data[k] = torch.from_numpy(v).long().reshape(-1, 1)
+            elif k in ["medial_vector", "vector"]:
+                cloud_data["medial_vector"] = torch.from_numpy(v).float()
             else:
-                labelled_cloud_fields[k] = torch.from_numpy(v).float()
-        labelled_cloud_fields["filename"] = Path(fn)
-        return LabelledCloud(**labelled_cloud_fields)
+                cloud_data[k] = torch.from_numpy(v).float()
+
+        cloud_data["filename"] = Path(fn)
+
+        return LabelledCloud(**cloud_data)
 
 
 def convert_cloud_to_labelled_cloud(
@@ -356,3 +373,61 @@ def convert_cloud_to_labelled_cloud(
     labelled_cloud = LabelledCloud(**cloud_dict)
 
     return labelled_cloud
+
+
+def merge_labelled_cloud(clouds: List["LabelledCloud"]) -> "LabelledCloud":
+    """Merge a list of LabelledCloud instances into a single LabelledCloud."""
+    all_xyz, all_rgb, all_medial_vector, all_branch_direction = [], [], [], []
+    all_branch_ids, all_class_l, all_loss_mask, all_vector_loss_mask, all_vector = (
+        [],
+        [],
+        [],
+        [],
+        [],
+    )
+
+    def accumulate_tensors(accumulated_list, tensor):
+        if tensor is not None:
+            accumulated_list.append(tensor)
+
+    for cloud in clouds:
+        accumulate_tensors(all_xyz, cloud.xyz)
+        accumulate_tensors(all_rgb, cloud.rgb)
+        accumulate_tensors(all_medial_vector, cloud.medial_vector)
+        accumulate_tensors(all_branch_direction, cloud.branch_direction)
+        accumulate_tensors(all_branch_ids, cloud.branch_ids)
+        accumulate_tensors(all_class_l, cloud.class_l)
+        accumulate_tensors(all_loss_mask, cloud.loss_mask)
+        accumulate_tensors(all_vector_loss_mask, cloud.vector_loss_mask)
+        accumulate_tensors(all_vector, cloud.vector)  # Legacy
+
+    # Concatenate all accumulated tensors
+    new_xyz = torch.cat(all_xyz, dim=0) if all_xyz else None
+    new_rgb = torch.cat(all_rgb, dim=0) if all_rgb else None
+
+    new_medial_vector = (
+        torch.cat(all_medial_vector, dim=0) if all_medial_vector else None
+    )
+    new_branch_direction = (
+        torch.cat(all_branch_direction, dim=0) if all_branch_direction else None
+    )
+    new_branch_ids = torch.cat(all_branch_ids, dim=0) if all_branch_ids else None
+    new_class_l = torch.cat(all_class_l, dim=0) if all_class_l else None
+    new_loss_mask = torch.cat(all_loss_mask, dim=0) if all_loss_mask else None
+    new_vector_loss_mask = (
+        torch.cat(all_vector_loss_mask, dim=0) if all_vector_loss_mask else None
+    )
+    new_vector = torch.cat(all_vector, dim=0) if all_vector else None  # Legacy
+
+    # Return a new LabelledCloud with the concatenated tensors
+    return LabelledCloud(
+        xyz=new_xyz,
+        rgb=new_rgb,
+        medial_vector=new_medial_vector,
+        branch_direction=new_branch_direction,
+        branch_ids=new_branch_ids,
+        class_l=new_class_l,
+        loss_mask=new_loss_mask,
+        vector_loss_mask=new_vector_loss_mask,
+        vector=new_vector,  # Legacy
+    )

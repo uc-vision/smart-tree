@@ -155,6 +155,7 @@ experiments/
 
 *.ply
 *.obj
-
+*.pt
+*.png
 sys
 re

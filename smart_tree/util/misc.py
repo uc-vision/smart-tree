@@ -20,7 +20,7 @@ def at_least_2d(tensors: Union[List[torch.tensor], torch.tensor], expand_dim=1):
             return tensors
 
 
-def move_to_cpu(func):
+def as_numpy(func):
     def wrapper(*args, **kwargs):
         new_args = []
         for arg in args:

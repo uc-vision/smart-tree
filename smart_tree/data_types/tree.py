@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pickle
 from dataclasses import dataclass
+from functools import partial
 from typing import Dict, List, Optional
 
 import open3d as o3d
@@ -249,10 +250,12 @@ class DisjointTreeSkeleton:
 
     @property
     def viewer_items(self) -> list[ViewerItem]:
-        items = []
-        items += [ViewerItem(f"Skeleton Lineset", self.as_o3d_lineset())]
-        items += [ViewerItem(f"Skeleton Tube", self.as_o3d_tube())]
-        items += [ViewerItem(f"Skeleton Coloured Tube", self.as_o3d_tube(colour=True))]
+        item = partial(ViewerItem, is_visible=False, group=f"Disconnected_Skeleton")
+        items = flatten_list([s.viewer_items for s in self.skeletons])
+        items += [item(f"Disjoint Lineset", self.as_o3d_lineset())]
+        items += [item(f"Disjoint Tube Coloured", self.as_o3d_tube(True))]
+        items += [item(f"Disjoint Tube ", self.as_o3d_tube(False))]
+
         return items
 
     def view(self):

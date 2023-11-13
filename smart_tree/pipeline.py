@@ -2,6 +2,7 @@ from pathlib import Path
 
 import torch
 
+from .connect.connection import SkeletonConnector
 from .data_types.cloud import Cloud, CloudLoader, LabelledCloud
 from .data_types.tree import DisjointTreeSkeleton
 from .dataset.augmentations import AugmentationPipeline
@@ -9,7 +10,6 @@ from .model.model_inference import ModelInference
 from .o3d_abstractions.visualizer import o3d_viewer
 from .skeleton.skeletonize import Skeletonizer
 from .util.file import save_o3d_cloud, save_o3d_lineset, save_o3d_mesh
-from .connect.connection import SkeletonConnector
 
 
 class Pipeline:
@@ -48,11 +48,11 @@ class Pipeline:
         return self.process_cloud(cloud)
 
     def process_cloud(self, cloud: Cloud):
-        cloud = self.preprocessing(cloud).to_device(self.device)
+        preprocessed_cld = self.preprocessing(cloud).to_device(self.device)
 
         # Run cloud through network
-        cloud: LabelledCloud = self.model_inference.forward(cloud)
-        
+        cloud: LabelledCloud = self.model_inference.forward(preprocessed_cld)
+
         if self.view_model_output:
             cloud.view()
 
@@ -69,7 +69,12 @@ class Pipeline:
 
         # View skeletonization results
         if self.view_skeletons:
-            o3d_viewer(skeleton.viewer_items + cloud.viewer_items, line_width=5)
+            o3d_viewer(
+                skeleton.viewer_items
+                + cloud.viewer_items
+                + preprocessed_cld.viewer_items,
+                line_width=5,
+            )
 
         if self.save_outputs:
             sp = self.save_path
