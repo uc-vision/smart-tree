@@ -145,7 +145,7 @@ smart_tree/conf/apple-trellis-split.json
 FRNN/
 
 
-smart_tree/conf
+#smart_tree/conf
 test_data/
 experiments/
 
