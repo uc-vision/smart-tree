@@ -1,21 +1,19 @@
+from pathlib import Path
 from typing import List
-from dataclasses import dataclass
-
 
 import torch
 from torch.nn import functional as F
 from tqdm import tqdm
-from pathlib import Path
 
-from smart_tree.data_types.cloud import Cloud
-from smart_tree.o3d_abstractions.visualizer import o3d_viewer
-from smart_tree.util.file import save_o3d_lineset, load_o3d_lineset
-from smart_tree.skeleton.shortest_path import shortest_paths
-from smart_tree.util.maths import torch_dot, magnitudes
-from smart_tree.util.queries import skeleton_to_points, skeleton_to_skeleton_distance
-from smart_tree.data_types.graph import join_graphs, Graph
 from smart_tree.data_types.branch import BranchSkeleton
-from smart_tree.data_types.tree import TreeSkeleton, DisjointTreeSkeleton
+from smart_tree.data_types.cloud import Cloud
+from smart_tree.data_types.graph import Graph, join_graphs
+from smart_tree.data_types.tree import DisjointTreeSkeleton, TreeSkeleton
+from smart_tree.o3d_abstractions.visualizer import o3d_viewer
+from smart_tree.skeleton.shortest_path import shortest_paths
+from smart_tree.util.file import load_o3d_lineset, save_o3d_lineset
+from smart_tree.util.maths import magnitudes, torch_dot
+from smart_tree.util.queries import skeleton_to_points, skeleton_to_skeleton_distance
 
 
 def find_closest_skeleton(
