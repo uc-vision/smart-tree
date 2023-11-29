@@ -51,8 +51,6 @@ def train_epoch(data_loader, model, optimizer, fp16=False, scaler=None, tracker=
 def eval_epoch(
     data_loader,
     model,
-    fp16=False,
-    device=torch.device("cuda"),
 ):
     tracker = Tracker()
     model.eval()
@@ -77,9 +75,6 @@ def eval_epoch(
 def capture_epoch(
     data_loader,
     model,
-    cmap,
-    fp16=False,
-    device=torch.device("cuda"),
 ):
     model.eval()
     captures = []
@@ -100,7 +95,7 @@ def capture_epoch(
         # )
 
     model.train()
-    return labelled_clouds
+    # return labelled_clouds
 
 
 # @torch.no_grad()
@@ -134,34 +129,34 @@ def capture_epoch(
 #     return clouds
 
 
-def capture_and_log(loader, model, epoch, wandb_run, cfg):
-    clouds = capture_clouds(
-        loader,
-        model,
-        cfg.cmap,
-        fp16=cfg.fp16,
-    )
+# def capture_and_log(loader, model, epoch, wandb_run, cfg):
+#     clouds = capture_clouds(
+#         loader,
+#         model,
+#         cfg.cmap,
+#         fp16=cfg.fp16,
+#     )
 
-    for cloud in tqdm(clouds, desc="Uploading Clouds", leave=False):
-        seg_cloud = cloud.to_o3d_seg_cld(np.asarray(cfg.cmap))
-        xyz_rgb = np.concatenate(
-            (np.asarray(seg_cloud.points), np.asarray(seg_cloud.colors) * 255),
-            -1,
-        )
+#     for cloud in tqdm(clouds, desc="Uploading Clouds", leave=False):
+#         seg_cloud = cloud.to_o3d_seg_cld(np.asarray(cfg.cmap))
+#         xyz_rgb = np.concatenate(
+#             (np.asarray(seg_cloud.points), np.asarray(seg_cloud.colors) * 255),
+#             -1,
+#         )
 
-        medial_cld_pts = np.asarray(cloud.medial_pts)
-        xyz_rgb2 = np.concatenate(
-            (medial_cld_pts, np.asarray(seg_cloud.colors) * 255),
-            -1,
-        )
+#         medial_cld_pts = np.asarray(cloud.medial_pts)
+#         xyz_rgb2 = np.concatenate(
+#             (medial_cld_pts, np.asarray(seg_cloud.colors) * 255),
+#             -1,
+#         )
 
-        wandb_run.log(
-            {
-                f"{Path(cloud.filename).stem}": wandb.Object3D(xyz_rgb),
-                f"{Path(cloud.filename).stem}_medial": wandb.Object3D(xyz_rgb2),
-            },
-            step=epoch,
-        )
+#         wandb_run.log(
+#             {
+#                 f"{Path(cloud.filename).stem}": wandb.Object3D(xyz_rgb),
+#                 f"{Path(cloud.filename).stem}_medial": wandb.Object3D(xyz_rgb2),
+#             },
+#             step=epoch,
+#         )
 
 
 @hydra.main(
@@ -261,7 +256,7 @@ def main(cfg: DictConfig):
         # else:
         #     epochs_no_improve += 1
 
-        model.psuedo_loss_inverse_weight = 1 / (epoch + 1)
+        # model.psuedo_loss_inverse_weight = 1 / (epoch + 1)
 
         if epochs_no_improve == cfg.early_stop_epoch and cfg.early_stop:
             log.info("Training Ended (Evaluation Test Score Not Improving)")

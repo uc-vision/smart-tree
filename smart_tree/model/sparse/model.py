@@ -125,7 +125,7 @@ class Smart_Tree(nn.Module):
 
 
 class Smart_Tree_Self_Consistency(Smart_Tree):
-    def __init__(self, *args, confidence_threshold=0.80, **kwargs):
+    def __init__(self, *args, confidence_threshold=0.95, **kwargs):
         super().__init__(*args, **kwargs)
         self.conf_threshold = confidence_threshold
         self.psuedo_loss_inverse_weight = 0.99
@@ -139,16 +139,24 @@ class Smart_Tree_Self_Consistency(Smart_Tree):
 
         return super().forward(model_input)
 
-    def compute_loss(self, voxel_predictions: Tuple[Dict], targets: Tuple[Data], data):
+    def compute_loss(
+        self,
+        voxel_predictions: Tuple[Dict],
+        voxel_targets: Tuple[Data],
+        data,
+    ):
         loss = {}
 
-        def compute_pt_predictions(preds: Dict, data: Data):
-            for k, v in preds.items():
-                preds[k] = gather_features_by_pc_voxel_id(v, data.voxel_id)
-            return preds
+        def gather_pt_data(dict: Dict, data: Data):
+            for k, v in dict.items():
+                dict[k] = gather_features_by_pc_voxel_id(v, data.voxel_id)
+            return dict
 
-        pts1_preds = compute_pt_predictions(voxel_predictions[0], data[0])
-        pts2_preds = compute_pt_predictions(voxel_predictions[1], data[1])
+        pts1_preds = gather_pt_data(voxel_predictions[0], data[0])
+        pts1_targets = gather_pt_data(voxel_targets[0], data[0])
+
+        pts2_preds = gather_pt_data(voxel_predictions[1], data[1])
+        pts2_targets = gather_pt_data(voxel_targets[1], data[1])
 
         data_1_point_ids = data[0].point_id
         data_2_point_ids = data[1].point_id
@@ -182,12 +190,16 @@ class Smart_Tree_Self_Consistency(Smart_Tree):
 
         loss["class_loss"] = self.class_loss(
             pts1_preds["class_l"],
-            targets[0]["class_l"].squeeze(1),
+            pts1_targets["class_l"].squeeze(1),
         )
 
-        # loss["class_psuedo_loss"] = self.class_loss(
-        #     pts2_preds["class_l"][valid_pts2_mask][mask_pt],
-        #     soft_label_target[mask_pt],
+        loss["class_psuedo_loss"] = (
+            self.class_loss(
+                pts2_preds["class_l"][valid_pts2_mask][mask_pt],
+                soft_label_target[mask_pt],
+            )
+            * 0.5
+        )
         # ) * (1 - self.psuedo_loss_inverse_weight)
         # nan_mask = torch.isnan(loss["class_psuedo_loss"])
         # loss["class_psuedo_loss"][nan_mask] = 0.0

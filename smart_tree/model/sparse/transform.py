@@ -76,12 +76,16 @@ def extract_cloud_features(cld, feature_names):
     return {k: getattr(cld, k) for k in feature_names}
 
 
-def get_cloud_feature_shapes(features):
-    return {k: v.shape[1] for k, v in features.items()}
+def get_cloud_feature_dims(features, dim=1):
+    return {k: v.shape[dim] for k, v in features.items()}
 
 
-def dict_to_concated_tensor(dicts: List[Dict]) -> torch.tensor:
-    return torch.cat([value for d in dicts for value in d.values()], dim=1)
+def dict_to_concated_tensor(dict: Dict) -> torch.tensor:
+    return torch.cat([v for v in dict.values()], dim=1)
+
+
+def filter_dict(original_dict, keys_to_keep):
+    return {k: original_dict[k] for k in keys_to_keep if k in original_dict}
 
 
 def concated_tensor_to_dict(tensor: torch.tensor, feats_shape: Dict):
@@ -100,33 +104,38 @@ def sparse_voxelize(
     input_feature_names: List[str],
     target_feature_names: List[str],
 ) -> Dict:
-    input_feats = extract_cloud_features(cld, input_feature_names)
+    all_feats_dict = extract_cloud_features(
+        cld, input_feature_names + target_feature_names
+    )
+    all_feats_dims = get_cloud_feature_dims(all_feats_dict)
+    all_feats_tensor = dict_to_concated_tensor(all_feats_dict)
+
     target_feats = extract_cloud_features(cld, target_feature_names)
     mask = list(extract_cloud_features(cld, ["loss_mask"]).values())[0]
     point_id = list(extract_cloud_features(cld, ["point_ids"]).values())[0]
 
-    feats_shape = get_cloud_feature_shapes(input_feats)
-    input_feats = dict_to_concated_tensor([input_feats])
-
     voxel_gen = PointToVoxel(
         vsize_xyz=[voxel_size] * 3,
         coors_range_xyz=[*cld.min_xyz, *cld.max_xyz],
-        num_point_features=input_feats.shape[1],
+        num_point_features=all_feats_tensor.shape[1],
         max_num_voxels=len(cld),
         max_num_points_per_voxel=1,
         device=cld.device,
     )
 
-    input_feats, coords, num_pts, voxel_id = voxel_gen.generate_voxel_with_id(
-        input_feats
+    all_feats_voxelized, coords, num_pts, voxel_id = voxel_gen.generate_voxel_with_id(
+        all_feats_tensor
     )
 
-    input_feats = input_feats.squeeze(1)
+    all_feats_voxelized = all_feats_voxelized.squeeze(1)
     coords = coords.squeeze(1)
     indice = torch.zeros((coords.shape[0], 1), dtype=torch.int32, device=cld.device)
     coords = torch.cat((indice, coords), dim=1)
 
-    input_feats: Dict = concated_tensor_to_dict(input_feats, feats_shape)
+    all_feats_dict: Dict = concated_tensor_to_dict(all_feats_voxelized, all_feats_dims)
+
+    input_feats = filter_dict(all_feats_dict, input_feature_names)
+    target_feats = filter_dict(all_feats_dict, target_feature_names)
 
     return VoxelizedTrainingData(
         input_feats,

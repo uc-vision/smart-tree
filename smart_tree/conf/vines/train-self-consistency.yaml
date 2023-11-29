@@ -1,7 +1,7 @@
 wandb:
   project: tree
   entity: harry1576
-  mode: disabeld
+  mode: online
 
 fp16: True
 num_epoch: 500
@@ -56,16 +56,16 @@ train_dataset:
 train_data_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: ${batch_size}
-  drop_last: False
+  drop_last: True
   pin_memory: False
   num_workers: 0
   shuffle: False
 
-  # sampler:
-  #   _target_: torch.utils.data.RandomSampler
-  #   replacement: True
-  #   num_samples: 256
-  #   data_source: ${train_dataset}
+  sampler:
+    _target_: torch.utils.data.RandomSampler
+    replacement: True
+    num_samples: 256
+    data_source: ${train_dataset}
 
   collate_fn:
     _target_: smart_tree.model.sparse.util.batch_collate_dual_clouds
