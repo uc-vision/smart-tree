@@ -1,5 +1,5 @@
 import json
-from dataclasses import asdict
+from dataclasses import asdict, fields
 from pathlib import Path
 from typing import Tuple
 
@@ -190,3 +190,63 @@ def load_yaml(path: Path):
     with open(f"{path}") as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
     return config
+
+
+class CloudLoader:
+    def load(self, file: str | Path):
+        if Path(file).suffix == ".npz":
+            return self.load_numpy(file)
+
+        else:
+            return self.load_o3d(file)
+
+    def load_o3d(self, file: str):
+        try:
+            pcd = o3d.io.read_point_cloud(filename=str(file))
+
+            return self._load_as_cloud(
+                {"xyz": np.asarray(pcd.points), "rgb": np.asarray(pcd.colors)}, file
+            )
+        except:
+            raise ValueError(f"File type {Path(file).suffix} not supported")
+
+    def load_numpy(self, file: str | Path):
+        data = np.load(file)
+
+        optional_params = [
+            f.name for f in fields(LabelledCloud) if f.default is not None
+        ]
+
+        for param in optional_params:
+            if param in data:
+                return self._load_as_labelled_cloud(data, file)
+
+        return self._load_as_cloud(data, file)
+
+    def _load_as_cloud(self, data, fn) -> Cloud:
+        cloud_fields = {f.name: data[f.name] for f in fields(Cloud) if f.name in data}
+
+        for k, v in cloud_fields.items():
+            cloud_fields[k] = torch.from_numpy(v).float()
+        cloud_fields["filename"] = Path(fn)
+        return Cloud(**cloud_fields)
+
+    def _load_as_labelled_cloud(self, data, fn) -> LabelledCloud:
+        labelled_cloud_fields = {
+            f.name: data[f.name] for f in fields(LabelledCloud) if f.name in data
+        }
+        cloud_data = {}
+        for k, v in labelled_cloud_fields.items():
+            if type(v) == np.ndarray:
+                if v.any() == None:
+                    continue
+            if k in ["class_l", "branch_ids"]:
+                cloud_data[k] = torch.from_numpy(v).long().reshape(-1, 1)
+            elif k in ["medial_vector", "vector"]:
+                cloud_data["medial_vector"] = torch.from_numpy(v).float()
+            else:
+                cloud_data[k] = torch.from_numpy(v).float()
+
+        cloud_data["filename"] = Path(fn)
+
+        return LabelledCloud(**cloud_data)

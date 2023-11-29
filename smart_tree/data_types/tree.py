@@ -208,9 +208,6 @@ class TreeSkeleton:
     def view(self):
         o3d_viewer(self.viewer_items)
 
-    def add_branches(self, branches: dict):
-        pass
-
 
 @dataclass
 class DisjointTreeSkeleton:

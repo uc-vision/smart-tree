@@ -1,0 +1,58 @@
+pipeline:
+  _target_: smart_tree.pipeline.Pipeline
+
+  preprocessing:
+    _target_: smart_tree.dataset.augmentations.AugmentationPipeline
+    augmentations:
+      - _target_:  smart_tree.dataset.augmentations.CentreCloud
+
+
+  model_inference:
+    _target_: smart_tree.model.model_inference.ModelInference
+
+    model:
+      _target_: smart_tree.model.model_inference.load_model
+      model_path:  /mnt/harry/PhD/smart-tree/smart_tree/model/weights/polar-disco-47_model.pt
+      weights_path: /mnt/harry/PhD/smart-tree/smart_tree/model/weights/polar-disco-47_model_weights.pt
+
+    dataloader:
+      _target_: smart_tree.model.model_inference.load_dataloader
+      _partial_: True
+      block_size: 4.0
+      buffer_size: 0.4
+      num_workers: 0
+      batch_size: 8
+      transform:
+        _target_: smart_tree.model.sparse.transform.sparse_voxelize
+        _partial_: True
+        voxel_size: 0.004
+        input_features: ['xyz']
+      collate_fn:
+        _target_: smart_tree.model.sparse.util.batch_collate
+        _partial_: True
+
+  skeletonizer:
+    _target_: smart_tree.skeleton.skeletonize.Skeletonizer
+    K: 8
+    min_connection_length: 0.04
+    minimum_graph_vertices: 64
+
+    repair_skeletons : True
+    smooth_skeletons : True
+    smooth_kernel_size: 11 #Needs to be odd
+    prune_skeletons : True
+    min_skeleton_radius : 0.01
+    min_skeleton_length : 0.02
+
+
+  view_model_output : True
+  view_skeletons : True
+  save_path: /mnt/harry/PhD/smart-tree/data/
+  save_outputs : True
+  branch_classes: [0,1]
+  cmap:
+      - [1.0, 0.0, 0.0] # Trunk
+      - [0.0, 1.0, 0.0] # Spur / Cane / Shoot
+      - [0.0, 0.0, 1.0] # Node
+      - [1.0, 1.0, 0.0] # Wire
+      - [0.0, 1.0, 1.0] # Post

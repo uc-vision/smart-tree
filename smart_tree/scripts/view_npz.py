@@ -2,12 +2,9 @@ import argparse
 from pathlib import Path
 from typing import List, Tuple
 
-import torch
-
 from smart_tree.data_types.cloud import Cloud, CloudLoader
 from smart_tree.data_types.tree import TreeSkeleton
-from smart_tree.o3d_abstractions.visualizer import ViewerItem, o3d_viewer
-from smart_tree.util.file import load_cloud
+from smart_tree.o3d_abstractions.visualizer import o3d_viewer
 
 
 def view_synthetic_data(data: List[Tuple[Cloud, TreeSkeleton]], line_width=1):

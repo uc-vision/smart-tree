@@ -3,10 +3,7 @@ from pathlib import Path
 
 import torch
 
-from smart_tree.data_types.cloud import Cloud, CloudLoader
-from smart_tree.data_types.tree import TreeSkeleton
-from smart_tree.o3d_abstractions.visualizer import ViewerItem, o3d_viewer
-from smart_tree.util.file import load_cloud, save_cloud
+from smart_tree.data_types.cloud import CloudLoader
 from smart_tree.util.maths import euler_angles_to_rotation
 
 
@@ -61,12 +58,12 @@ def main():
     for cloud in clouds:
         cloud = cloud.rotate(rotation_mat)
 
-        save_name = cloud.filename.name
-        save_cloud(
-            cloud,
-            f"/mnt/harry/PhD/smart-tree/data/synthetic-vine-pcds-3-rotated/{save_name}",
-        )
-        # cloud.view()
+        # save_name = cloud.filename.name
+        # save_cloud(
+        #     cloud,
+        #     f"/mnt/harry/PhD/smart-tree/data/synthetic-vine-pcds-3-rotated/{save_name}",
+        # )
+        cloud.view()
 
 
 if __name__ == "__main__":

@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass
 from functools import partial
 from pathlib import Path
 from typing import List, Optional
 
-import numpy as np
 import open3d as o3d
 import torch
 import torch.nn.functional as F
@@ -16,13 +14,14 @@ from typeguard import typechecked
 from ..o3d_abstractions.geometries import o3d_cloud, o3d_lines_between_clouds
 from ..o3d_abstractions.visualizer import ViewerItem, o3d_viewer
 from ..util.misc import voxel_filter
+from .base import Base
 
 patch_typeguard()
 
 
 @typechecked
 @dataclass
-class Cloud:
+class Cloud(Base):
     xyz: TensorType["N", 3]
     rgb: Optional[TensorType["N", 3]] = None
     filename: Optional[Path] = None
@@ -40,47 +39,20 @@ class Cloud:
             f"{'*' * 80}"
         )
 
-    def scale(
-        self,
-        factor,
-    ) -> Cloud:
+    def scale(self, factor) -> Cloud:
         scaled_xyz = self.xyz * factor
-        return Cloud(xyz=scaled_xyz, rgb=self.rgb, filename=self.filename)
+        return self.__class__(xyz=scaled_xyz, rgb=self.rgb, filename=self.filename)
 
     def translate(self, translation_vector: TensorType[3]) -> Cloud:
         translated_xyz = self.xyz + translation_vector
-        return Cloud(xyz=translated_xyz, rgb=self.rgb, filename=self.filename)
+        return self.__class__(xyz=translated_xyz, rgb=self.rgb, filename=self.filename)
 
     def rotate(self, rotation_matrix: TensorType[3, 3, float]) -> Cloud:
         rotated_xyz = torch.matmul(self.xyz, rotation_matrix.T.to(self.xyz.device))
-        return Cloud(xyz=rotated_xyz, rgb=self.rgb, filename=self.filename)
+        return self.__class__(xyz=rotated_xyz, rgb=self.rgb, filename=self.filename)
 
     def voxel_downsample(self, voxel_size: float | TensorType[1]) -> Cloud:
         return self.filter(voxel_filter(self.xyz, voxel_size).reshape(-1))
-
-    def filter(
-        self,
-        mask: TensorType["N", torch.bool] | TensorType["N", torch.int32] | torch.tensor,
-    ) -> Cloud:
-        args = asdict(self)
-        for k, v in args.items():
-            if isinstance(v, torch.Tensor):
-                args[k] = v[mask]
-        return self.__class__(**args)
-
-    def pin_memory(self) -> Cloud:
-        args = asdict(self)
-        for k, v in args.items():
-            if isinstance(v, torch.Tensor):
-                args[k] = v.pin_memory()
-        return self.__class__(**args)
-
-    def to_device(self, device: torch.device) -> Cloud:
-        args = asdict(self)
-        for k, v in args.items():
-            if isinstance(v, torch.Tensor):
-                args[k] = v.to(device)
-        return self.__class__(**args)
 
     def delete(self, delete_idx) -> Cloud:
         return self.filter(
@@ -90,8 +62,15 @@ class Cloud:
             ).reshape(-1)
         )
 
+    def to_labelled_cloud(self, **kwargs) -> LabelledCloud:
+        args = asdict(self)
+        args.update(kwargs)
+        return LabelledCloud(**args)
+
     def with_xyz(self, new_xyz):
-        return Cloud(new_xyz, self.rgb, self.filename)
+        args = asdict(self)
+        args["xyz"] = new_xyz
+        return self.__class__(**args)
 
     @property
     def device(self) -> torch.device:
@@ -108,10 +87,6 @@ class Cloud:
     @property
     def centre(self) -> TensorType[3]:
         return torch.mean(self.xyz, dim=0)
-
-    @property
-    def max_y(self) -> TensorType:
-        return self.max_xyz[2]
 
     @property
     def bounding_box(self) -> tuple[TensorType[3], TensorType[3]]:
@@ -161,9 +136,23 @@ class LabelledCloud(Cloud):
     class_l: Optional[TensorType["N", 1]] = None
 
     loss_mask: Optional[TensorType["N", 1]] = None
+    point_ids: Optional[TensorType["N", 2]] = None  # Batch number , point_number
     vector_loss_mask: Optional[TensorType["N", 1]] = None
 
-    vector: Optional[TensorType["N", 3]] = None  # Legacy
+    # vector: Optional[TensorType["N", 3]] = None  # Legacy
+
+    def __post_init__(self):
+        if self.loss_mask == None:
+            mask_shape = (len(self), 1)
+            self.loss_mask = torch.ones(
+                mask_shape, device=self.device, dtype=torch.bool
+            )
+
+        self.point_ids = torch.arange(
+            len(self), device=self.device, dtype=torch.int64
+        ).unsqueeze(1)
+        zeros_column = torch.zeros_like(self.point_ids)
+        self.point_ids = torch.cat((zeros_column, self.point_ids), dim=1)
 
     def __str__(self):
         base_str = super().__str__()
@@ -177,7 +166,8 @@ class LabelledCloud(Cloud):
     def translate(self, translation_vector: TensorType[3]) -> Cloud:
         args = asdict(self)
         args["xyz"] = args["xyz"] + translation_vector
-        args["medial_vector"] = args["medial_vector"] + translation_vector
+        if args["medial_vector"] is not None:
+            args["medial_vector"] = args["medial_vector"] + translation_vector
         return LabelledCloud(**args)
 
     def scale(self, factor: float | TensorType[1] | torch.tensor) -> LabelledCloud:
@@ -189,13 +179,15 @@ class LabelledCloud(Cloud):
 
     def rotate(self, rot_matrix: TensorType[3, 3]) -> LabelledCloud:
         args = asdict(self)
-        args["xyz"] = torch.matmul(args["xyz"], rot_matrix.T)
+        rot_mat = rot_matrix.T.to(self.xyz.device)
+
+        args["xyz"] = torch.matmul(args["xyz"], rot_mat)
         if args["medial_vector"] is not None:
-            args["medial_vector"] = torch.matmul(args["medial_vector"], rot_matrix.T)
+            args["medial_vector"] = torch.matmul(args["medial_vector"], rot_mat)
         if args["branch_direction"] is not None:
             args["branch_direction"] = torch.matmul(
                 args["branch_direction"],
-                rot_matrix.T,
+                rot_mat,
             )
         return LabelledCloud(**args)
 
@@ -203,25 +195,11 @@ class LabelledCloud(Cloud):
         mask = torch.isin(self.class_l, classes)
         return self.filter(mask.view(-1))
 
-    def filter(self, mask: TensorType) -> LabelledCloud:
-        return super().filter(mask)
-
-    def with_xyz(self, new_xyz):
-        new_cld = deepcopy(self)
-        new_cld.xyz = new_xyz
-        return new_cld
-
-    def pin_memory(self) -> LabelledCloud:
-        return super().pin_memory()
-
-    def to_device(self, device: torch.device) -> Cloud:
-        return super().to_device(device)
-
     @property
     def number_classes(self) -> int:
         if not hasattr(self, "class_l"):
             return 1
-        return torch.max(self.class_l).item() - torch.min(self.class_l).item() + 1
+        return int(torch.max(self.class_l).item() - torch.min(self.class_l).item()) + 1
 
     @property
     def radius(self) -> TensorType["N", 1]:
@@ -240,7 +218,15 @@ class LabelledCloud(Cloud):
         cmap: TensorType["N", 3] = None,
     ) -> o3d.geometry.PointCloud:
         if cmap is None:
-            cmap = torch.rand(self.number_classes, 3)
+            cmap = torch.tensor(
+                [
+                    [1.0, 0.0, 0.0],  # Trunk
+                    [0.0, 1.0, 0.0],  # Spur / Cane / Shoot
+                    [0.0, 0.0, 1.0],  # Node
+                    [1.0, 1.0, 0.0],  # Wire
+                    [0.0, 1.0, 1.0],  # Post
+                ]
+            )
 
         colours = cmap.to(self.device)[self.class_l.view(-1).long()]
         return o3d_cloud(self.xyz, colours=colours)
@@ -288,91 +274,6 @@ class LabelledCloud(Cloud):
 
     def view(self):
         o3d_viewer(self.viewer_items)
-
-
-class CloudLoader:
-    def load(self, file: str | Path):
-        if Path(file).suffix == ".npz":
-            return self.load_numpy(file)
-
-        else:
-            return self.load_o3d(file)
-
-    def load_o3d(self, file: str):
-        try:
-            pcd = o3d.io.read_point_cloud(filename=str(file))
-
-            return self._load_as_cloud(
-                {"xyz": np.asarray(pcd.points), "rgb": np.asarray(pcd.colors)}, file
-            )
-        except:
-            raise ValueError(f"File type {Path(file).suffix} not supported")
-
-    def load_numpy(self, file: str | Path):
-        data = np.load(file)
-
-        optional_params = [
-            f.name for f in fields(LabelledCloud) if f.default is not None
-        ]
-
-        for param in optional_params:
-            if param in data:
-                return self._load_as_labelled_cloud(data, file)
-
-        return self._load_as_cloud(data, file)
-
-    def _load_as_cloud(self, data, fn) -> Cloud:
-        cloud_fields = {f.name: data[f.name] for f in fields(Cloud) if f.name in data}
-
-        for k, v in cloud_fields.items():
-            cloud_fields[k] = torch.from_numpy(v).float()
-        cloud_fields["filename"] = Path(fn)
-        return Cloud(**cloud_fields)
-
-    def _load_as_labelled_cloud(self, data, fn) -> LabelledCloud:
-        labelled_cloud_fields = {
-            f.name: data[f.name] for f in fields(LabelledCloud) if f.name in data
-        }
-        cloud_data = {}
-        for k, v in labelled_cloud_fields.items():
-            if type(v) == np.ndarray:
-                if v.any() == None:
-                    continue
-            if k in ["class_l", "branch_ids"]:
-                cloud_data[k] = torch.from_numpy(v).long().reshape(-1, 1)
-            elif k in ["medial_vector", "vector"]:
-                cloud_data["medial_vector"] = torch.from_numpy(v).float()
-            else:
-                cloud_data[k] = torch.from_numpy(v).float()
-
-        cloud_data["filename"] = Path(fn)
-
-        return LabelledCloud(**cloud_data)
-
-
-def convert_cloud_to_labelled_cloud(
-    cloud: Cloud,
-    medial_vector: Optional[TensorType["N", 3]] = None,
-    branch_direction: Optional[TensorType["N", 3]] = None,
-    branch_ids: Optional[TensorType["N", 1]] = None,
-    class_l: Optional[TensorType["N", 1]] = None,
-    loss_mask: Optional[TensorType["N", 1]] = None,
-    vector_loss_mask: Optional[TensorType["N", 1]] = None,
-    vector: Optional[TensorType["N", 3]] = None,
-) -> LabelledCloud:
-    cloud_dict = asdict(cloud)
-
-    cloud_dict["medial_vector"] = medial_vector
-    cloud_dict["branch_direction"] = branch_direction
-    cloud_dict["branch_ids"] = branch_ids
-    cloud_dict["class_l"] = class_l
-    cloud_dict["loss_mask"] = loss_mask
-    cloud_dict["vector_loss_mask"] = vector_loss_mask
-    cloud_dict["vector"] = vector
-
-    labelled_cloud = LabelledCloud(**cloud_dict)
-
-    return labelled_cloud
 
 
 def merge_labelled_cloud(clouds: List["LabelledCloud"]) -> "LabelledCloud":

@@ -6,12 +6,8 @@ import torch
 import torch.utils.data
 from typeguard import typechecked
 
-from ..data_types.cloud import (
-    Cloud,
-    CloudLoader,
-    LabelledCloud,
-    convert_cloud_to_labelled_cloud,
-)
+from ..data_types.cloud import Cloud, LabelledCloud
+from ..util.file import CloudLoader
 from .augmentations import AugmentationPipeline
 
 
@@ -25,11 +21,13 @@ class Dataset:
         transform: Optional[callable] = None,
         augmentation: Optional[AugmentationPipeline] = None,
         cache: bool = False,
+        self_consistency: bool = False,
         device=torch.device("cuda:0"),
     ):
         self.mode = mode
         self.transform = transform
         self.augmentation = augmentation
+        self.self_consistency = self_consistency
         self.device = device
 
         assert Path(json_path).is_file(), f"JSON path is invalid: '{json_path}'"
@@ -122,7 +120,7 @@ class SingleTreeInference:
         buffer_mask = (block_cld.xyz > xyzmin) & (block_cld.xyz < xyzmax)
         buffer_mask = torch.all(buffer_mask, dim=1).unsqueeze(1)
 
-        cld = convert_cloud_to_labelled_cloud(block_cld, loss_mask=buffer_mask)
+        cld = block_cld.to_labelled_cloud(loss_mask=buffer_mask)
 
         if self.augmentation:
             cld = self.augmentation(cld)

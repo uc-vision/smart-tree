@@ -1,40 +1,27 @@
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import List
 
 import torch
 from torchtyping import TensorType, patch_typeguard
 from typeguard import typechecked
 
+from .base import Base
 
 patch_typeguard()
 
 
 @typechecked
 @dataclass
-class LineSegment:
+class LineSegment(Base):
     a: TensorType[3, float]
     b: TensorType[3, float]
-
-    def to_device(self, device: torch.device):
-        args = asdict(self)
-        for k, v in args.items():
-            args[k] = v.to(device)
-
-        return LineSegment(**args)
 
 
 @typechecked
 @dataclass
-class CollatedLineSegment:
+class CollatedLineSegment(Base):
     a: TensorType["N", 3, float]
     b: TensorType["N", 3, float]
-
-    def to_device(self, device: torch.device):
-        args = asdict(self)
-        for k, v in args.items():
-            args[k] = v.to(device)
-
-        return CollatedLineSegment(**args)
 
 
 def collates_line_segments(lines: List[LineSegment]) -> CollatedLineSegment:

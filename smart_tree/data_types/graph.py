@@ -1,26 +1,27 @@
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import List, Optional
 
 import cugraph
 import cupy
 import networkx as nx
+import numpy as np
 import open3d as o3d
 import torch
 from cudf import DataFrame
 from torchtyping import TensorType, patch_typeguard
 from tqdm import tqdm
 from typeguard import typechecked
-import numpy as np
 
 from ..o3d_abstractions.geometries import o3d_line_set
 from ..o3d_abstractions.visualizer import ViewerItem, o3d_viewer
+from .base import Base
 
 patch_typeguard()
 
 
 @typechecked
 @dataclass
-class Graph:
+class Graph(Base):
     vertices: TensorType["M", 3]
     edges: TensorType["N", 2]
     edge_weights: TensorType["N", 1]
@@ -66,14 +67,6 @@ class Graph:
             components.append(cugraph.subgraph(g, subgraph_vertices))
 
         return sorted(components, key=lambda graph: len(graph.nodes()), reverse=True)
-
-    def to_device(self, device: torch.device):
-        args = asdict(self)
-        for k, v in args.items():
-            if isinstance(v, torch.Tensor):
-                args[k] = v.to(device)
-
-        return Graph(**args)
 
     def as_o3d_lineset(
         self,

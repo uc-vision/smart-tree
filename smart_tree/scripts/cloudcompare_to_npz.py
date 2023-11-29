@@ -1,13 +1,11 @@
 import os
 from collections import defaultdict
 
-import matplotlib.pyplot as plt
 import numpy as np
 import open3d as o3d
 import torch
 
 from smart_tree.data_types.cloud import LabelledCloud, merge_labelled_cloud
-from smart_tree.o3d_abstractions.visualizer import o3d_viewer
 from smart_tree.util.file import save_cloud
 
 if __name__ == "__main__":

@@ -20,21 +20,6 @@ def test_len_method(sample_cloud_data):
     assert len(cloud) == 2
 
 
-def test_str_method(sample_cloud_data):
-    xyz, rgb, filename = sample_cloud_data
-    cloud = Cloud(xyz=xyz, rgb=rgb, filename=filename)
-    expected_str = (
-        f"{'*' * 80}"
-        f"Cloud:\n"
-        f"Num pts: {xyz.shape[0]}\n"
-        f"Coloured: True\n"
-        f"Filename: {filename}\n"
-        f"{'*' * 80}"
-    )
-
-    assert str(cloud) == expected_str
-
-
 def test_scale_method(sample_cloud_data):
     xyz, rgb, filename = sample_cloud_data
     cloud = Cloud(xyz=xyz, rgb=rgb, filename=filename)

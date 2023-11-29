@@ -1,37 +1,20 @@
-from functools import partial
+from typing import Dict, List, Tuple
+from dataclasses import dataclass, asdict
+from .transform import VoxelizedTrainingData, merge_voxelized_data
+
 
 import spconv.pytorch as spconv
 import torch
-from py_structs.torch import map_tensors
 
 
-def batch_collate(batch):
-    """Custom Batch Collate Function for Sparse Data..."""
-
-    batch_feats, batch_coords, batch_mask, fn = zip(*batch)
-
-    for i, coords in enumerate(batch_coords):
-        coords[:, 0] = torch.tensor([i], dtype=torch.float32)
-
-    if isinstance(batch_feats[0], tuple):
-        input_feats, target_feats = tuple(zip(*batch_feats))
-
-        input_feats, target_feats, coords, mask = [
-            torch.cat(x) for x in [input_feats, target_feats, batch_coords, batch_mask]
-        ]
-
-        return [(input_feats, target_feats), coords, mask, fn]
-
-    feats, coords, mask = [
-        torch.cat(x) for x in [batch_feats, batch_coords, batch_mask]
-    ]
-
-    return [feats, coords, mask, fn]
+@dataclass
+class Data:
+    point_id: torch.Tensor
+    voxel_id: torch.Tensor
+    mask: torch.Tensor
 
 
-def sparse_from_batch(features, coordinates, device):
-    batch_size = features.shape[0]
-
+def sparse_from_batch(features, coordinates, batch_size, device):
     features = features.to(device)
     coordinates = coordinates.to(device)
 
@@ -41,28 +24,50 @@ def sparse_from_batch(features, coordinates, device):
         features,
         coordinates.int(),
         values[1:],
-        batch_size=batch_size,
+        batch_size,
     )
 
 
-def get_batch(dataloader, device, fp_16=False):
-    for (feats, target_feats), coords, mask, filenames in dataloader:
-        if fp_16:
-            feats = feats.half()
-            target_feats = target_feats.half()
-            coords = coords.half()
+def batch_collate(
+    batch: List[Dict],
+    device=torch.device("cuda"),
+    fp_16=True,
+):
+    # dtype = torch.float16 if fp_16 else torch.float32
 
-        sparse_input = sparse_from_batch(
-            feats,
-            coords,
-            device=device,
-        )
-        targets = map_tensors(
-            target_feats,
-            partial(
-                torch.Tensor.to,
-                device=device,
-            ),
-        )
+    training_data = merge_voxelized_data(batch)
 
-        yield sparse_input, targets, mask, filenames
+    sparse_input = torch.cat(list(training_data.input_voxelized.values()), dim=0)
+
+    sparse_input = sparse_from_batch(
+        sparse_input,
+        training_data.coords,
+        len(batch),
+        device,
+    )
+
+    return (
+        sparse_input,
+        training_data.targets,
+        Data(
+            training_data.point_id,
+            training_data.voxel_id,
+            training_data.mask,
+        ),
+    )
+
+
+def batch_collate_dual_clouds(
+    batch: List[Tuple[Dict, Dict]],
+    device=torch.device("cuda"),
+    fp_16=True,
+):
+    # Need to batch clouds for each row corresponds to the different augmentation
+
+    batch_1, batch_2 = zip(*batch)
+
+    sparse_input_1, targets_1, data_1 = batch_collate(batch_1, device, fp_16)
+
+    sparse_input_2, targets_2, data_2 = batch_collate(batch_2, device, fp_16)
+
+    return (sparse_input_1, sparse_input_2), (targets_1, targets_2), (data_1, data_2)

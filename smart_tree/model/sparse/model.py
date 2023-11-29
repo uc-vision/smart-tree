@@ -1,13 +1,16 @@
 import functools
-from typing import List
+from typing import Dict, List, Tuple
+from dataclasses import asdict
 
 import spconv.pytorch as spconv
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from spconv.pytorch.utils import gather_features_by_pc_voxel_id
 
 from ..loss import DirectionLoss, FocalLoss
 from .model_blocks import MLP, ResidualBlock, UBlock
+from .util import Data
 
 
 class Smart_Tree(nn.Module):
@@ -18,8 +21,11 @@ class Smart_Tree(nn.Module):
         mlp_layers=2,
         num_classes=1,
         log_radius=True,
+        target_features=[],
     ):
         super().__init__()
+
+        self.target_features = target_features
 
         self.class_loss = FocalLoss()
         self.radius_loss = nn.L1Loss()
@@ -51,9 +57,12 @@ class Smart_Tree(nn.Module):
 
         self.output_layer = spconv.SparseSequential(norm_fn(unet_planes[0]), nn.ReLU())
 
-        self.radius_head = MLP(unet_planes[0], 1, norm_fn, mlp_layers)
-        self.medial_dir_head = MLP(unet_planes[0], 3, norm_fn, mlp_layers)
-        self.class_head = MLP(unet_planes[0], num_classes, norm_fn, mlp_layers)
+        if "radius" in self.target_features:
+            self.radius_head = MLP(unet_planes[0], 1, norm_fn, mlp_layers)
+        if "medial_direction" in self.target_features:
+            self.medial_dir_head = MLP(unet_planes[0], 3, norm_fn, mlp_layers)
+        if "class_l" in self.target_features:
+            self.class_head = MLP(unet_planes[0], num_classes, norm_fn, mlp_layers)
 
         self.apply(self.set_bn_init)
 
@@ -73,11 +82,15 @@ class Smart_Tree(nn.Module):
 
         self.output_feats = output.features
 
-        predictions["radius"] = self.radius_head(self.output_feats)
-        predictions["medial_direction"] = F.normalize(
-            self.medial_dir_head(self.output_feats)
-        )
-        predictions["class_l"] = self.class_head(self.output_feats)
+        if "radius" in self.target_features:
+            predictions["radius"] = self.radius_head(self.output_feats)
+
+        if "medial_direction" in self.target_features:
+            predictions["medial_direction"] = F.normalize(
+                self.medial_dir_head(self.output_feats)
+            )
+        if "class_l" in self.target_features:
+            predictions["class_l"] = self.class_head(self.output_feats)
 
         return predictions
 
@@ -89,27 +102,97 @@ class Smart_Tree(nn.Module):
     ):
         losses = {}
 
-        mask = mask.reshape(-1)
+        mask = mask.reshape(-1).long()
 
-        target_class = targets[:, [-1]].long()
-        pred_class = predictions["class_l"]
+        if "radius" in self.target_features:
+            target_radius = targets["radius"][mask]
+            if self.log_radius:
+                target_radius = torch.log(target_radius)
+            pred_radius = predictions["radius"][mask]
+            losses["radius"] = self.radius_loss(pred_radius, target_radius)
 
-        target_radius = targets[:, [0]]
-        if self.log_radius:
-            target_radius = torch.log(target_radius)
+        if "medial_direction" in self.target_features:
+            tgt_dir = targets["medial_direction"][mask]
+            pred_dir = predictions["medial_direction"][mask]
+            losses["medial_direction"] = self.direction_loss(pred_dir, tgt_dir)
 
-        pred_radius = predictions["radius"]
-
-        target_direction = targets[:, 1:4]
-        pred_direction = predictions["medial_direction"]
-
-        losses["class_l"] = self.class_loss(pred_class[mask], target_class[mask])
-        losses["radius"] = self.radius_loss(pred_radius[mask], target_radius[mask])
-        losses["medial_direction"] = self.direction_loss(
-            pred_direction[mask], target_direction[mask]
-        )
+        if "class_l" in self.target_features:
+            target_class = targets["class_l"][mask]
+            pred_class = predictions["class_l"][mask]
+            losses["class_l"] = self.class_loss(pred_class, target_class)
 
         return losses
+
+
+class Smart_Tree_Self_Consistency(Smart_Tree):
+    def __init__(self, *args, confidence_threshold=0.80, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.conf_threshold = confidence_threshold
+        self.psuedo_loss_inverse_weight = 0.99
+        # self.class_loss = nn.CrossEntropyLoss()
+
+    def forward(self, model_input):
+        if isinstance(model_input, tuple):
+            pred1 = super().forward(model_input[0])
+            pred2 = super().forward(model_input[1])
+            return pred1, pred2
+
+        return super().forward(model_input)
+
+    def compute_loss(self, voxel_predictions: Tuple[Dict], targets: Tuple[Data], data):
+        loss = {}
+
+        def compute_pt_predictions(preds: Dict, data: Data):
+            for k, v in preds.items():
+                preds[k] = gather_features_by_pc_voxel_id(v, data.voxel_id)
+            return preds
+
+        pts1_preds = compute_pt_predictions(voxel_predictions[0], data[0])
+        pts2_preds = compute_pt_predictions(voxel_predictions[1], data[1])
+
+        data_1_point_ids = data[0].point_id
+        data_2_point_ids = data[1].point_id
+
+        max_pt_id = max(data_1_point_ids.shape[0], data_2_point_ids.shape[0]) * 2
+
+        pts1_point_ids = data_1_point_ids[:, 0] * max_pt_id + data_1_point_ids[:, 1]
+        pts2_point_ids = data_2_point_ids[:, 0] * max_pt_id + data_2_point_ids[:, 1]
+
+        assert pts1_point_ids.shape[0] == torch.unique(pts1_point_ids, dim=0).size(0), (
+            pts1_point_ids.shape[0],
+            torch.unique(pts1_point_ids, dim=0).size(0),
+            "Each point must have a unique id",
+        )
+        assert pts2_point_ids.shape[0] == torch.unique(pts2_point_ids, dim=0).size(0), (
+            pts2_point_ids.shape[0],
+            torch.unique(pts2_point_ids, dim=0).size(0),
+            "Each point must have a unique id",
+        )
+
+        valid_pts1_mask = torch.isin(pts1_point_ids, pts2_point_ids)
+        valid_pts2_mask = torch.isin(pts2_point_ids, pts1_point_ids)
+
+        assert valid_pts1_mask.sum().item() == valid_pts2_mask.sum().item()
+
+        class_confidence = torch.softmax(pts1_preds["class_l"][valid_pts1_mask], dim=-1)
+        max_probs, soft_label_target = torch.max(class_confidence, dim=-1)
+        mask_pt = max_probs > self.conf_threshold
+
+        # print(f"Number confident soft labels {mask_pt.sum()}")
+
+        loss["class_loss"] = self.class_loss(
+            pts1_preds["class_l"],
+            targets[0]["class_l"].squeeze(1),
+        )
+
+        # loss["class_psuedo_loss"] = self.class_loss(
+        #     pts2_preds["class_l"][valid_pts2_mask][mask_pt],
+        #     soft_label_target[mask_pt],
+        # ) * (1 - self.psuedo_loss_inverse_weight)
+        # nan_mask = torch.isnan(loss["class_psuedo_loss"])
+        # loss["class_psuedo_loss"][nan_mask] = 0.0
+
+        return loss
 
 
 class Smarter_Tree(Smart_Tree):

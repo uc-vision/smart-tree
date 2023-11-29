@@ -23,7 +23,7 @@ class FocalLoss(nn.Module):
             outputs = outputs.contiguous().view(
                 -1, outputs.size(2)
             )  # N,H*W,C => N*H*W,C
-        targets = targets.view(-1, 1)
+        targets = targets.view(-1, 1).long()
 
         logpt = F.log_softmax(outputs, dim=1)
         logpt = logpt.gather(1, targets)
@@ -46,3 +46,17 @@ class DirectionLoss(nn.Module):
 
     def forward(self, outputs, targets):
         return torch.mean(1 - self.loss_fn(outputs, targets))
+
+
+# A work-around could be to assume that you have gaussian noise and make the Neural Network predict a mean μ
+#  and variance σ
+# . For the cost function you can use the NLPD (negative log probability density). For datapoint (xi,yi)
+#  that will be −logN(yi−μ(xi),σ(xi))
+# . This will make your μ(xi)
+#  try to predict your yi
+#  and your σ(xi)
+#  be smaller when you have more confidence and bigger when you have less.
+
+# To check how good are your assumptions for the validation data you may want to look at yi−μ(xi)σ(xi)
+#  to see if they roughly follow a N(0,1)
+# . On test data you again want to maximize the probability of your test data so you can use NLPD metric again.

@@ -65,27 +65,27 @@ class ModelInference:
 
             mask = mask.view(-1)
 
-            radius.append(preds["radius"][mask])
-            medial_direction.append(preds["medial_direction"][mask])
-            #branch_direction.append(preds["branch_direction"][mask])
+            # radius.append(preds["radius"][mask])
+            # medial_direction.append(preds["medial_direction"][mask])
+            # branch_direction.append(preds["branch_direction"][mask])
             class_l.append(preds["class_l"][mask])
 
             inputs.append(input_feats[mask])
 
-        radius = torch.cat(radius)
-        medial_direction = torch.cat(medial_direction)
+        # radius = torch.cat(radius)
+        # medial_direction = torch.cat(medial_direction)
         class_l = torch.cat(class_l)
-        #branch_direction = torch.cat(branch_direction)
+        # branch_direction = torch.cat(branch_direction)
         inputs = torch.cat(inputs)
 
-        medial_vector = torch.exp(radius) * medial_direction
+        # medial_vector = torch.exp(radius) * medial_direction
 
         class_l = torch.argmax(class_l, dim=1, keepdim=True)
 
         return LabelledCloud(
             xyz=inputs[:, :3],
             # rgb=inputs[:, 3:6],
-            #branch_direction=branch_direction,
-            medial_vector=medial_vector,
+            # branch_direction=branch_direction,
+            # medial_vector=medial_vector,
             class_l=class_l,
         ).to_device(self.device)

@@ -1,6 +1,7 @@
 import random
 from abc import ABC, abstractmethod
-from typing import Sequence
+from copy import deepcopy
+from typing import Sequence, Tuple
 
 import numpy as np
 import torch
@@ -135,10 +136,11 @@ class RandomRotate(Augmentation):
     def __call__(self, cloud):
         x, y, z = (torch.rand(3) - 0.5) * self.max_rots
 
-        self.rot_mat = euler_angles_to_rotation(torch.tensor([x, y, z])).to(
-            device=cloud.xyz.device
-        )
-        return cloud.rotate(self.rot_mat.float())
+        self.rot_mat = euler_angles_to_rotation(
+            torch.tensor([x, y, z], device=cloud.xyz.device)
+        ).float()
+
+        return cloud.rotate(self.rot_mat)
 
 
 class RandomTranslate(Augmentation):
@@ -197,6 +199,28 @@ class RandomAugmentation(Augmentation):
                 cloud = augmentation(cloud)
 
         return cloud
+
+
+class DualAugmentation(Augmentation):
+    def __init__(
+        self,
+        augmentations1: Sequence[Augmentation],
+        augmentations2: Sequence[Augmentation],
+    ):
+        self.augmentations1 = augmentations1
+        self.augmentations2 = augmentations2
+
+    def __call__(self, cloud: Cloud) -> Tuple[Cloud, Cloud]:
+        cloud1 = deepcopy(cloud)
+        cloud2 = deepcopy(cloud)
+
+        for augmentation in self.augmentations1:
+            cloud1 = augmentation(cloud1)
+
+        for augmentation in self.augmentations2:
+            cloud2 = augmentation(cloud2)
+
+        return cloud1, cloud2
 
 
 class AugmentationPipeline(Augmentation):

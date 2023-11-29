@@ -17,7 +17,7 @@ def sample_branch_skeleton():
 
 
 def test_to_tubes(sample_branch_skeleton):
-    tubes = sample_branch_skeleton.to_tubes()
+    tubes = sample_branch_skeleton.as_tubes()
 
     assert all(isinstance(tube, Tube) for tube in tubes)
 
@@ -37,6 +37,8 @@ def test_length(sample_branch_skeleton):
 
 def test_filter(sample_branch_skeleton):
     mask = torch.tensor([True, False])
+
+    print(sample_branch_skeleton)
 
     filtered_branch_skeleton = sample_branch_skeleton.filter(mask)
 

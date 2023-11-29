@@ -3,13 +3,13 @@ from pathlib import Path
 import torch
 
 from .connect.connection import SkeletonConnector
-from .data_types.cloud import Cloud, CloudLoader, LabelledCloud
+from .data_types.cloud import Cloud, LabelledCloud
 from .data_types.tree import DisjointTreeSkeleton
 from .dataset.augmentations import AugmentationPipeline
 from .model.model_inference import ModelInference
 from .o3d_abstractions.visualizer import o3d_viewer
 from .skeleton.skeletonize import Skeletonizer
-from .util.file import save_o3d_cloud, save_o3d_lineset, save_o3d_mesh
+from .util.file import CloudLoader, save_o3d_cloud, save_o3d_lineset, save_o3d_mesh
 
 
 class Pipeline:
