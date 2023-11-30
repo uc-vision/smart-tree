@@ -73,6 +73,10 @@ Please use the following BibTeX entry to cite our work: <br>
   organization={Springer}
 }
 ```
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=uc-vision/smart-tree&type=Date)](https://star-history.com/#uc-vision/smart-tree&Date)
+
 
 ## 📥 Contact 
 
