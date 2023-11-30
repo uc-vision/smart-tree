@@ -48,23 +48,21 @@ def train_epoch(data_loader, model, optimizer, fp16=False, scaler=None, tracker=
 
 
 @torch.no_grad()
-def eval_epoch(
-    data_loader,
-    model,
-):
-    tracker = Tracker()
+def eval_epoch(data_loader, model, tracker=None):
     model.eval()
 
-    for model_input, targets, mask, fn in tqdm(
+    for model_input, targets, data in tqdm(
         data_loader,
         desc="Evaluating",
         leave=False,
         total=len(data_loader),
     ):
         preds = model.forward(model_input)
-        loss = model.compute_loss(preds, targets, mask)
-        tracker.update_losses(loss)
-        # tracker.update_metrics(preds, targets, mask)
+        # loss = model.compute_loss(preds, targets, data)
+
+        if tracker:
+            # tracker.update_losses(loss)
+            tracker.update_metrics(preds, targets)
 
     model.train()
 
@@ -188,13 +186,14 @@ def main(cfg: DictConfig):
 
     train_loader = instantiate(cfg.train_data_loader)
     # val_loader = instantiate(cfg.validation_data_loader)
-    # test_loader = instantiate(cfg.test_data_loader)
+    test_loader = instantiate(cfg.test_data_loader)
 
     training_tracker = instantiate(cfg.training_tracker)
+    test_tracker = instantiate(cfg.training_tracker)
 
     log.info(f"Train Dataset Size: {len(train_loader.dataset)}")
     # log.info(f"Validation Dataset Size: {len(val_loader.dataset)}")
-    # log.info(f"Test Dataset Size: {len(test_loader.dataset)}")
+    log.info(f"Test Dataset Size: {len(test_loader.dataset)}")
 
     # Model
     model = instantiate(cfg.model).to(device).train()
@@ -223,17 +222,8 @@ def main(cfg: DictConfig):
                 tracker=training_tracker,
             )
 
-            # val_tracker = eval_epoch(
-            #     val_loader,
-            #     model,
-            #     fp16=cfg.fp16,
-            # )
-
-            # test_tracker = eval_epoch(
-            #     test_loader,
-            #     model,
-            #     fp16=cfg.fp16,
-            # )
+            # val_tracker = eval_epoch(val_loader, model, val_trackers)
+            test_tracker = eval_epoch(test_loader, model, test_tracker)
 
             # make a logging script to upload cloud ..
 
@@ -264,11 +254,11 @@ def main(cfg: DictConfig):
 
         if cfg.wandb.mode == "disabled":
             log.info(f"Training: {training_tracker}")
-
-        # log onto wandb...
-        print(epoch)
-        training_tracker.log("Training", epoch)
-        # val_tracker.log("Validation", epoch)
+            log.info(f"Testing: {test_tracker}")
+        else:
+            training_tracker.log("Training", epoch)
+            test_tracker.log("Testing", epoch)
+            # val_tracker.log("Validation", epoch)
 
 
 if __name__ == "__main__":

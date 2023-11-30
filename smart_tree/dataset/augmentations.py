@@ -177,6 +177,17 @@ class RandomDropout:
         return cloud.filter(~mask)
 
 
+class LabelDropout:
+    def __init__(self, probability: float):
+        self.probability = probability  # probability to drop label
+
+    def __call__(self, cloud: Cloud) -> Cloud:
+        cloud.loss_mask = (
+            torch.rand(cloud.loss_mask.shape[0]) > self.probability
+        ).unsqueeze(1)
+        return cloud
+
+
 class RandomAugmentation(Augmentation):
     def __init__(
         self,

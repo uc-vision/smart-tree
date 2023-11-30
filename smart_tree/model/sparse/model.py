@@ -129,6 +129,7 @@ class Smart_Tree_Self_Consistency(Smart_Tree):
         super().__init__(*args, **kwargs)
         self.conf_threshold = confidence_threshold
         self.psuedo_loss_inverse_weight = 0.99
+
         # self.class_loss = nn.CrossEntropyLoss()
 
     def forward(self, model_input):
@@ -161,6 +162,10 @@ class Smart_Tree_Self_Consistency(Smart_Tree):
         data_1_point_ids = data[0].point_id
         data_2_point_ids = data[1].point_id
 
+        mask_1 = data[0].mask.squeeze(1)
+
+        mask_2 = data[1].mask.squeeze(1)
+
         max_pt_id = max(data_1_point_ids.shape[0], data_2_point_ids.shape[0]) * 2
 
         pts1_point_ids = data_1_point_ids[:, 0] * max_pt_id + data_1_point_ids[:, 1]
@@ -169,12 +174,12 @@ class Smart_Tree_Self_Consistency(Smart_Tree):
         assert pts1_point_ids.shape[0] == torch.unique(pts1_point_ids, dim=0).size(0), (
             pts1_point_ids.shape[0],
             torch.unique(pts1_point_ids, dim=0).size(0),
-            "Each point must have a unique id",
+            "Each point must have a unique ID",
         )
         assert pts2_point_ids.shape[0] == torch.unique(pts2_point_ids, dim=0).size(0), (
             pts2_point_ids.shape[0],
             torch.unique(pts2_point_ids, dim=0).size(0),
-            "Each point must have a unique id",
+            "Each point must have a unique ID",
         )
 
         valid_pts1_mask = torch.isin(pts1_point_ids, pts2_point_ids)
@@ -189,8 +194,8 @@ class Smart_Tree_Self_Consistency(Smart_Tree):
         # print(f"Number confident soft labels {mask_pt.sum()}")
 
         loss["class_loss"] = self.class_loss(
-            pts1_preds["class_l"],
-            pts1_targets["class_l"].squeeze(1),
+            pts1_preds["class_l"][mask_1],
+            pts1_targets["class_l"].squeeze(1)[mask_1],
         )
 
         loss["class_psuedo_loss"] = (

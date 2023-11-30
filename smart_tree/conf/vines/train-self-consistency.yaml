@@ -35,6 +35,8 @@ train_dataset:
   augmentation:
     _target_: smart_tree.dataset.augmentations.AugmentationPipeline
     augmentations:
+      - _target_: smart_tree.dataset.augmentations.LabelDropout
+        probability: 0.99
       - _target_: smart_tree.dataset.augmentations.DualAugmentation
         augmentations1:
         - _target_: smart_tree.dataset.augmentations.RandomDropout
@@ -64,7 +66,7 @@ train_data_loader:
   sampler:
     _target_: torch.utils.data.RandomSampler
     replacement: True
-    num_samples: 256
+    num_samples: 1024
     data_source: ${train_dataset}
 
   collate_fn:
@@ -154,4 +156,7 @@ scheduler:
   mode: "min"
 
 training_tracker:
+  _target_: smart_tree.model.tracker.SegmentationTracker
+
+test_tracker:
   _target_: smart_tree.model.tracker.SegmentationTracker

@@ -29,13 +29,13 @@ def sparse_from_batch(features, coordinates, batch_size, device):
 
 
 def batch_collate(
-    batch: List[Dict],
+    batch: List[VoxelizedTrainingData],
     device=torch.device("cuda"),
     fp_16=True,
 ):
     # dtype = torch.float16 if fp_16 else torch.float32
 
-    training_data = merge_voxelized_data(batch)
+    training_data: VoxelizedTrainingData = merge_voxelized_data(batch)
 
     sparse_input = torch.cat(list(training_data.input_voxelized.values()), dim=0)
 
