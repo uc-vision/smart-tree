@@ -11,6 +11,8 @@ early_stop_epoch: 20
 early_stop: True
 capture_output: 1
 
+loss_mask_probability: 0.99
+
 batch_size: 16
 directory: /local/synthetic-vine-pcds-3-rotated
 json_path: /local/smart-tree/smart_tree/conf/vines/vine-split.json
@@ -36,7 +38,7 @@ train_dataset:
     _target_: smart_tree.dataset.augmentations.AugmentationPipeline
     augmentations:
       - _target_: smart_tree.dataset.augmentations.LabelDropout
-        probability: 0.99
+        probability: ${loss_mask_probability}
       - _target_: smart_tree.dataset.augmentations.DualAugmentation
         augmentations1:
         - _target_: smart_tree.dataset.augmentations.RandomDropout
