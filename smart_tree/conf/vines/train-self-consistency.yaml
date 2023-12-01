@@ -4,18 +4,18 @@ wandb:
   mode: online
 
 fp16: True
-num_epoch: 500
+num_epoch: 200
 lr_decay: True
 lr: 0.01
 early_stop_epoch: 20
 early_stop: True
-capture_output: 1
+
 
 loss_mask_probability: 0.99
 
-batch_size: 16
-directory: /local/synthetic-vine-pcds-3-rotated
-json_path: /local/smart-tree/smart_tree/conf/vines/vine-split.json
+batch_size: 4
+directory: /mnt/harry/PhD/smart-tree/data/synthetic-vine-pcds-3-rotated
+json_path: /mnt/harry/PhD/smart-tree/smart_tree/conf/vines/vine-split.json
 voxel_size: 0.005
 input_feature_names : ['xyz']
 target_feature_names: ['class_l']
@@ -27,7 +27,9 @@ cmap:
     - [1.0, 1.0, 0.0] # Wire
     - [0.0, 1.0, 1.0] # Post
 
-# Training dataset...
+########################################
+# Training Dataset
+########################################
 train_dataset:
   _target_: smart_tree.dataset.dataset.Dataset
   mode: train
@@ -46,8 +48,7 @@ train_dataset:
         augmentations2:
         - _target_: smart_tree.dataset.augmentations.Scale
           min_scale: 0.9
-          max_scale: 1.1
-
+          max_scale: 1.0
 
   transform:
     _target_ : smart_tree.model.sparse.transform.sparse_voxelize_clouds
@@ -55,7 +56,6 @@ train_dataset:
     input_feature_names: ${input_feature_names}
     target_feature_names: ${target_feature_names}
     voxel_size: ${voxel_size}
-
 
 train_data_loader:
   _target_: torch.utils.data.DataLoader
@@ -68,7 +68,7 @@ train_data_loader:
   sampler:
     _target_: torch.utils.data.RandomSampler
     replacement: True
-    num_samples: 1024
+    num_samples: 256
     data_source: ${train_dataset}
 
   collate_fn:
@@ -76,10 +76,11 @@ train_data_loader:
     _partial_: True
     fp_16: ${fp16}
 
-
   dataset: ${train_dataset}
 
-# Val dataset
+########################################
+# Validation Dataset
+########################################
 validation_dataset:
   _target_: smart_tree.dataset.dataset.Dataset
   mode: validation
@@ -93,7 +94,6 @@ validation_dataset:
     target_feature_names: ${target_feature_names}
     voxel_size: ${voxel_size}
 
-
 validation_data_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: ${batch_size}
@@ -106,11 +106,11 @@ validation_data_loader:
     _partial_: True
     fp_16: ${fp16}
 
-
-
   dataset: ${validation_dataset}
 
-# Test dataset
+########################################
+# Test Dataset
+########################################
 test_dataset:
   _target_: smart_tree.dataset.dataset.Dataset
   mode: test
@@ -124,7 +124,6 @@ test_dataset:
     target_feature_names: ${target_feature_names}
     voxel_size: ${voxel_size}
 
-
 test_data_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: ${batch_size}
@@ -137,17 +136,63 @@ test_data_loader:
     _partial_: True
     fp_16: ${fp16}
 
-
   dataset: ${test_dataset}
+
+
+########################################
+# Capture Dataset / Settings
+########################################
+
+capture_dataset:
+  _target_: smart_tree.dataset.dataset.Dataset
+  mode: validation
+  directory: ${directory}
+  json_path: ${json_path}
+  cache: True
+  transform:
+    _target_ : smart_tree.model.sparse.transform.sparse_voxelize
+    _partial_ : True
+    input_feature_names: ${input_feature_names}
+    target_feature_names: ${target_feature_names}
+    voxel_size: ${voxel_size}
+
+capture_data_loader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: ${batch_size}
+  drop_last: True
+  pin_memory: False
+  num_workers: 0
+  shuffle: False
+  collate_fn:
+    _target_: smart_tree.model.sparse.util.batch_collate
+    _partial_: True
+    fp_16: ${fp16}
+
+  sampler:
+    _target_: torch.utils.data.RandomSampler
+    replacement: True
+    num_samples: 4
+    data_source: ${capture_dataset}
+
+  dataset: ${capture_dataset}
+
+
+
+capture_output: True # Wether to capture validation output
+capture_epoch: 1
+capture_fn:
+  _target_: smart_tree.model.sparse.helper.model_output_to_labelled_clds
+  _partial_: True
+  cmap: ${cmap}
+
 
 model:
   _target_: smart_tree.model.sparse.model.Smart_Tree_Self_Consistency
   input_channels: 3
-  unet_planes: [8, 16, 32, 64, 128]
+  unet_planes: [8, 16, 32, 64, 128, 256, 512]
   mlp_layers: 2
   num_classes: 5
   target_features: ${target_feature_names}
-
 
 optimizer:
   _target_: torch.optim.Adam
@@ -158,6 +203,9 @@ scheduler:
   mode: "min"
 
 training_tracker:
+  _target_: smart_tree.model.tracker.SegmentationTracker
+
+val_tracker:
   _target_: smart_tree.model.tracker.SegmentationTracker
 
 test_tracker:

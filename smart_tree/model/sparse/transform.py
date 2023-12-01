@@ -16,6 +16,7 @@ class VoxelizedTrainingData:
     point_id: torch.Tensor
     voxel_id: torch.Tensor
     mask: torch.Tensor
+    filename: str
 
 
 def merge_voxelized_data(
@@ -56,6 +57,7 @@ def merge_voxelized_data(
         point_id=merged_point_id,
         voxel_id=merged_voxel_id,
         mask=merged_mask,
+        filename=data_list[0].filename,
     )
 
 
@@ -144,4 +146,5 @@ def sparse_voxelize(
         point_id,
         voxel_id,
         mask,
+        cld.filename,
     )

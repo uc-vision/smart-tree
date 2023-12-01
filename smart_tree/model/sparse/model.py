@@ -1,6 +1,5 @@
 import functools
 from typing import Dict, List, Tuple
-from dataclasses import asdict
 
 import spconv.pytorch as spconv
 import torch
@@ -142,29 +141,34 @@ class Smart_Tree_Self_Consistency(Smart_Tree):
 
     def compute_loss(
         self,
-        voxel_predictions: Tuple[Dict],
-        voxel_targets: Tuple[Data],
+        voxel_predictions: Tuple[Dict] | Dict,
+        voxel_targets: Tuple[Data] | Data,
         data,
     ):
-        loss = {}
-
         def gather_pt_data(dict: Dict, data: Data):
             for k, v in dict.items():
                 dict[k] = gather_features_by_pc_voxel_id(v, data.voxel_id)
             return dict
 
+        if not isinstance(voxel_predictions, tuple):
+            preds = gather_pt_data(voxel_predictions, data)
+            targets = gather_pt_data(voxel_targets, data)
+            return super().compute_loss(preds, targets, data.mask.squeeze(1))
+
+        loss = {}
+
         pts1_preds = gather_pt_data(voxel_predictions[0], data[0])
         pts1_targets = gather_pt_data(voxel_targets[0], data[0])
 
         pts2_preds = gather_pt_data(voxel_predictions[1], data[1])
-        pts2_targets = gather_pt_data(voxel_targets[1], data[1])
+        # pts2_targets = gather_pt_data(voxel_targets[1], data[1])
 
         data_1_point_ids = data[0].point_id
         data_2_point_ids = data[1].point_id
 
         mask_1 = data[0].mask.squeeze(1)
 
-        mask_2 = data[1].mask.squeeze(1)
+        # mask_2 = data[1].mask.squeeze(1)
 
         max_pt_id = max(data_1_point_ids.shape[0], data_2_point_ids.shape[0]) * 2
 

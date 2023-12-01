@@ -1,9 +1,8 @@
 import contextlib
 import logging
 import os
-from pathlib import Path
+from typing import Callable, List
 
-from dataclasses import asdict
 import hydra
 import numpy as np
 import taichi as ti
@@ -14,20 +13,17 @@ from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
 import wandb
-from smart_tree.o3d_abstractions.camera import Renderer
+from smart_tree.data_types.cloud import LabelledCloud
 
-from .tracker import Tracker
+from .helper import log_cloud_on_wandb
 
 
 def train_epoch(data_loader, model, optimizer, fp16=False, scaler=None, tracker=None):
-    for model_input, targets, data in tqdm(
-        data_loader,
-        desc="Training",
-        leave=False,
-        total=len(data_loader),
-    ):
+    data_loader_tqdm = tqdm(data_loader, desc="Training", leave=False)
+
+    for model_input, targets, meta_data in data_loader_tqdm:
         preds = model.forward(model_input)
-        loss = model.compute_loss(preds, targets, data)
+        loss = model.compute_loss(preds, targets, meta_data)
 
         if fp16:
             assert sum(loss.values()).dtype is torch.float32
@@ -36,10 +32,11 @@ def train_epoch(data_loader, model, optimizer, fp16=False, scaler=None, tracker=
             scaler.update()
             scale = scaler.get_scale()
         else:
-            (sum(loss.values())).backward()
+            sum(loss.values()).backward()
             optimizer.step()
 
         optimizer.zero_grad()
+
         if tracker:
             tracker.update_losses(loss)
             tracker.update_metrics(preds, targets)
@@ -51,17 +48,14 @@ def train_epoch(data_loader, model, optimizer, fp16=False, scaler=None, tracker=
 def eval_epoch(data_loader, model, tracker=None):
     model.eval()
 
-    for model_input, targets, data in tqdm(
-        data_loader,
-        desc="Evaluating",
-        leave=False,
-        total=len(data_loader),
-    ):
+    data_loader_tqdm = tqdm(data_loader, desc="Evaluating", leave=False)
+
+    for model_input, targets, data in data_loader_tqdm:
         preds = model.forward(model_input)
-        # loss = model.compute_loss(preds, targets, data)
+        loss = model.compute_loss(preds, targets, data)
 
         if tracker:
-            # tracker.update_losses(loss)
+            tracker.update_losses(loss)
             tracker.update_metrics(preds, targets)
 
     model.train()
@@ -70,91 +64,17 @@ def eval_epoch(data_loader, model, tracker=None):
 
 
 @torch.no_grad()
-def capture_epoch(
-    data_loader,
-    model,
-):
+def capture_clouds(data_loader, model, capture_func: Callable):
     model.eval()
-    captures = []
+    clouds: List[LabelledCloud] = []
 
-    for model_input, targets, mask, fn in tqdm(
-        data_loader,
-        desc="Capturing Outputs",
-        leave=False,
-        total=len(data_loader),
-    ):
-        model_output = model.forward(model_input)
+    for model_input, targets, data in data_loader:
+        preds = model.forward(model_input)
 
-        # labelled_clouds = model_output_to_labelled_clds(
-        #     model_input,
-        #     model_output,
-        #     cmap,
-        #     fn,
-        # )
+        clouds += capture_func(model_input, preds, data)
 
     model.train()
-    # return labelled_clouds
-
-
-# @torch.no_grad()
-# def capture_clouds(
-#     data_loader,
-#     model,
-#     cmap,
-#     fp16=False,
-#     device=torch.device("cuda"),
-# ) -> List[Cloud]:
-#     model.eval()
-#     clouds = []
-
-#     for model_input, targets, mask, filenames in tqdm(
-#         get_batch(data_loader, device, fp16),
-#         desc="Capturing Outputs",
-#         leave=False,
-#         total=len(data_loader),
-#     ):
-#         model_output = model.forward(model_input)
-#         clouds.extend(
-#             model_output_to_labelled_clds(
-#                 model_input,
-#                 model_output,
-#                 cmap,
-#                 filenames,
-#             )
-#         )
-
-#     model.train()
-#     return clouds
-
-
-# def capture_and_log(loader, model, epoch, wandb_run, cfg):
-#     clouds = capture_clouds(
-#         loader,
-#         model,
-#         cfg.cmap,
-#         fp16=cfg.fp16,
-#     )
-
-#     for cloud in tqdm(clouds, desc="Uploading Clouds", leave=False):
-#         seg_cloud = cloud.to_o3d_seg_cld(np.asarray(cfg.cmap))
-#         xyz_rgb = np.concatenate(
-#             (np.asarray(seg_cloud.points), np.asarray(seg_cloud.colors) * 255),
-#             -1,
-#         )
-
-#         medial_cld_pts = np.asarray(cloud.medial_pts)
-#         xyz_rgb2 = np.concatenate(
-#             (medial_cld_pts, np.asarray(seg_cloud.colors) * 255),
-#             -1,
-#         )
-
-#         wandb_run.log(
-#             {
-#                 f"{Path(cloud.filename).stem}": wandb.Object3D(xyz_rgb),
-#                 f"{Path(cloud.filename).stem}_medial": wandb.Object3D(xyz_rgb2),
-#             },
-#             step=epoch,
-#         )
+    return clouds
 
 
 @hydra.main(
@@ -180,20 +100,24 @@ def main(cfg: DictConfig):
     log.info(f"Machine: {os.uname()[1]}")
     log.info(f"FP-16: {cfg.fp16}")
 
-    # renderer = Renderer(960, 540)
-
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     train_loader = instantiate(cfg.train_data_loader)
-    # val_loader = instantiate(cfg.validation_data_loader)
+    val_loader = instantiate(cfg.validation_data_loader)
     test_loader = instantiate(cfg.test_data_loader)
 
     training_tracker = instantiate(cfg.training_tracker)
-    test_tracker = instantiate(cfg.training_tracker)
+    val_tracker = instantiate(cfg.val_tracker)
+    test_tracker = instantiate(cfg.test_tracker)
 
     log.info(f"Train Dataset Size: {len(train_loader.dataset)}")
-    # log.info(f"Validation Dataset Size: {len(val_loader.dataset)}")
+    log.info(f"Validation Dataset Size: {len(val_loader.dataset)}")
     log.info(f"Test Dataset Size: {len(test_loader.dataset)}")
+
+    if cfg.capture_output:
+        capture_function = instantiate(cfg.capture_fn)
+        capturer_loader = instantiate(cfg.capture_data_loader)
+        log.info(f"Capture Dataset Size: {len(capturer_loader.dataset)}")
 
     # Model
     model = instantiate(cfg.model).to(device).train()
@@ -208,7 +132,7 @@ def main(cfg: DictConfig):
     scaler = torch.cuda.amp.grad_scaler.GradScaler()
 
     epochs_no_improve = 0
-    best_val_loss = torch.inf
+    best_epoch_loss = torch.inf
 
     # Epochs
     for epoch in tqdm(range(0, cfg.num_epoch), leave=True, desc="Epoch"):
@@ -222,31 +146,23 @@ def main(cfg: DictConfig):
                 tracker=training_tracker,
             )
 
-            # val_tracker = eval_epoch(val_loader, model, val_trackers)
+            val_tracker = eval_epoch(val_loader, model, val_tracker)
             test_tracker = eval_epoch(test_loader, model, test_tracker)
 
-            # make a logging script to upload cloud ..
+        if cfg.capture_output and (epoch + 1) % cfg.capture_epoch == 0:
+            clouds: List = capture_clouds(capturer_loader, model, capture_function)
+            log_cloud_on_wandb(clouds, epoch)
 
-        #     # if (epoch + 1) % cfg.capture_output == 0:
-        #     #    capture_and_log(test_loader, model, epoch, wandb.run, cfg)
-        #     # capture_and_log(val_loader, model, epoch, wandb.run, cfg)
+        if val_tracker.epoch_loss < best_epoch_loss:
+            epochs_no_improve = 0
+            best_epoch_loss = val_tracker.epoch_loss
+            wandb.run.summary["Best Val Loss"] = best_epoch_loss
+            torch.save(model.state_dict(), f"{run_dir}/{run_name}_model_weights.pt")
+            log.info(f"Weights Saved at epoch: {epoch}")
+        else:
+            epochs_no_improve += 1
 
-        # scheduler.step(val_tracker.total_loss) if cfg.lr_decay else None
-
-        # Save Best Model
-        # if val_tracker.total_loss < best_val_loss:
-        #     epochs_no_improve = 0
-        #     best_val_loss = val_tracker.total_loss
-        #     wandb.run.summary["Best Val Loss"] = best_val_loss
-        #     torch.save(model.state_dict(), f"{run_dir}/{run_name}_model_weights.pt")
-        #     log.info(f"Weights Saved at epoch: {epoch}")
-        # with amp_ctx:
-        #     capture_and_log(test_loader, model, epoch, wandb.run, cfg)
-        # capture_and_log(val_loader, model, epoch, wandb.run, cfg)
-        # else:
-        #     epochs_no_improve += 1
-
-        # model.psuedo_loss_inverse_weight = 1 / (epoch + 1)
+        scheduler.step(val_tracker.epoch_loss) if cfg.lr_decay else None
 
         if epochs_no_improve == cfg.early_stop_epoch and cfg.early_stop:
             log.info("Training Ended (Evaluation Test Score Not Improving)")
@@ -258,7 +174,7 @@ def main(cfg: DictConfig):
         else:
             training_tracker.log("Training", epoch)
             test_tracker.log("Testing", epoch)
-            # val_tracker.log("Validation", epoch)
+            val_tracker.log("Validation", epoch)
 
 
 if __name__ == "__main__":

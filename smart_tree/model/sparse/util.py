@@ -1,10 +1,10 @@
+from dataclasses import dataclass
 from typing import Dict, List, Tuple
-from dataclasses import dataclass, asdict
-from .transform import VoxelizedTrainingData, merge_voxelized_data
-
 
 import spconv.pytorch as spconv
 import torch
+
+from .transform import VoxelizedTrainingData, merge_voxelized_data
 
 
 @dataclass
@@ -12,6 +12,7 @@ class Data:
     point_id: torch.Tensor
     voxel_id: torch.Tensor
     mask: torch.Tensor
+    filename: str
 
 
 def sparse_from_batch(features, coordinates, batch_size, device):
@@ -53,6 +54,7 @@ def batch_collate(
             training_data.point_id,
             training_data.voxel_id,
             training_data.mask,
+            training_data.filename,
         ),
     )
 

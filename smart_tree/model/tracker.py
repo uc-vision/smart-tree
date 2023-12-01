@@ -16,7 +16,7 @@ class Tracker:
             self.losses.setdefault(k, []).append(v.item())
 
     @property
-    def total_loss(self):
+    def epoch_loss(self):
         return sum(v[-1] for v in self.losses.values())
 
     def log(self, name, epoch):
