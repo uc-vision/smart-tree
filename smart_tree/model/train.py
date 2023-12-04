@@ -88,7 +88,7 @@ def main(cfg: DictConfig):
     log = logging.getLogger(__name__)
 
     ti.init(arch=ti.gpu)
-    wandb.init(
+    run = wandb.init(
         project=cfg.wandb.project,
         entity=cfg.wandb.entity,
         mode=cfg.wandb.mode,
@@ -160,6 +160,10 @@ def main(cfg: DictConfig):
         if (
             cfg.capture_output and (epoch + 1) % cfg.capture_epoch == 0
         ) or epochs_no_improve == 0:
+            if cfg.capture_delete_old_artifacts:
+                for artifact in run.logged_artifacts():
+                    artifact.delete(delete_aliases=True)
+
             clouds: List = capture_clouds(capturer_loader, model, capture_function)
             log_cloud_on_wandb(clouds, epoch)
 

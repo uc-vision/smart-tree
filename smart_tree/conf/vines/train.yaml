@@ -227,6 +227,7 @@ capture_fn:
   _target_: smart_tree.model.sparse.helper.model_output_to_labelled_clds
   _partial_: True
   cmap: ${cmap}
+capture_delete_old_artifacts: True
 
 
 model:
