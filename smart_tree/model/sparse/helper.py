@@ -26,7 +26,7 @@ def model_output_to_labelled_clds(
             xyz,
             rgb=rgb,
             class_l=predicted_class.unsqueeze(1),
-            filename=metadata.filename,
+            filename=metadata.filename[i],
         )
 
         clouds.append(lc)

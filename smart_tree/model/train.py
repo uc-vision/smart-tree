@@ -18,14 +18,14 @@ from smart_tree.data_types.cloud import LabelledCloud
 from .helper import log_cloud_on_wandb
 
 
-def train_epoch(data_loader, model, optimizer, fp16=False, scaler=None, tracker=None):
+def train_epoch(data_loader, model, optimizer, scaler=None, tracker=None):
     data_loader_tqdm = tqdm(data_loader, desc="Training", leave=False)
 
     for model_input, targets, meta_data in data_loader_tqdm:
         preds = model.forward(model_input)
         loss = model.compute_loss(preds, targets, meta_data)
 
-        if fp16:
+        if scaler:
             assert sum(loss.values()).dtype is torch.float32
             scaler.scale(sum(loss.values())).backward()
             scaler.step(optimizer)
@@ -129,7 +129,7 @@ def main(cfg: DictConfig):
 
     # FP-16
     amp_ctx = torch.cuda.amp.autocast() if cfg.fp16 else contextlib.nullcontext()
-    scaler = torch.cuda.amp.grad_scaler.GradScaler()
+    scaler = torch.cuda.amp.grad_scaler.GradScaler() if cfg.fp16 else None
 
     epochs_no_improve = 0
     best_epoch_loss = torch.inf
@@ -142,16 +142,11 @@ def main(cfg: DictConfig):
                 model,
                 optimizer,
                 scaler=scaler,
-                fp16=cfg.fp16,
                 tracker=training_tracker,
             )
 
             val_tracker = eval_epoch(val_loader, model, val_tracker)
             test_tracker = eval_epoch(test_loader, model, test_tracker)
-
-        if cfg.capture_output and (epoch + 1) % cfg.capture_epoch == 0:
-            clouds: List = capture_clouds(capturer_loader, model, capture_function)
-            log_cloud_on_wandb(clouds, epoch)
 
         if val_tracker.epoch_loss < best_epoch_loss:
             epochs_no_improve = 0
@@ -161,6 +156,12 @@ def main(cfg: DictConfig):
             log.info(f"Weights Saved at epoch: {epoch}")
         else:
             epochs_no_improve += 1
+
+        if (
+            cfg.capture_output and (epoch + 1) % cfg.capture_epoch == 0
+        ) or epochs_no_improve == 0:
+            clouds: List = capture_clouds(capturer_loader, model, capture_function)
+            log_cloud_on_wandb(clouds, epoch)
 
         scheduler.step(val_tracker.epoch_loss) if cfg.lr_decay else None
 

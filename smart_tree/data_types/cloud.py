@@ -22,7 +22,7 @@ patch_typeguard()
 @typechecked
 @dataclass
 class Cloud(Base):
-    xyz: TensorType["N", 3]
+    xyz: TensorType["N", 3, torch.float32]
     rgb: Optional[TensorType["N", 3]] = None
     filename: Optional[Path] = None
 
@@ -48,7 +48,10 @@ class Cloud(Base):
         return self.__class__(xyz=translated_xyz, rgb=self.rgb, filename=self.filename)
 
     def rotate(self, rotation_matrix: TensorType[3, 3, float]) -> Cloud:
-        rotated_xyz = torch.matmul(self.xyz, rotation_matrix.T.to(self.xyz.device))
+        rotated_xyz = torch.matmul(self.xyz, rotation_matrix.T.to(self.xyz.device)).to(
+            torch.float32
+        )
+
         return self.__class__(xyz=rotated_xyz, rgb=self.rgb, filename=self.filename)
 
     def voxel_downsample(self, voxel_size: float | TensorType[1]) -> Cloud:
@@ -145,7 +148,9 @@ class LabelledCloud(Cloud):
         if self.loss_mask == None:
             mask_shape = (len(self), 1)
             self.loss_mask = torch.ones(
-                mask_shape, device=self.device, dtype=torch.bool
+                mask_shape,
+                device=self.device,
+                dtype=torch.bool,
             )
 
         self.point_ids = torch.arange(
@@ -179,9 +184,9 @@ class LabelledCloud(Cloud):
 
     def rotate(self, rot_matrix: TensorType[3, 3]) -> LabelledCloud:
         args = asdict(self)
-        rot_mat = rot_matrix.T.to(self.xyz.device)
+        rot_mat = rot_matrix.T.to(self.device).to(self.xyz.dtype)
 
-        args["xyz"] = torch.matmul(args["xyz"], rot_mat)
+        args["xyz"] = torch.matmul(args["xyz"], rot_mat).to(self.xyz.dtype)
         if args["medial_vector"] is not None:
             args["medial_vector"] = torch.matmul(args["medial_vector"], rot_mat)
         if args["branch_direction"] is not None:
@@ -194,6 +199,18 @@ class LabelledCloud(Cloud):
     def filter_by_class(self, classes: TensorType["N"]) -> LabelledCloud:
         mask = torch.isin(self.class_l, classes)
         return self.filter(mask.view(-1))
+
+    def add_xyz(self, xyz, class_l=None):
+        self.xyz = torch.cat((self.xyz, xyz))
+        padd_vector = torch.zeros(
+            (xyz.shape[0], 3),
+            device=self.device,
+            dtype=self.xyz.dtype,
+        )
+
+        self.medial_vector = torch.cat((self.medial_vector, padd_vector))
+        if class_l != None:
+            self.class_l = torch.cat((self.class_l, class_l))
 
     @property
     def number_classes(self) -> int:

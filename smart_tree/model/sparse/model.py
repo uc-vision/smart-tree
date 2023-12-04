@@ -97,14 +97,14 @@ class Smart_Tree(nn.Module):
         self,
         predictions: dict,
         targets: torch.tensor,
-        mask: torch.tensor,
+        meta_data: torch.tensor,
     ):
         losses = {}
 
-        mask = mask.reshape(-1).long()
+        mask = meta_data.mask.reshape(-1).bool()
 
         if "radius" in self.target_features:
-            target_radius = targets["radius"][mask]
+            target_radius = targets["radius"]  # [mask]
             if self.log_radius:
                 target_radius = torch.log(target_radius)
             pred_radius = predictions["radius"][mask]
@@ -116,8 +116,8 @@ class Smart_Tree(nn.Module):
             losses["medial_direction"] = self.direction_loss(pred_dir, tgt_dir)
 
         if "class_l" in self.target_features:
-            target_class = targets["class_l"][mask]
-            pred_class = predictions["class_l"][mask]
+            target_class = targets["class_l"]  # [mask]
+            pred_class = predictions["class_l"]  # [mask]
             losses["class_l"] = self.class_loss(pred_class, target_class)
 
         return losses

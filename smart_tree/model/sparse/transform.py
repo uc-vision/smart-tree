@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Optional
 
 import torch
 from spconv.pytorch import SparseConvTensor
@@ -13,10 +13,10 @@ class VoxelizedTrainingData:
     input_voxelized: Dict[str, torch.Tensor]
     coords: torch.Tensor
     targets: Dict[str, torch.Tensor]
-    point_id: torch.Tensor
     voxel_id: torch.Tensor
-    mask: torch.Tensor
-    filename: str
+    filename: str | List[str]
+    mask: Optional[torch.Tensor] = None
+    point_id: Optional[torch.Tensor] = None
 
 
 def merge_voxelized_data(
@@ -25,15 +25,27 @@ def merge_voxelized_data(
     merged_input_voxelized = {}
     merged_targets = {}
 
+    # Initialize lists to store point_ids and masks if they exist
+    point_ids = []
+    masks = []
+    file_names = []
+
     for i, data in enumerate(data_list):
         data.coords[:, 0] = torch.tensor([i], dtype=torch.float32)
-        data.point_id[:, 0] = torch.tensor([i], dtype=torch.float32)
+
+        if data.point_id is not None:
+            data.point_id[:, 0] = torch.tensor([i], dtype=torch.float32)
+            point_ids.append(data.point_id)
+
+        if data.mask is not None:
+            masks.append(data.mask)
 
     merged_coords = torch.cat([data.coords for data in data_list], dim=0)
-    merged_point_id = torch.cat([data.point_id for data in data_list], dim=0)
-
     merged_voxel_id = torch.cat([data.voxel_id for data in data_list], dim=0)
-    merged_mask = torch.cat([data.mask for data in data_list], dim=0)
+
+    # Merge point_ids and masks if they are not empty
+    merged_point_id = torch.cat(point_ids, dim=0) if point_ids else None
+    merged_mask = torch.cat(masks, dim=0) if masks else None
 
     for data in data_list:
         for key, tensor in data.input_voxelized.items():
@@ -50,6 +62,8 @@ def merge_voxelized_data(
             else:
                 merged_targets[key] = tensor.clone()
 
+        file_names.append(data.filename)
+
     return VoxelizedTrainingData(
         input_voxelized=merged_input_voxelized,
         coords=merged_coords,
@@ -57,7 +71,7 @@ def merge_voxelized_data(
         point_id=merged_point_id,
         voxel_id=merged_voxel_id,
         mask=merged_mask,
-        filename=data_list[0].filename,
+        filename=file_names,  # Assuming all data have the same filename
     )
 
 
@@ -101,10 +115,12 @@ def concated_tensor_to_dict(tensor: torch.tensor, feats_shape: Dict):
 
 
 def sparse_voxelize(
-    cld: Union[Cloud, LabelledCloud],
+    cld: Cloud | LabelledCloud,
     voxel_size: float,
     input_feature_names: List[str],
-    target_feature_names: List[str],
+    target_feature_names: List[str] = [],
+    extract_point_ids=True,
+    extract_masks=True,
 ) -> Dict:
     all_feats_dict = extract_cloud_features(
         cld, input_feature_names + target_feature_names
@@ -113,8 +129,16 @@ def sparse_voxelize(
     all_feats_tensor = dict_to_concated_tensor(all_feats_dict)
 
     target_feats = extract_cloud_features(cld, target_feature_names)
-    mask = list(extract_cloud_features(cld, ["loss_mask"]).values())[0]
-    point_id = list(extract_cloud_features(cld, ["point_ids"]).values())[0]
+
+    if extract_masks:
+        mask = list(extract_cloud_features(cld, ["loss_mask"]).values())[0]
+    else:
+        mask = None
+
+    if extract_point_ids:
+        point_id = list(extract_cloud_features(cld, ["point_ids"]).values())[0]
+    else:
+        point_id = None
 
     voxel_gen = PointToVoxel(
         vsize_xyz=[voxel_size] * 3,
@@ -143,8 +167,8 @@ def sparse_voxelize(
         input_feats,
         coords,
         target_feats,
-        point_id,
         voxel_id,
-        mask,
         cld.filename,
+        mask,
+        point_id,
     )

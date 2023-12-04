@@ -13,9 +13,9 @@ early_stop: True
 
 loss_mask_probability: 0.99
 
-batch_size: 4
-directory: /mnt/harry/PhD/smart-tree/data/synthetic-vine-pcds-3-rotated
-json_path: /mnt/harry/PhD/smart-tree/smart_tree/conf/vines/vine-split.json
+batch_size: 16
+directory: /local/synthetic-vine-pcds-3-rotated
+json_path: /local/smart-tree/smart_tree/conf/vines/vine-split.json
 voxel_size: 0.005
 input_feature_names : ['xyz']
 target_feature_names: ['class_l']
@@ -39,12 +39,29 @@ train_dataset:
   augmentation:
     _target_: smart_tree.dataset.augmentations.AugmentationPipeline
     augmentations:
-      - _target_: smart_tree.dataset.augmentations.LabelDropout
-        probability: ${loss_mask_probability}
+      # - _target_: smart_tree.dataset.augmentations.LabelDropout
+      #   probability: ${loss_mask_probability}
       - _target_: smart_tree.dataset.augmentations.DualAugmentation
         augmentations1:
         - _target_: smart_tree.dataset.augmentations.RandomDropout
           probability: 0.01
+        - _target_: smart_tree.dataset.augmentations.CentreCloud
+        - _target_: smart_tree.dataset.augmentations.Scale
+          min_scale: 0.9
+          max_scale: 1.1
+        - _target_:  smart_tree.dataset.augmentations.RandomFlips
+          x_prob: 0.5
+          y_prob: 0.5
+        # - _target_:  smart_tree.dataset.augmentations.RandomCubicCrop
+        #   size: 4.0
+        - _target_:  smart_tree.dataset.augmentations.RandomDropout
+          probability: 0.1
+        - _target_:  smart_tree.dataset.augmentations.RandomGaussianNoise
+          mean : 0.0
+          std : 0.5
+          prob : 0.1
+          magnitude : 0.02
+
         augmentations2:
         - _target_: smart_tree.dataset.augmentations.Scale
           min_scale: 0.9
@@ -97,7 +114,7 @@ validation_dataset:
 validation_data_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: ${batch_size}
-  drop_last: True
+  drop_last: False
   pin_memory: False
   num_workers: 0
   shuffle: False
@@ -127,7 +144,7 @@ test_dataset:
 test_data_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: ${batch_size}
-  drop_last: True
+  drop_last: False
   pin_memory: False
   num_workers: 0
   shuffle: False
@@ -145,7 +162,7 @@ test_data_loader:
 
 capture_dataset:
   _target_: smart_tree.dataset.dataset.Dataset
-  mode: validation
+  mode: capture
   directory: ${directory}
   json_path: ${json_path}
   cache: True
@@ -153,13 +170,20 @@ capture_dataset:
     _target_ : smart_tree.model.sparse.transform.sparse_voxelize
     _partial_ : True
     input_feature_names: ${input_feature_names}
-    target_feature_names: ${target_feature_names}
     voxel_size: ${voxel_size}
+    extract_point_ids: False
+    extract_masks: False
+
+  augmentation:
+    _target_: smart_tree.dataset.augmentations.AugmentationPipeline
+    augmentations:
+        - _target_: smart_tree.dataset.augmentations.CentreCloud
+
 
 capture_data_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: ${batch_size}
-  drop_last: True
+  drop_last: False
   pin_memory: False
   num_workers: 0
   shuffle: False
@@ -171,7 +195,7 @@ capture_data_loader:
   sampler:
     _target_: torch.utils.data.RandomSampler
     replacement: True
-    num_samples: 4
+    num_samples: 8
     data_source: ${capture_dataset}
 
   dataset: ${capture_dataset}
@@ -179,7 +203,7 @@ capture_data_loader:
 
 
 capture_output: True # Wether to capture validation output
-capture_epoch: 1
+capture_epoch: 10
 capture_fn:
   _target_: smart_tree.model.sparse.helper.model_output_to_labelled_clds
   _partial_: True
@@ -189,7 +213,7 @@ capture_fn:
 model:
   _target_: smart_tree.model.sparse.model.Smart_Tree_Self_Consistency
   input_channels: 3
-  unet_planes: [8, 16, 32, 64, 128, 256, 512]
+  unet_planes: [8, 16, 32, 64, 128, 256, 512, 1024]
   mlp_layers: 2
   num_classes: 5
   target_features: ${target_feature_names}

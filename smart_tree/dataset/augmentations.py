@@ -112,7 +112,7 @@ class RandomCubicCrop(Augmentation):
         return cloud.filter(mask)
 
 
-class RandomGaussianNoise(Augmentation):
+class RandomGaussianPeturb(Augmentation):
     def __init__(self, mean=0.0, std=0.01, prob=0.0, magnitude=1.0):
         self.mean = mean
         self.std = std
@@ -122,19 +122,45 @@ class RandomGaussianNoise(Augmentation):
     def __call__(self, cloud):
         mask = torch.rand(cloud.xyz.shape[0]) < self.prob
         noise = (
-            torch.randn(cloud.xyz.shape, device=cloud.xyz.device) * self.std + self.mean
+            torch.randn(cloud.xyz.shape, device=cloud.xyz.device, dtype=torch.float32)
+            * self.std
+            + self.mean
         ).float()
         noise *= self.magnitude
         cloud.xyz[mask] += noise[mask]
         return cloud.with_xyz(cloud.xyz)
 
 
-class RandomRotate(Augmentation):
-    def __init__(self, max_x, max_y, max_z):
-        self.max_rots = torch.tensor([max_x, max_y, max_z])
+class SaltNoise(Augmentation):
+    def __init__(self, percentage=0.0, label_id=5):
+        self.percentage = percentage  # based on number of xyz points add random points
+        self.label_id = label_id
 
     def __call__(self, cloud):
-        x, y, z = (torch.rand(3) - 0.5) * self.max_rots
+        num_points = int(len(cloud) * self.percentage)
+
+        min_xyz = cloud.min_xyz
+        max_xyz = cloud.max_xyz
+
+        points = (
+            torch.rand((num_points, 3), dtype=torch.float32, device=cloud.device)
+            * (max_xyz - min_xyz)
+            + min_xyz
+        )
+        labels = torch.full((num_points, 1), self.label_id, device=cloud.device).float()
+
+        print(points)
+        print(labels)
+        cloud.add_xyz(points, labels.to(cloud.device))
+        return cloud
+
+
+class RandomRotate(Augmentation):
+    def __init__(self, max_x, max_y, max_z):
+        self.max_rots = torch.tensor([max_x, max_y, max_z], dtype=torch.float32)
+
+    def __call__(self, cloud):
+        x, y, z = (torch.rand(3, dtype=torch.float32) - 0.5) * self.max_rots
 
         self.rot_mat = euler_angles_to_rotation(
             torch.tensor([x, y, z], device=cloud.xyz.device)

@@ -17,7 +17,7 @@ class Dataset:
         self,
         json_path: Path | str,
         directory: Path | str,
-        mode: Literal["train", "validation", "test", "unlabelled"],
+        mode: Literal["train", "validation", "test", "capture", "unlabelled"],
         transform: Optional[callable] = None,
         augmentation: Optional[AugmentationPipeline] = None,
         cache: bool = False,
@@ -41,6 +41,8 @@ class Dataset:
             tree_paths = json_data["validation"]
         elif mode == "test":
             tree_paths = json_data["test"]
+        elif mode == "capture":
+            tree_paths = json_data["capture"]
 
         self.full_paths = [Path(f"{directory}/{p}") for p in tree_paths]
         invalid_paths = [path for path in self.full_paths if not path.exists()]

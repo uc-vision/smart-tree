@@ -23,7 +23,7 @@ class Base:
             for k, v in asdict(self).items()
         }
 
-    def filter(self, mask: TensorType["N", torch.bool]):
+    def filter(self, mask: TensorType["N"]):
         filtered_args = self.apply_to_2d_tensors(lambda v: v[mask])
         return self.__class__(**filtered_args)
 

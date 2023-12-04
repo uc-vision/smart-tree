@@ -1,20 +1,24 @@
+hydra:
+  run:
+    dir: /mnt/maara/singapore_project/hydra/
+
 wandb:
-  project: tree
+  project: vine-9001
   entity: harry1576
-  mode: disabled
+  mode: online
+  dir: /mnt/maara/singapore_project/wandb/
 
 fp16: True
-num_epoch: 500
+num_epoch: 200
 lr_decay: True
-lr: 0.1
+lr: 0.005
 early_stop_epoch: 20
 early_stop: True
-capture_output: 1
 
-batch_size: 2
-directory: /mnt/harry/PhD/smart-tree/data/synthetic-vine-pcds-3-rotated
-json_path: /mnt/harry/PhD/smart-tree/smart_tree/conf/vines/vine-split.json
-voxel_size: 0.0025
+batch_size: 8
+directory: /local/synthetic-vine-pcds-3-rotated
+json_path: /local/smart-tree/smart_tree/conf/vines/vine-split.json
+voxel_size: 0.004
 input_feature_names : ['xyz']
 target_feature_names: ['class_l']
 
@@ -24,8 +28,11 @@ cmap:
     - [0.0, 0.0, 1.0] # Node
     - [1.0, 1.0, 0.0] # Wire
     - [0.0, 1.0, 1.0] # Post
+    - [1.0, 0.5, 1.0]
 
-# Training dataset...
+########################################
+# Training Dataset
+########################################
 train_dataset:
   _target_: smart_tree.dataset.dataset.Dataset
   mode: train
@@ -35,32 +42,53 @@ train_dataset:
   augmentation:
     _target_: smart_tree.dataset.augmentations.AugmentationPipeline
     augmentations:
-      - _target_: smart_tree.dataset.augmentations.CentreCloud
-      - _target_: smart_tree.dataset.augmentations.Scale
-        min_scale: 0.9
-        max_scale: 1.1
-      - _target_:  smart_tree.dataset.augmentations.RandomFlips
+      - _target_: smart_tree.dataset.augmentations.RandomFlips
         x_prob: 0.5
         y_prob: 0.5
-      # - _target_:  smart_tree.dataset.augmentations.RandomCubicCrop
-      #   size: 4.0
-      - _target_:  smart_tree.dataset.augmentations.RandomDropout
-        probability: 0.1
-      - _target_:  smart_tree.dataset.augmentations.RandomGaussianNoise
-        mean : 0.0
-        std : 0.5
-        prob : 0.1
-        magnitude : 0.02
-      # - _target_:  smart_tree.dataset.augmentations.Dropout3D
-      #   noise_scale: [0.5, 1.0]
-      #   octaves: 6
-      #   freq_multiplier: 1.2
+      - _target_: smart_tree.dataset.augmentations.RandomAugmentation
+        shuffle: true
+        apply_prob: 0.5
+        augmentations:
+          # - _target_: smart_tree.dataset.augmentations.SaltNoise
+          #   percentage: 0.005  # based on number of xyz points add random points
+          #   label_id: 5
+          - _target_: smart_tree.dataset.augmentations.RandomGaussianPeturb
+            mean: 0.0
+            std: 1.0
+            prob: 0.05
+            magnitude: 0.002
+          - _target_: smart_tree.dataset.augmentations.RandomRotate
+            max_x: 0.2
+            max_y: 0.2
+            max_z: 0.2
+          - _target_: smart_tree.dataset.augmentations.Scale
+            min_scale: 0.85
+            max_scale: 1.15
+          - _target_: smart_tree.dataset.augmentations.RandomTranslate
+            max_x: 2.0
+            max_y: 2.0
+            max_z: 2.0
+          - _target_: smart_tree.dataset.augmentations.RandomCrop
+            max_x: 0.8
+            max_y: 0.4
+            max_z: 0.8
+          - _target_: smart_tree.dataset.augmentations.Dropout3D
+            noise_scale:
+            - 0.4
+            - 1.2
+            octaves: 6
+            freq_multiplier: 1.2
+            dropout:
+            - 0.0
+            - 0.3
+            peturb:
+            - 0.1
+            - 0.4
+            peturb_bias: 0.5
+            peturb_distance:
+            - 0.0
+            - 0.008
 
-      #   dropout: [0.0, 0.2]
-      #   peturb: [0.1, 0.4]
-
-      #   peturb_bias: 0.5
-      #   peturb_distance: [0.0, 0.006]
   transform:
     _target_ : smart_tree.model.sparse.transform.sparse_voxelize
     _partial_ : True
@@ -68,30 +96,30 @@ train_dataset:
     target_feature_names: ${target_feature_names}
     voxel_size: ${voxel_size}
 
-
 train_data_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: ${batch_size}
-  drop_last: False
+  drop_last: True
   pin_memory: False
   num_workers: 0
-  shuffle: False
+  shuffle: True
 
-  sampler:
-    _target_: torch.utils.data.RandomSampler
-    replacement: True
-    num_samples: 256
-    data_source: ${train_dataset}
+  # sampler:
+  #   _target_: torch.utils.data.RandomSampler
+  #   replacement: true
+  #   num_samples: 128
+  #   data_source: ${train_dataset}
 
   collate_fn:
     _target_: smart_tree.model.sparse.util.batch_collate
     _partial_: True
-    input_keys: ${input_feature_names}
-    target_keys: ${target_feature_names}
+    fp_16: ${fp16}
 
   dataset: ${train_dataset}
 
-# Val dataset
+########################################
+# Validation Dataset
+########################################
 validation_dataset:
   _target_: smart_tree.dataset.dataset.Dataset
   mode: validation
@@ -105,24 +133,23 @@ validation_dataset:
     target_feature_names: ${target_feature_names}
     voxel_size: ${voxel_size}
 
-
 validation_data_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: ${batch_size}
-  drop_last: True
+  drop_last: False
   pin_memory: False
   num_workers: 0
   shuffle: False
   collate_fn:
     _target_: smart_tree.model.sparse.util.batch_collate
     _partial_: True
-    input_keys: ${input_feature_names}
-    target_keys: ${target_feature_names}
-
+    fp_16: ${fp16}
 
   dataset: ${validation_dataset}
 
-# Test dataset
+########################################
+# Test Dataset
+########################################
 test_dataset:
   _target_: smart_tree.dataset.dataset.Dataset
   mode: test
@@ -136,31 +163,79 @@ test_dataset:
     target_feature_names: ${target_feature_names}
     voxel_size: ${voxel_size}
 
-
 test_data_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: ${batch_size}
-  drop_last: True
+  drop_last: False
   pin_memory: False
   num_workers: 0
   shuffle: False
   collate_fn:
     _target_: smart_tree.model.sparse.util.batch_collate
     _partial_: True
-    input_keys: ${input_feature_names}
-    target_keys: ${target_feature_names}
-
+    fp_16: ${fp16}
 
   dataset: ${test_dataset}
+
+########################################
+# Capture Dataset / Settings
+########################################
+capture_dataset:
+  _target_: smart_tree.dataset.dataset.Dataset
+  mode: capture
+  directory: ${directory}
+  json_path: ${json_path}
+  cache: True
+  transform:
+    _target_ : smart_tree.model.sparse.transform.sparse_voxelize
+    _partial_ : True
+    input_feature_names: ${input_feature_names}
+    voxel_size: ${voxel_size}
+    extract_point_ids: False
+    extract_masks: False
+
+  augmentation:
+    _target_: smart_tree.dataset.augmentations.AugmentationPipeline
+    augmentations:
+        - _target_: smart_tree.dataset.augmentations.CentreCloud
+
+
+capture_data_loader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: ${batch_size}
+  drop_last: False
+  pin_memory: False
+  num_workers: 0
+  shuffle: False
+  collate_fn:
+    _target_: smart_tree.model.sparse.util.batch_collate
+    _partial_: True
+    fp_16: ${fp16}
+
+  sampler:
+    _target_: torch.utils.data.RandomSampler
+    replacement: True
+    num_samples: 8
+    data_source: ${capture_dataset}
+
+  dataset: ${capture_dataset}
+
+
+capture_output: True 
+capture_epoch: 10
+capture_fn:
+  _target_: smart_tree.model.sparse.helper.model_output_to_labelled_clds
+  _partial_: True
+  cmap: ${cmap}
+
 
 model:
   _target_: smart_tree.model.sparse.model.Smart_Tree
   input_channels: 3
-  unet_planes: [8, 16, 32, 64, 128, 256]
+  unet_planes: [32, 64, 128, 256, 384, 384, 512, 512]
   mlp_layers: 3
-  num_classes: 5
+  num_classes: 6
   target_features: ${target_feature_names}
-
 
 optimizer:
   _target_: torch.optim.Adam
@@ -169,3 +244,12 @@ optimizer:
 scheduler:
   _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
   mode: "min"
+
+training_tracker:
+  _target_: smart_tree.model.tracker.SegmentationTracker
+
+val_tracker:
+  _target_: smart_tree.model.tracker.SegmentationTracker
+
+test_tracker:
+  _target_: smart_tree.model.tracker.SegmentationTracker
