@@ -41,6 +41,7 @@ train_dataset:
     augmentations:
       # - _target_: smart_tree.dataset.augmentations.LabelDropout
       #   probability: ${loss_mask_probability}
+      - _target_: smart_tree.dataset.augmentations.CentreCloud
       - _target_: smart_tree.dataset.augmentations.DualAugmentation
         augmentations1:
         - _target_: smart_tree.dataset.augmentations.RandomDropout
@@ -192,11 +193,11 @@ capture_data_loader:
     _partial_: True
     fp_16: ${fp16}
 
-  sampler:
-    _target_: torch.utils.data.RandomSampler
-    replacement: True
-    num_samples: 8
-    data_source: ${capture_dataset}
+  # sampler:
+  #   _target_: torch.utils.data.RandomSampler
+  #   replacement: True
+  #   num_samples: 8
+  #   data_source: ${capture_dataset}
 
   dataset: ${capture_dataset}
 

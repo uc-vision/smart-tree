@@ -93,6 +93,7 @@ def main(cfg: DictConfig):
         entity=cfg.wandb.entity,
         mode=cfg.wandb.mode,
         config=OmegaConf.to_container(cfg, resolve=[True | False]),
+        dir=cfg.wandb.dir,
     )
     run_dir = HydraConfig.get().runtime.output_dir
     run_name = wandb.run.name
@@ -133,6 +134,7 @@ def main(cfg: DictConfig):
 
     epochs_no_improve = 0
     best_epoch_loss = torch.inf
+    best_epoch = 0
 
     # Epochs
     for epoch in tqdm(range(0, cfg.num_epoch), leave=True, desc="Epoch"):
@@ -151,21 +153,23 @@ def main(cfg: DictConfig):
         if val_tracker.epoch_loss < best_epoch_loss:
             epochs_no_improve = 0
             best_epoch_loss = val_tracker.epoch_loss
+            best_epoch = epoch
             wandb.run.summary["Best Val Loss"] = best_epoch_loss
             torch.save(model.state_dict(), f"{run_dir}/{run_name}_model_weights.pt")
             log.info(f"Weights Saved at epoch: {epoch}")
+            clouds: List = capture_clouds(capturer_loader, model, capture_function)
+
         else:
             epochs_no_improve += 1
 
-        if (
-            cfg.capture_output and (epoch + 1) % cfg.capture_epoch == 0
-        ) or epochs_no_improve == 0:
-            if cfg.capture_delete_old_artifacts:
-                for artifact in run.logged_artifacts():
-                    artifact.delete(delete_aliases=True)
+        # if (
+        #     cfg.capture_output and (epoch + 1) % cfg.capture_epoch == 0
+        # ) or epochs_no_improve == 0:
+        #     if cfg.capture_delete_old_artifacts and artefacts_logged:
+        #         for artifact in run.logged_artifacts():
+        #             artifact.delete(delete_aliases=True)
 
-            clouds: List = capture_clouds(capturer_loader, model, capture_function)
-            log_cloud_on_wandb(clouds, epoch)
+        #     artefacts_logged = True
 
         scheduler.step(val_tracker.epoch_loss) if cfg.lr_decay else None
 
@@ -180,6 +184,8 @@ def main(cfg: DictConfig):
             training_tracker.log("Training", epoch)
             test_tracker.log("Testing", epoch)
             val_tracker.log("Validation", epoch)
+
+    log_cloud_on_wandb(clouds, epoch)
 
 
 if __name__ == "__main__":

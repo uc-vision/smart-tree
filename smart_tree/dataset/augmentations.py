@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from taichi_perlin import dropout_3d
 
-from ..data_types.cloud import Cloud
+from ..data_types.cloud import Cloud, LabelledCloud, merge_labelled_cloud
 from ..util.maths import euler_angles_to_rotation
 
 
@@ -95,6 +95,16 @@ class RandomCrop(Augmentation):
         return cloud.filter(mask)
 
 
+class RemoveGround(Augmentation):
+    def __init__(self, ground_height):
+        self.ground_height = ground_height
+
+    def __call__(self, cloud):
+        mask = cloud.xyz[:, 2] >= self.ground_height
+
+        return cloud.filter(mask)
+
+
 class RandomCubicCrop(Augmentation):
     def __init__(self, size):
         self.size = size
@@ -148,11 +158,9 @@ class SaltNoise(Augmentation):
             + min_xyz
         )
         labels = torch.full((num_points, 1), self.label_id, device=cloud.device).float()
+        salt_cld = LabelledCloud(points, class_l=labels)
 
-        print(points)
-        print(labels)
-        cloud.add_xyz(points, labels.to(cloud.device))
-        return cloud
+        return merge_labelled_cloud([cloud, salt_cld])
 
 
 class RandomRotate(Augmentation):

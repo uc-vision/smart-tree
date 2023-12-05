@@ -1,12 +1,12 @@
-hydra:
-  run:
-    dir: /mnt/maara/singapore_project/hydra/
+# hydra:
+#   run:
+#     dir: /mnt/maara/singapore_project/hydra/
 
 wandb:
   project: vine-9001
   entity: harry1576
   mode: online
-  dir: /mnt/maara/singapore_project/wandb/
+  dir: /local/smart-tree
 
 fp16: True
 num_epoch: 200
@@ -15,10 +15,10 @@ lr: 0.005
 early_stop_epoch: 20
 early_stop: True
 
-batch_size: 8
+batch_size: 4
 directory: /local/synthetic-vine-pcds-3-rotated
 json_path: /local/smart-tree/smart_tree/conf/vines/vine-split.json
-voxel_size: 0.004
+voxel_size: 0.001
 input_feature_names : ['xyz']
 target_feature_names: ['class_l']
 
@@ -42,6 +42,9 @@ train_dataset:
   augmentation:
     _target_: smart_tree.dataset.augmentations.AugmentationPipeline
     augmentations:
+      - _target_: smart_tree.dataset.augmentations.CentreCloud
+      - _target_: smart_tree.dataset.augmentations.RemoveGround
+        ground_height: 0.4
       - _target_: smart_tree.dataset.augmentations.RandomFlips
         x_prob: 0.5
         y_prob: 0.5
@@ -49,29 +52,29 @@ train_dataset:
         shuffle: true
         apply_prob: 0.5
         augmentations:
-          # - _target_: smart_tree.dataset.augmentations.SaltNoise
-          #   percentage: 0.005  # based on number of xyz points add random points
-          #   label_id: 5
+          - _target_: smart_tree.dataset.augmentations.SaltNoise
+            percentage: 0.005  # based on number of xyz points add random points
+            label_id: 5
           - _target_: smart_tree.dataset.augmentations.RandomGaussianPeturb
             mean: 0.0
             std: 1.0
-            prob: 0.05
+            prob: 0.75
             magnitude: 0.002
           - _target_: smart_tree.dataset.augmentations.RandomRotate
-            max_x: 0.2
-            max_y: 0.2
-            max_z: 0.2
+            max_x: 0.5
+            max_y: 0.5
+            max_z: 0.5
           - _target_: smart_tree.dataset.augmentations.Scale
-            min_scale: 0.85
-            max_scale: 1.15
+            min_scale: 0.75
+            max_scale: 1.2
           - _target_: smart_tree.dataset.augmentations.RandomTranslate
             max_x: 2.0
             max_y: 2.0
             max_z: 2.0
-          - _target_: smart_tree.dataset.augmentations.RandomCrop
-            max_x: 0.8
-            max_y: 0.4
-            max_z: 0.8
+          # - _target_: smart_tree.dataset.augmentations.RandomCrop
+          #   max_x: 0.8
+          #   max_y: 0.4
+          #   max_z: 0.8
           - _target_: smart_tree.dataset.augmentations.Dropout3D
             noise_scale:
             - 0.4
@@ -212,29 +215,28 @@ capture_data_loader:
     _partial_: True
     fp_16: ${fp16}
 
-  sampler:
-    _target_: torch.utils.data.RandomSampler
-    replacement: True
-    num_samples: 8
-    data_source: ${capture_dataset}
+  # sampler:
+  #   _target_: torch.utils.data.RandomSampler
+  #   replacement: True
+  #   num_samples: 8
+  #   data_source: ${capture_dataset}
 
   dataset: ${capture_dataset}
 
-
 capture_output: True 
-capture_epoch: 10
+capture_epoch: 5
+capture_delete_old_artifacts: True
 capture_fn:
   _target_: smart_tree.model.sparse.helper.model_output_to_labelled_clds
   _partial_: True
   cmap: ${cmap}
-capture_delete_old_artifacts: True
 
 
 model:
   _target_: smart_tree.model.sparse.model.Smart_Tree
   input_channels: 3
   unet_planes: [32, 64, 128, 256, 384, 384, 512, 512]
-  mlp_layers: 3
+  mlp_layers: 2
   num_classes: 6
   target_features: ${target_feature_names}
 

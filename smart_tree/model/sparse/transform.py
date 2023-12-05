@@ -121,6 +121,7 @@ def sparse_voxelize(
     target_feature_names: List[str] = [],
     extract_point_ids=True,
     extract_masks=True,
+    use_number_pts=False,
 ) -> Dict:
     all_feats_dict = extract_cloud_features(
         cld, input_feature_names + target_feature_names
@@ -131,7 +132,7 @@ def sparse_voxelize(
     target_feats = extract_cloud_features(cld, target_feature_names)
 
     if extract_masks:
-        mask = list(extract_cloud_features(cld, ["loss_mask"]).values())[0]
+        mask = list(extract_cloud_features(cld, ["class_loss_mask"]).values())[0]
     else:
         mask = None
 
@@ -162,6 +163,9 @@ def sparse_voxelize(
 
     input_feats = filter_dict(all_feats_dict, input_feature_names)
     target_feats = filter_dict(all_feats_dict, target_feature_names)
+
+    if use_number_pts:
+        input_feats["num_pts"] = num_pts
 
     return VoxelizedTrainingData(
         input_feats,

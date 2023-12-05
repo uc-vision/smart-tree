@@ -129,7 +129,7 @@ class LabelledCloud(Cloud):
     branch_direction: Unit vector of branch direction of closest branch
     branch_ids: ID of closest branch
     class_l: Class of point (I.E. 0 = trunk, 1 = branch, 2 = leaf)
-    loss_mask: Areas we don't want to compute any loss on i.e. near edges of a block
+    class_loss_mask: Areas we don't want to compute any loss on i.e. near edges of a block
     vector_loss_mask: Where we don't want to compute loss for the medial vector or branch direction i.e. leaves
     """
 
@@ -138,16 +138,19 @@ class LabelledCloud(Cloud):
     branch_ids: Optional[TensorType["N", 1]] = None
     class_l: Optional[TensorType["N", 1]] = None
 
-    loss_mask: Optional[TensorType["N", 1]] = None
     point_ids: Optional[TensorType["N", 2]] = None  # Batch number , point_number
-    vector_loss_mask: Optional[TensorType["N", 1]] = None
-
-    # vector: Optional[TensorType["N", 3]] = None  # Legacy
+    class_loss_mask: Optional[TensorType["N", 1, torch.bool]] = None
+    vector_loss_mask: Optional[TensorType["N", 1, torch.bool]] = None
 
     def __post_init__(self):
-        if self.loss_mask == None:
+        if self.class_loss_mask == None:
             mask_shape = (len(self), 1)
-            self.loss_mask = torch.ones(
+            self.class_loss_mask = torch.ones(
+                mask_shape,
+                device=self.device,
+                dtype=torch.bool,
+            )
+            self.vector_loss_mask = torch.ones(
                 mask_shape,
                 device=self.device,
                 dtype=torch.bool,
@@ -258,7 +261,7 @@ class LabelledCloud(Cloud):
 
     def as_o3d_loss_mask_cld(self) -> o3d.geometry.PointCloud:
         cmap = torch.tensor([[1, 0, 0], [0, 1, 0]])
-        colours = cmap.to(self.device)[self.loss_mask.view(-1).int()]
+        colours = cmap.to(self.device)[self.class_loss_mask.view(-1)]
         return o3d_cloud(self.xyz, colours=colours)
 
     def as_o3d_medial_cld(self) -> o3d.geometry.PointCloud:
@@ -296,7 +299,13 @@ class LabelledCloud(Cloud):
 def merge_labelled_cloud(clouds: List["LabelledCloud"]) -> "LabelledCloud":
     """Merge a list of LabelledCloud instances into a single LabelledCloud."""
     all_xyz, all_rgb, all_medial_vector, all_branch_direction = [], [], [], []
-    all_branch_ids, all_class_l, all_loss_mask, all_vector_loss_mask, all_vector = (
+    (
+        all_branch_ids,
+        all_class_l,
+        all_class_loss_mask,
+        all_vector_loss_mask,
+        all_vector,
+    ) = (
         [],
         [],
         [],
@@ -315,9 +324,9 @@ def merge_labelled_cloud(clouds: List["LabelledCloud"]) -> "LabelledCloud":
         accumulate_tensors(all_branch_direction, cloud.branch_direction)
         accumulate_tensors(all_branch_ids, cloud.branch_ids)
         accumulate_tensors(all_class_l, cloud.class_l)
-        accumulate_tensors(all_loss_mask, cloud.loss_mask)
+        accumulate_tensors(all_class_loss_mask, cloud.class_loss_mask)
         accumulate_tensors(all_vector_loss_mask, cloud.vector_loss_mask)
-        accumulate_tensors(all_vector, cloud.vector)  # Legacy
+        # accumulate_tensors(all_vector, cloud.vector)  # Legacy
 
     # Concatenate all accumulated tensors
     new_xyz = torch.cat(all_xyz, dim=0) if all_xyz else None
@@ -331,11 +340,34 @@ def merge_labelled_cloud(clouds: List["LabelledCloud"]) -> "LabelledCloud":
     )
     new_branch_ids = torch.cat(all_branch_ids, dim=0) if all_branch_ids else None
     new_class_l = torch.cat(all_class_l, dim=0) if all_class_l else None
-    new_loss_mask = torch.cat(all_loss_mask, dim=0) if all_loss_mask else None
+    new_loss_mask = (
+        torch.cat(all_class_loss_mask, dim=0) if all_class_loss_mask else None
+    )
     new_vector_loss_mask = (
         torch.cat(all_vector_loss_mask, dim=0) if all_vector_loss_mask else None
     )
     new_vector = torch.cat(all_vector, dim=0) if all_vector else None  # Legacy
+
+    target_length = new_xyz.shape[0]
+
+    for item in [
+        new_rgb,
+        new_medial_vector,
+        new_branch_direction,
+        new_branch_ids,
+        new_class_l,
+        new_loss_mask,
+        new_vector_loss_mask,
+        new_vector,
+    ]:
+        if item == None:
+            continue
+
+        if item.shape[0] != target_length:
+            remainder = target_length - item.shape[0]
+            item = torch.cat(
+                [item, torch.full((remainder,), -1, device=item.device)], dim=0
+            )
 
     # Return a new LabelledCloud with the concatenated tensors
     return LabelledCloud(
