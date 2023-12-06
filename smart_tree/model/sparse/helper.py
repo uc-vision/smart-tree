@@ -33,10 +33,6 @@ def model_output_to_labelled_clds(
 
     return clouds
 
-
-def identity_collate_fn(batch):
-    return batch
-
     # return to_labelled_clds(
     #     sparse_input.indices[:, 0],
     #     sparse_input.features[:, :3],
