@@ -34,3 +34,16 @@ class Base:
     def pin_memory(self):
         pinned_args = self.apply_to_tensors(lambda v: v.pin_memory())
         return self.__class__(**pinned_args)
+
+    def print_tensors_with_nans(self):
+        def has_nans(tensor):
+            if torch.isnan(tensor).any():
+                return True
+            return False
+
+        tensors_with_nans = self.apply_to_tensors(
+            lambda v: has_nans(v) if isinstance(v, torch.Tensor) else None
+        )
+        for key, value in tensors_with_nans.items():
+            if value is True:
+                print(f"Tensor '{key}' contains NaNs.")

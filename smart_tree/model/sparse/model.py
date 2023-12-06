@@ -97,7 +97,7 @@ class Smart_Tree(nn.Module):
         self,
         predictions: dict,
         targets: torch.tensor,
-        meta_data: torch.tensor,
+        meta_data,
     ):
         losses = {}
 

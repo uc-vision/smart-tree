@@ -237,6 +237,7 @@ class CloudLoader:
         }
         cloud_data = {}
         for k, v in labelled_cloud_fields.items():
+            print(k)
             if type(v) == np.ndarray:
                 if v.any() == None:
                     continue

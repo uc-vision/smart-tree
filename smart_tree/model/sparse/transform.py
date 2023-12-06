@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List, Union, Optional
+from typing import Dict, List, Optional, Union
 
 import torch
 from spconv.pytorch import SparseConvTensor
@@ -124,22 +124,26 @@ def sparse_voxelize(
     use_number_pts=False,
 ) -> Dict:
     all_feats_dict = extract_cloud_features(
-        cld, input_feature_names + target_feature_names
+        cld,
+        input_feature_names + target_feature_names,
     )
+
     all_feats_dims = get_cloud_feature_dims(all_feats_dict)
     all_feats_tensor = dict_to_concated_tensor(all_feats_dict)
 
     target_feats = extract_cloud_features(cld, target_feature_names)
 
-    if extract_masks:
-        mask = list(extract_cloud_features(cld, ["class_loss_mask"]).values())[0]
-    else:
-        mask = None
+    mask = (
+        list(extract_cloud_features(cld, ["class_loss_mask"]).values())[0]
+        if extract_masks
+        else None
+    )
 
-    if extract_point_ids:
-        point_id = list(extract_cloud_features(cld, ["point_ids"]).values())[0]
-    else:
-        point_id = None
+    point_id = (
+        list(extract_cloud_features(cld, ["point_ids"]).values())[0]
+        if extract_point_ids
+        else None
+    )
 
     voxel_gen = PointToVoxel(
         vsize_xyz=[voxel_size] * 3,

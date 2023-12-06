@@ -65,7 +65,7 @@ class Dataset:
         try:
             return self.process_cloud(cld)
         except Exception:
-            print(f"Exception processing {cld}")
+            print(f"Exception processing {self.full_paths[idx]}")
             raise
 
     def __len__(self):

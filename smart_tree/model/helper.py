@@ -22,3 +22,7 @@ def log_cloud_on_wandb(clouds: List, epoch):
         upload_data,
         step=epoch,
     )
+
+
+def identity_collate_fn(batch):
+    return batch

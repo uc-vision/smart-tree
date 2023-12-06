@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from functools import partial
 from pathlib import Path
 from typing import List, Optional
@@ -125,42 +125,49 @@ class Cloud(Base):
 @dataclass
 class LabelledCloud(Cloud):
     """
-    medial_vector: Vector towards medial axis
-    branch_direction: Unit vector of branch direction of closest branch
-    branch_ids: ID of closest branch
-    class_l: Class of point (I.E. 0 = trunk, 1 = branch, 2 = leaf)
-    class_loss_mask: Areas we don't want to compute any loss on i.e. near edges of a block
-    vector_loss_mask: Where we don't want to compute loss for the medial vector or branch direction i.e. leaves
+    A class representing a point cloud with additional labeled data.
     """
 
     medial_vector: Optional[TensorType["N", 3]] = None
-    branch_direction: Optional[TensorType["N", 3]] = None
-    branch_ids: Optional[TensorType["N", 1]] = None
-    class_l: Optional[TensorType["N", 1]] = None
+    """ Vector towards medial axis. """
 
-    point_ids: Optional[TensorType["N", 2]] = None  # Batch number , point_number
+    branch_direction: Optional[TensorType["N", 3]] = None
+    """ Unit vector of branch direction of closest branch. """
+
+    branch_ids: Optional[TensorType["N", 1]] = None
+    """ ID of the closest branch. """
+
+    class_l: Optional[torch.Tensor] = None
+    """ Class of point (e.g., 0 = trunk, 1 = branch, 2 = leaf). """
+
+    point_ids: Optional[TensorType["N", 2]] = None
+    """ Batch number and point number. """
+
     class_loss_mask: Optional[TensorType["N", 1, torch.bool]] = None
+    """ Mask for areas where class loss is not computed (e.g., near edges). """
+
     vector_loss_mask: Optional[TensorType["N", 1, torch.bool]] = None
+    """ Mask for areas where vector loss is not computed (e.g., leaves). """
 
     def __post_init__(self):
-        if self.class_loss_mask == None:
-            mask_shape = (len(self), 1)
+        mask_shape = (len(self.xyz), 1)
+
+        if self.class_loss_mask is None:
             self.class_loss_mask = torch.ones(
-                mask_shape,
-                device=self.device,
-                dtype=torch.bool,
-            )
-            self.vector_loss_mask = torch.ones(
-                mask_shape,
-                device=self.device,
-                dtype=torch.bool,
+                mask_shape, dtype=torch.bool, device=self.device
             )
 
-        self.point_ids = torch.arange(
-            len(self), device=self.device, dtype=torch.int64
-        ).unsqueeze(1)
-        zeros_column = torch.zeros_like(self.point_ids)
-        self.point_ids = torch.cat((zeros_column, self.point_ids), dim=1)
+        if self.vector_loss_mask is None:
+            self.vector_loss_mask = torch.ones(
+                mask_shape, dtype=torch.bool, device=self.device
+            )
+
+        if self.point_ids is None:
+            self.point_ids = torch.arange(len(self.xyz)).unsqueeze(1)
+            zeros_column = torch.zeros_like(self.point_ids)
+            self.point_ids = torch.cat((zeros_column, self.point_ids), dim=1).to(
+                self.device
+            )
 
     def __str__(self):
         base_str = super().__str__()
@@ -168,6 +175,8 @@ class LabelledCloud(Cloud):
         for k, v in args.items():
             if v is not None:
                 base_str += f"\nContains: {k}"
+                if isinstance(v, torch.Tensor):
+                    base_str += f" Shape: {tuple(v.shape)}"
         base_str += f"\n{'*' * 80}"
         return f"{base_str}"
 
@@ -241,10 +250,11 @@ class LabelledCloud(Cloud):
             cmap = torch.tensor(
                 [
                     [1.0, 0.0, 0.0],  # Trunk
-                    [0.0, 1.0, 0.0],  # Spur / Cane / Shoot
+                    [0.0, 1.0, 0.0],  # Spur /\ Cane /\ Shoot
                     [0.0, 0.0, 1.0],  # Node
                     [1.0, 1.0, 0.0],  # Wire
                     [0.0, 1.0, 1.0],  # Post
+                    [1.0, 0.5, 1.0],
                 ]
             )
 
@@ -259,9 +269,14 @@ class LabelledCloud(Cloud):
         trunk_id = self.branch_ids[0]
         return self.filter((self.branch_ids != trunk_id).view(-1)).as_o3d_cld()
 
-    def as_o3d_loss_mask_cld(self) -> o3d.geometry.PointCloud:
+    def as_o3d_class_loss_mask_cld(self) -> o3d.geometry.PointCloud:
         cmap = torch.tensor([[1, 0, 0], [0, 1, 0]])
-        colours = cmap.to(self.device)[self.class_loss_mask.view(-1)]
+        colours = cmap.to(self.device)[self.class_loss_mask.long().view(-1)]
+        return o3d_cloud(self.xyz, colours=colours)
+
+    def as_o3d_vector_loss_mask_cld(self) -> o3d.geometry.PointCloud:
+        cmap = torch.tensor([[1, 0, 0], [0, 1, 0]])
+        colours = cmap.to(self.device)[self.vector_loss_mask.long().view(-1)]
         return o3d_cloud(self.xyz, colours=colours)
 
     def as_o3d_medial_cld(self) -> o3d.geometry.PointCloud:
@@ -288,96 +303,69 @@ class LabelledCloud(Cloud):
             items += [item("Branches", self.as_o3d_branch_cld())]
         if self.class_l is not None:
             items += [item("Segmented", self.as_o3d_segmented_cld())]
-        if self.loss_mask is not None:
-            items += [item("Loss Mask", self.as_o3d_loss_mask_cld())]
+        if self.class_loss_mask is not None:
+            items += [item("Class Loss Mask", self.as_o3d_class_loss_mask_cld())]
+        if self.vector_loss_mask is not None:
+            items += [item("Vector Loss Mask", self.as_o3d_vector_loss_mask_cld())]
         return items
 
     def view(self):
         o3d_viewer(self.viewer_items)
 
 
-def merge_labelled_cloud(clouds: List["LabelledCloud"]) -> "LabelledCloud":
-    """Merge a list of LabelledCloud instances into a single LabelledCloud."""
-    all_xyz, all_rgb, all_medial_vector, all_branch_direction = [], [], [], []
-    (
-        all_branch_ids,
-        all_class_l,
-        all_class_loss_mask,
-        all_vector_loss_mask,
-        all_vector,
-    ) = (
-        [],
-        [],
-        [],
-        [],
-        [],
+def concatenate_tensors(
+    tensors: List[Optional[torch.Tensor]],
+) -> Optional[torch.Tensor]:
+    filtered_tensors = [
+        tensor
+        for tensor in tensors
+        if tensor is not None and isinstance(tensor, torch.Tensor)
+    ]
+    return torch.cat(filtered_tensors, dim=0) if filtered_tensors else None
+
+
+def pad_tensor_to_length(tensor: torch.Tensor, target_length: int) -> torch.Tensor:
+    if tensor.shape[0] == target_length:
+        return tensor
+
+    remainder = target_length - tensor.shape[0]
+    padding = torch.full(
+        (remainder, *tensor.shape[1:]), torch.nan, device=tensor.device
+    )
+    return torch.cat([tensor, padding], dim=0)
+
+
+def merge_labelled_cloud(clouds: List[LabelledCloud]) -> LabelledCloud:
+    if not clouds:
+        raise ValueError("The input list of clouds is empty")
+
+    field_names = [field.name for field in fields(LabelledCloud)]
+
+    # Concatenate tensors for each field
+    concatenated = {
+        field: concatenate_tensors(
+            [
+                getattr(cloud, field)
+                for cloud in clouds
+                if getattr(cloud, field) is not None
+            ]
+        )
+        for field in field_names
+    }
+
+    # Find the target length from the 'xyz' attribute
+    target_length = (
+        concatenated["xyz"].shape[0] if concatenated.get("xyz") is not None else None
     )
 
-    def accumulate_tensors(accumulated_list, tensor):
-        if tensor is not None:
-            accumulated_list.append(tensor)
-
-    for cloud in clouds:
-        accumulate_tensors(all_xyz, cloud.xyz)
-        accumulate_tensors(all_rgb, cloud.rgb)
-        accumulate_tensors(all_medial_vector, cloud.medial_vector)
-        accumulate_tensors(all_branch_direction, cloud.branch_direction)
-        accumulate_tensors(all_branch_ids, cloud.branch_ids)
-        accumulate_tensors(all_class_l, cloud.class_l)
-        accumulate_tensors(all_class_loss_mask, cloud.class_loss_mask)
-        accumulate_tensors(all_vector_loss_mask, cloud.vector_loss_mask)
-        # accumulate_tensors(all_vector, cloud.vector)  # Legacy
-
-    # Concatenate all accumulated tensors
-    new_xyz = torch.cat(all_xyz, dim=0) if all_xyz else None
-    new_rgb = torch.cat(all_rgb, dim=0) if all_rgb else None
-
-    new_medial_vector = (
-        torch.cat(all_medial_vector, dim=0) if all_medial_vector else None
-    )
-    new_branch_direction = (
-        torch.cat(all_branch_direction, dim=0) if all_branch_direction else None
-    )
-    new_branch_ids = torch.cat(all_branch_ids, dim=0) if all_branch_ids else None
-    new_class_l = torch.cat(all_class_l, dim=0) if all_class_l else None
-    new_loss_mask = (
-        torch.cat(all_class_loss_mask, dim=0) if all_class_loss_mask else None
-    )
-    new_vector_loss_mask = (
-        torch.cat(all_vector_loss_mask, dim=0) if all_vector_loss_mask else None
-    )
-    new_vector = torch.cat(all_vector, dim=0) if all_vector else None  # Legacy
-
-    target_length = new_xyz.shape[0]
-
-    for item in [
-        new_rgb,
-        new_medial_vector,
-        new_branch_direction,
-        new_branch_ids,
-        new_class_l,
-        new_loss_mask,
-        new_vector_loss_mask,
-        new_vector,
-    ]:
-        if item == None:
+    # Pad other tensors to match the target length
+    for field in field_names:
+        if field == "xyz" or concatenated[field] is None:
             continue
 
-        if item.shape[0] != target_length:
-            remainder = target_length - item.shape[0]
-            item = torch.cat(
-                [item, torch.full((remainder,), -1, device=item.device)], dim=0
+        if concatenated[field].shape[0] != target_length:
+            concatenated[field] = pad_tensor_to_length(
+                concatenated[field], target_length
             )
 
-    # Return a new LabelledCloud with the concatenated tensors
-    return LabelledCloud(
-        xyz=new_xyz,
-        rgb=new_rgb,
-        medial_vector=new_medial_vector,
-        branch_direction=new_branch_direction,
-        branch_ids=new_branch_ids,
-        class_l=new_class_l,
-        loss_mask=new_loss_mask,
-        vector_loss_mask=new_vector_loss_mask,
-        vector=new_vector,  # Legacy
-    )
+    return LabelledCloud(**concatenated)

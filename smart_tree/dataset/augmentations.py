@@ -135,7 +135,8 @@ class RandomGaussianPeturb(Augmentation):
             torch.randn(cloud.xyz.shape, device=cloud.xyz.device, dtype=torch.float32)
             * self.std
             + self.mean
-        ).float()
+        )
+
         noise *= self.magnitude
         cloud.xyz[mask] += noise[mask]
         return cloud.with_xyz(cloud.xyz)
@@ -158,9 +159,20 @@ class SaltNoise(Augmentation):
             + min_xyz
         )
         labels = torch.full((num_points, 1), self.label_id, device=cloud.device).float()
-        salt_cld = LabelledCloud(points, class_l=labels)
+        salt_cld = LabelledCloud(
+            points,
+            rgb=torch.ones((num_points, 3), device=cloud.device),
+            class_l=labels,
+        )
+        salt_cld.point_ids = salt_cld.point_ids.to(cloud.device) + len(cloud)
 
-        return merge_labelled_cloud([cloud, salt_cld])
+        assert salt_cld.device == cloud.device, "Clouds must be on same device"
+
+        new_cloud = merge_labelled_cloud([cloud, salt_cld])
+
+        print(new_cloud.print_tensors_with_nans())
+
+        return new_cloud
 
 
 class RandomRotate(Augmentation):
@@ -207,7 +219,7 @@ class RandomDropout:
         self.probability = probability
 
     def __call__(self, cloud: Cloud) -> Cloud:
-        mask = torch.rand(cloud.xyz.shape[0]) < self.probability
+        mask = torch.rand(cloud.xyz.shape[0], device=cloud.device) < self.probability
         return cloud.filter(~mask)
 
 
@@ -215,10 +227,12 @@ class LabelDropout:
     def __init__(self, probability: float):
         self.probability = probability  # probability to drop label
 
-    def __call__(self, cloud: Cloud) -> Cloud:
-        cloud.loss_mask = (
-            torch.rand(cloud.loss_mask.shape[0]) > self.probability
+    def __call__(self, cloud: LabelledCloud) -> LabelledCloud:
+        cloud.class_loss_mask = (
+            torch.rand(cloud.class_loss_mask.shape[0], device=cloud.device)
+            > self.probability
         ).unsqueeze(1)
+
         return cloud
 
 
