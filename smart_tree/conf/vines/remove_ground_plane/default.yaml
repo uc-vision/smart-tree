@@ -20,7 +20,7 @@ directory: /local/synthetic-vine-pcds-3-rotated
 json_path: /local/smart-tree/smart_tree/conf/vines/vine-split.json
 voxel_size: 0.005
 input_feature_names : ['xyz']
-target_feature_names: ['class_l']
+target_feature_names: ['medial_vector', 'class_l']
 
 cmap:
     - [1.0, 0.0, 0.0] # Trunk
@@ -190,9 +190,7 @@ capture_dataset:
   augmentation:
     _target_: smart_tree.dataset.augmentations.AugmentationPipeline
     augmentations:
-      - _target_: smart_tree.dataset.augmentations.CentreCloud
-      - _target_: smart_tree.dataset.augmentations.RemoveGround
-        ground_height_percentage: 35
+        - _target_: smart_tree.dataset.augmentations.CentreCloud
 
 
 capture_data_loader:

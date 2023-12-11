@@ -99,25 +99,34 @@ class Smart_Tree(nn.Module):
         targets: torch.tensor,
         meta_data,
     ):
+        def gather_pt_data(dict: Dict, data: Data):
+            for k, v in dict.items():
+                dict[k] = gather_features_by_pc_voxel_id(v, data.voxel_id)
+            return dict
+
+        predictions = gather_pt_data(predictions, meta_data)
+        targets = gather_pt_data(targets, meta_data)
+
         losses = {}
 
-        mask = meta_data.mask.reshape(-1).bool()
+        class_mask = meta_data.class_mask.reshape(-1).bool()
+        vector_mask = meta_data.vector_mask.reshape(-1).bool()
 
         if "radius" in self.target_features:
-            target_radius = targets["radius"]  # [mask]
+            target_radius = targets["radius"][vector_mask]
             if self.log_radius:
                 target_radius = torch.log(target_radius)
-            pred_radius = predictions["radius"][mask]
+            pred_radius = predictions["radius"][vector_mask]
             losses["radius"] = self.radius_loss(pred_radius, target_radius)
 
         if "medial_direction" in self.target_features:
-            tgt_dir = targets["medial_direction"][mask]
-            pred_dir = predictions["medial_direction"][mask]
+            tgt_dir = targets["medial_direction"][vector_mask]
+            pred_dir = predictions["medial_direction"][vector_mask]
             losses["medial_direction"] = self.direction_loss(pred_dir, tgt_dir)
 
         if "class_l" in self.target_features:
-            target_class = targets["class_l"]  # [mask]
-            pred_class = predictions["class_l"]  # [mask]
+            target_class = targets["class_l"][class_mask]
+            pred_class = predictions["class_l"][class_mask]
             losses["class_l"] = self.class_loss(pred_class, target_class)
 
         return losses

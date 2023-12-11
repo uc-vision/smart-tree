@@ -96,11 +96,22 @@ class RandomCrop(Augmentation):
 
 
 class RemoveGround(Augmentation):
-    def __init__(self, ground_height):
-        self.ground_height = ground_height
+    def __init__(self, ground_height_percentage, dim=2):
+        if not 0 <= ground_height_percentage <= 100:
+            raise ValueError("ground_height_percentage must be between 0 and 100")
+        if not 0 <= dim <= 2:
+            raise ValueError("dim must be 0 (x), 1 (y), or 2 (z)")
+
+        self.ground_height_percentage = ground_height_percentage / 100
+        self.dim = dim
 
     def __call__(self, cloud):
-        mask = cloud.xyz[:, 2] >= self.ground_height
+        height_range = cloud.max_xyz - cloud.min_xyz
+
+        cut_off = cloud.min_xyz + (height_range * self.ground_height_percentage)
+        cut_off_height = cut_off[self.dim]
+
+        mask = cloud.xyz[:, self.dim] >= cut_off_height
 
         return cloud.filter(mask)
 
@@ -170,8 +181,6 @@ class SaltNoise(Augmentation):
 
         new_cloud = merge_labelled_cloud([cloud, salt_cld])
 
-        print(new_cloud.print_tensors_with_nans())
-
         return new_cloud
 
 
@@ -232,6 +241,18 @@ class LabelDropout:
             torch.rand(cloud.class_loss_mask.shape[0], device=cloud.device)
             > self.probability
         ).unsqueeze(1)
+
+        return cloud
+
+
+class MaskVector:
+    def __init__(self, vector_classes: list):
+        self.vector_classes = torch.tensor(vector_classes)  # probability to drop label
+
+    def __call__(self, cloud: LabelledCloud) -> LabelledCloud:
+        self.vector_classes = self.vector_classes.to(cloud.device)
+
+        cloud.vector_loss_mask = torch.isin(cloud.class_l, self.vector_classes)
 
         return cloud
 

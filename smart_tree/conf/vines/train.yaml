@@ -6,7 +6,7 @@ wandb:
   project: vine-9001
   entity: harry1576
   mode: online
-  dir: /local/smart-tree
+  dir: /local/smart-tree #mnt/maara/singapore_project/wandb/
 
 fp16: True
 num_epoch: 200
@@ -15,12 +15,14 @@ lr: 0.005
 early_stop_epoch: 20
 early_stop: True
 
-batch_size: 2
-directory: /mnt/harry/PhD/smart-tree/data/synthetic-vine-pcds-3-rotated
-json_path: /mnt/harry/PhD/smart-tree/smart_tree/conf/vines/vine-split.json
+batch_size: 8
+directory: /local/synthetic-vine-pcds-3-rotated
+json_path: /local/smart-tree/smart_tree/conf/vines/vine-split.json
 voxel_size: 0.005
 input_feature_names : ['xyz']
-target_feature_names: ['class_l']
+target_feature_names: ['medial_vector','class_l']
+
+vector_classes: [1,2]
 
 cmap:
     - [1.0, 0.0, 0.0] # Trunk
@@ -28,7 +30,7 @@ cmap:
     - [0.0, 0.0, 1.0] # Node
     - [1.0, 1.0, 0.0] # Wire
     - [0.0, 1.0, 1.0] # Post
-    - [1.0, 0.5, 1.0]
+    - [1.0, 0.5, 1.0] # Noise
 
 ########################################
 # Training Dataset
@@ -45,6 +47,8 @@ train_dataset:
       - _target_: smart_tree.dataset.augmentations.CentreCloud
       # # - _target_: smart_tree.dataset.augmentations.RemoveGround
       # #   ground_height: 0.4
+      - _target_: smart_tree.dataset.augmentations.MaskVector
+        vector_classes: ${vector_classes}
       - _target_: smart_tree.dataset.augmentations.RandomFlips
         x_prob: 0.5
         y_prob: 0.5
@@ -53,7 +57,7 @@ train_dataset:
         apply_prob: 0.5
         augmentations:
           - _target_: smart_tree.dataset.augmentations.SaltNoise
-            percentage: 0.005  # based on number of xyz points add random points
+            percentage: 0.001  # based on number of xyz points add random points
             label_id: 5
           - _target_: smart_tree.dataset.augmentations.RandomGaussianPeturb
             mean: 0.0
@@ -200,7 +204,9 @@ capture_dataset:
   augmentation:
     _target_: smart_tree.dataset.augmentations.AugmentationPipeline
     augmentations:
-        - _target_: smart_tree.dataset.augmentations.CentreCloud
+      - _target_: smart_tree.dataset.augmentations.CentreCloud
+      - _target_: smart_tree.dataset.augmentations.RemoveGround
+        ground_height_percentage: 35
 
 
 capture_data_loader:
@@ -224,6 +230,8 @@ capture_data_loader:
   dataset: ${capture_dataset}
 
 capture_output: True
+capture_on_improvement: True
+capture_final_epoch: False
 capture_epoch: 5
 capture_delete_old_artifacts: True
 capture_fn:
@@ -236,7 +244,7 @@ model:
   _target_: smart_tree.model.sparse.model.Smart_Tree
   input_channels: 3
   unet_planes: [32, 64, 128, 256, 384, 384, 512, 512]
-  mlp_layers: 2
+  mlp_layers: 3
   num_classes: 6
   target_features: ${target_feature_names}
 

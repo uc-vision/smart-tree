@@ -24,7 +24,7 @@ def unpackage_data(data: dict) -> Tuple[Cloud, TreeSkeleton]:
     cld = LabelledCloud(
         xyz=torch.tensor(data["xyz"]),
         rgb=torch.tensor(data["rgb"]),
-        # medial_vector=data["medial_vector"],
+        medial_vector=data["medial_vector"],
         class_l=torch.tensor(data["class_l"]).int().reshape(-1, 1),
         branch_ids=torch.tensor(data["branch_ids"]).int().reshape(-1, 1),
     )
@@ -237,7 +237,6 @@ class CloudLoader:
         }
         cloud_data = {}
         for k, v in labelled_cloud_fields.items():
-            print(k)
             if type(v) == np.ndarray:
                 if v.any() == None:
                     continue
@@ -247,6 +246,9 @@ class CloudLoader:
                 cloud_data["medial_vector"] = torch.from_numpy(v).float()
             else:
                 cloud_data[k] = torch.from_numpy(v).float()
+
+        if "vector" in data.keys():
+            cloud_data["medial_vector"] = torch.from_numpy(data["vector"]).float()
 
         cloud_data["filename"] = Path(fn)
 

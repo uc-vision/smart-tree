@@ -11,7 +11,8 @@ from .transform import VoxelizedTrainingData, merge_voxelized_data
 class Data:
     point_id: torch.Tensor
     voxel_id: torch.Tensor
-    mask: torch.Tensor
+    class_mask: torch.Tensor
+    vector_mask: torch.Tensor
     filename: str
 
 
@@ -53,7 +54,8 @@ def batch_collate(
         Data(
             training_data.point_id,
             training_data.voxel_id,
-            training_data.mask,
+            training_data.class_mask,
+            training_data.vector_mask,
             training_data.filename,
         ),
     )

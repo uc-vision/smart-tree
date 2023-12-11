@@ -18,6 +18,9 @@ from smart_tree.data_types.cloud import LabelledCloud
 from .helper import log_cloud_on_wandb
 
 
+log = logging.getLogger(__name__)
+
+
 def train_epoch(data_loader, model, optimizer, scaler=None, tracker=None):
     data_loader_tqdm = tqdm(data_loader, desc="Training", leave=False)
 
@@ -68,13 +71,21 @@ def capture_clouds(data_loader, model, capture_func: Callable):
     model.eval()
     clouds: List[LabelledCloud] = []
 
-    for model_input, targets, data in data_loader:
+    data_loader_tqdm = tqdm(data_loader, desc="Capturing Clouds", leave=False)
+
+    for model_input, targets, data in data_loader_tqdm:
         preds = model.forward(model_input)
 
         clouds += capture_func(model_input, preds, data)
 
     model.train()
     return clouds
+
+
+def capture_and_log_clouds(data_loader, model, capture_func: Callable, epoch):
+    clouds = capture_clouds(data_loader, model, capture_func)
+    log_cloud_on_wandb(clouds, epoch)
+    log.info(f"Captured Clouds {epoch}")
 
 
 @hydra.main(
@@ -85,7 +96,6 @@ def capture_clouds(data_loader, model, capture_func: Callable):
 def main(cfg: DictConfig):
     torch.manual_seed(42)
     torch.cuda.manual_seed_all(42)
-    log = logging.getLogger(__name__)
 
     ti.init(arch=ti.gpu)
     run = wandb.init(
@@ -134,7 +144,6 @@ def main(cfg: DictConfig):
 
     epochs_no_improve = 0
     best_epoch_loss = torch.inf
-    best_epoch = 0
 
     # Epochs
     for epoch in tqdm(range(0, cfg.num_epoch), leave=True, desc="Epoch"):
@@ -153,23 +162,15 @@ def main(cfg: DictConfig):
         if val_tracker.epoch_loss < best_epoch_loss:
             epochs_no_improve = 0
             best_epoch_loss = val_tracker.epoch_loss
-            best_epoch = epoch
             wandb.run.summary["Best Val Loss"] = best_epoch_loss
             torch.save(model.state_dict(), f"{run_dir}/{run_name}_model_weights.pt")
             log.info(f"Weights Saved at epoch: {epoch}")
-            clouds: List = capture_clouds(capturer_loader, model, capture_function)
+
+            if cfg.capture_output and cfg.capture_on_improvement:
+                capture_and_log_clouds(capturer_loader, model, capture_function, epoch)
 
         else:
             epochs_no_improve += 1
-
-        # if (
-        #     cfg.capture_output and (epoch + 1) % cfg.capture_epoch == 0
-        # ) or epochs_no_improve == 0:
-        #     if cfg.capture_delete_old_artifacts and artefacts_logged:
-        #         for artifact in run.logged_artifacts():
-        #             artifact.delete(delete_aliases=True)
-
-        #     artefacts_logged = True
 
         scheduler.step(val_tracker.epoch_loss) if cfg.lr_decay else None
 
@@ -185,7 +186,8 @@ def main(cfg: DictConfig):
             test_tracker.log("Testing", epoch)
             val_tracker.log("Validation", epoch)
 
-    log_cloud_on_wandb(clouds, epoch)
+    if cfg.capture_output and cfg.capture_final_epoch:
+        capture_and_log_clouds(capturer_loader, model, capture_function, epoch)
 
 
 if __name__ == "__main__":

@@ -15,7 +15,8 @@ class VoxelizedTrainingData:
     targets: Dict[str, torch.Tensor]
     voxel_id: torch.Tensor
     filename: str | List[str]
-    mask: Optional[torch.Tensor] = None
+    class_mask: Optional[torch.Tensor] = None
+    vector_mask: Optional[torch.Tensor] = None
     point_id: Optional[torch.Tensor] = None
 
 
@@ -27,7 +28,9 @@ def merge_voxelized_data(
 
     # Initialize lists to store point_ids and masks if they exist
     point_ids = []
-    masks = []
+    class_masks = []
+    vector_masks = []
+
     file_names = []
 
     for i, data in enumerate(data_list):
@@ -37,15 +40,19 @@ def merge_voxelized_data(
             data.point_id[:, 0] = torch.tensor([i], dtype=torch.float32)
             point_ids.append(data.point_id)
 
-        if data.mask is not None:
-            masks.append(data.mask)
+        if data.class_mask is not None:
+            class_masks.append(data.class_mask)
+
+        if data.vector_mask is not None:
+            vector_masks.append(data.vector_mask)
 
     merged_coords = torch.cat([data.coords for data in data_list], dim=0)
     merged_voxel_id = torch.cat([data.voxel_id for data in data_list], dim=0)
 
     # Merge point_ids and masks if they are not empty
     merged_point_id = torch.cat(point_ids, dim=0) if point_ids else None
-    merged_mask = torch.cat(masks, dim=0) if masks else None
+    merged_class_mask = torch.cat(class_masks, dim=0) if class_masks else None
+    merged_vector_mask = torch.cat(vector_masks, dim=0) if vector_masks else None
 
     for data in data_list:
         for key, tensor in data.input_voxelized.items():
@@ -70,7 +77,8 @@ def merge_voxelized_data(
         targets=merged_targets,
         point_id=merged_point_id,
         voxel_id=merged_voxel_id,
-        mask=merged_mask,
+        class_mask=merged_class_mask,
+        vector_mask=merged_vector_mask,
         filename=file_names,  # Assuming all data have the same filename
     )
 
@@ -133,7 +141,13 @@ def sparse_voxelize(
 
     target_feats = extract_cloud_features(cld, target_feature_names)
 
-    mask = (
+    class_mask = (
+        list(extract_cloud_features(cld, ["class_loss_mask"]).values())[0]
+        if extract_masks
+        else None
+    )
+
+    vector_mask = (
         list(extract_cloud_features(cld, ["class_loss_mask"]).values())[0]
         if extract_masks
         else None
@@ -177,6 +191,7 @@ def sparse_voxelize(
         target_feats,
         voxel_id,
         cld.filename,
-        mask,
+        class_mask,
+        vector_mask,
         point_id,
     )

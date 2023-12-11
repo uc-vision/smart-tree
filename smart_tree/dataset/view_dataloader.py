@@ -24,7 +24,7 @@ def main(cfg: DictConfig):
 
     torch.multiprocessing.set_start_method("spawn")
 
-    loader = instantiate(cfg.train_data_loader)
+    loader = instantiate(cfg.capture_data_loader)
     log.info(f"Train Dataset Size: {len(loader.dataset)}")
 
     for i in range(10):
