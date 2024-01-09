@@ -2,7 +2,8 @@ import argparse
 from pathlib import Path
 from typing import List, Tuple
 
-from smart_tree.data_types.cloud import Cloud, CloudLoader
+from smart_tree.data_types.cloud import Cloud
+from smart_tree.util.file import CloudLoader
 from smart_tree.data_types.tree import TreeSkeleton
 from smart_tree.o3d_abstractions.visualizer import o3d_viewer
 
@@ -17,7 +18,7 @@ def view_synthetic_data(data: List[Tuple[Cloud, TreeSkeleton]], line_width=1):
 
         geometries += (
             cloud.translate(-cloud.centre)
-            # .translate(torch.tensor([0, 0, -cloud.max_y / 2]))
+            #.translate(torch.tensor([0, 0, -cloud.max_y / 2]))
             .viewer_items
         )
 
@@ -25,6 +26,7 @@ def view_synthetic_data(data: List[Tuple[Cloud, TreeSkeleton]], line_width=1):
 
 
 def parse_args():
+    
     parser = argparse.ArgumentParser(description="Visualizer Arguments")
 
     parser.add_argument(

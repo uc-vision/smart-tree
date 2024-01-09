@@ -3,7 +3,11 @@ from pathlib import Path
 
 import torch
 
-from smart_tree.data_types.cloud import CloudLoader
+from smart_tree.util.file import (
+    CloudLoader,
+    save_data_npz,
+    load_cloud_and_skeleton,
+)
 from smart_tree.util.maths import euler_angles_to_rotation
 
 
@@ -43,11 +47,15 @@ def paths_from_args(args, glob="*.npz"):
         return files
 
 
+def load_data(paths):
+    for path in paths:
+        yield load_cloud_and_skeleton(path)
+
+
 def main():
     args = parse_args()
 
-    loader = CloudLoader()
-    clouds = [loader.load(filename) for filename in paths_from_args(args)]
+    # loader = CloudLoader()
 
     rotation_mat = euler_angles_to_rotation(torch.tensor([1.57, 0.0, 0.0])).float()
 
@@ -55,14 +63,19 @@ def main():
 
     # translated_cloud = [cloud.translate(-cloud.centre) for cloud in rotated_clouds]
 
-    for cloud in clouds:
+    for cloud, skeleton in load_data(paths_from_args(args)):
+        print("Cloud Loaded...")
+
+        print(cloud.medial_vector)
+
+        cloud.view()
+
         cloud = cloud.rotate(rotation_mat)
 
-        # save_name = cloud.filename.name
-        # save_cloud(
-        #     cloud,
-        #     f"/mnt/harry/PhD/smart-tree/data/synthetic-vine-pcds-3-rotated/{save_name}",
-        # )
+        save_name = f"/local/smart-tree/data/vines/synthetic-vine-pcds-3-rotated/{cloud.filename.name}"
+
+        save_data_npz(save_name, skeleton, cloud)
+
         cloud.view()
 
 

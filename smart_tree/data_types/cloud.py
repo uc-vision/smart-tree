@@ -183,8 +183,6 @@ class LabelledCloud(Cloud):
     def translate(self, translation_vector: TensorType[3]) -> Cloud:
         args = asdict(self)
         args["xyz"] = args["xyz"] + translation_vector
-        if args["medial_vector"] is not None:
-            args["medial_vector"] = args["medial_vector"] + translation_vector
         return LabelledCloud(**args)
 
     def scale(self, factor: float | TensorType[1] | torch.tensor) -> LabelledCloud:
@@ -196,15 +194,16 @@ class LabelledCloud(Cloud):
 
     def rotate(self, rot_matrix: TensorType[3, 3]) -> LabelledCloud:
         args = asdict(self)
-        rot_mat = rot_matrix.T.to(self.device).to(self.xyz.dtype)
+        xyz_rot_mat = rot_matrix.T.to(self.device).to(self.xyz.dtype)
 
-        args["xyz"] = torch.matmul(args["xyz"], rot_mat).to(self.xyz.dtype)
+        args["xyz"] = torch.matmul(args["xyz"], xyz_rot_mat).to(self.xyz.dtype)
         if args["medial_vector"] is not None:
-            args["medial_vector"] = torch.matmul(args["medial_vector"], rot_mat)
+            medial_rot_mat = rot_matrix.T.to(self.device).to(self.medial_vector.dtype)
+            args["medial_vector"] = torch.matmul(args["medial_vector"], medial_rot_mat)
         if args["branch_direction"] is not None:
             args["branch_direction"] = torch.matmul(
                 args["branch_direction"],
-                rot_mat,
+                xyz_rot_mat,
             )
         return LabelledCloud(**args)
 
@@ -250,10 +249,10 @@ class LabelledCloud(Cloud):
             cmap = torch.tensor(
                 [
                     [1.0, 0.0, 0.0],  # Trunk
-                    [0.0, 1.0, 0.0],  # Spur /\ Cane /\ Shoot
+                    [0.0, 1.0, 0.0],  # Spur /|\ Cane /|\ Shoot
                     [0.0, 0.0, 1.0],  # Node
                     [1.0, 1.0, 0.0],  # Wire
-                    [0.0, 1.0, 1.0],  # Post
+                    [0.0, 1.0, 1.0],  # PostS
                     [1.0, 0.5, 1.0],
                 ]
             )
