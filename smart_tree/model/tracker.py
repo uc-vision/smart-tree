@@ -15,6 +15,9 @@ class Tracker:
         for k, v in loss_dict.items():
             self.losses.setdefault(k, []).append(v.item())
 
+    def update_metrics(self, *args, **kwargs):
+        pass
+
     @property
     def epoch_loss(self):
         return sum(v[-1] for v in self.losses.values())

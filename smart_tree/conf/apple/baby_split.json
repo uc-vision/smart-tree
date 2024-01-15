@@ -1,0 +1,38 @@
+{
+    "train": [
+        "apple_1.npz",
+        "apple_10.npz",
+        "apple_100.npz",
+        "apple_11.npz",
+        "apple_12.npz",
+        "apple_14.npz",
+        "apple_17.npz",
+        "apple_18.npz",
+        "apple_19.npz",
+        "apple_2.npz"
+    ],
+    "test": [
+        "apple_21.npz",
+        "apple_27.npz",
+        "apple_35.npz",
+        "apple_41.npz",
+        "apple_49.npz",
+        "apple_53.npz",
+        "apple_58.npz",
+        "apple_62.npz",
+        "apple_70.npz",
+        "apple_88.npz"
+    ],
+    "validation": [
+        "apple_13.npz",
+        "apple_15.npz",
+        "apple_16.npz",
+        "apple_44.npz",
+        "apple_48.npz",
+        "apple_80.npz",
+        "apple_81.npz",
+        "apple_83.npz",
+        "apple_91.npz",
+        "apple_94.npz"
+    ]
+}

@@ -24,7 +24,6 @@ dependencies = [
     'plyfile',
     'py_structs',
     'torchtyping',
-    'beartype',
     'typeguard==2.11.1',
     'taichi',
     'pycln',

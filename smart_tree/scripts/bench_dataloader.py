@@ -7,20 +7,19 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig
 from tqdm import tqdm
 
-from smart_tree.model.helper import get_batch
-
+import taichi as ti
 
 @hydra.main(
     version_base=None,
-    config_path="../conf",
-    config_name="vine-dataset",
+    config_path="/local/smart-tree/smart_tree/conf/apple",
+    config_name="train",
 )
 def main(cfg: DictConfig):
     torch.manual_seed(42)
     torch.cuda.manual_seed_all(42)
     log = logging.getLogger(__name__)
-
-    cfg = cfg.training
+    
+    ti.init(arch=ti.gpu,log_level=ti.INFO)
     torch.multiprocessing.set_start_method("spawn")
 
     train_loader = instantiate(cfg.train_data_loader)
@@ -29,8 +28,7 @@ def main(cfg: DictConfig):
     while True:
         start = time.time()
 
-        batches = get_batch(train_loader, device="cpu")
-        for sparse_input, targets, mask, filenames in tqdm(batches):
+        for x in tqdm(train_loader):
             pass
 
         print(time.time() - start)

@@ -20,7 +20,6 @@ from .graph import Graph, join_graphs
 from .line import LineSegment
 from .tube import Tube
 
-
 @typechecked
 @dataclass
 class TreeSkeleton:
@@ -51,7 +50,7 @@ class TreeSkeleton:
                 continue
 
             parent_branch = self.branches[branch.parent_id]
-            tubes = parent_branch.to_tubes()
+            tubes = parent_branch.as_tubes()
 
             v, idx, _ = pts_to_nearest_tube(
                 branch.xyz[[0]],
@@ -135,7 +134,7 @@ class TreeSkeleton:
         return torch.cat(xyz, dim=0)
 
     def to_tubes(self) -> List[Tube]:
-        return flatten_list([b.to_tubes() for b in self.branches.values()])
+        return flatten_list([b.as_tubes() for b in self.branches.values()])
 
     def to_line_segments(self) -> List[LineSegment]:
         return flatten_list([b.to_line_segments() for b in self.branches.values()])
@@ -179,12 +178,19 @@ class TreeSkeleton:
 
         return join_graphs(graphs, offset_edges=False)
 
+    def pin_memory(self):
+        new_branches = {}
+        for branch_id, branch in self.branches.items():
+            new_branches[branch_id] = branch.pin_memory()
+
+        return TreeSkeleton(self._id, new_branches, self.colour)
+
     def to_device(self, device: torch.device):
         new_branches = {}
         for branch_id, branch in self.branches():
             new_branches[branch_id] = branch.to_device(device)
 
-        return BranchSkeleton(self._id, new_branches, self.colour)
+        return TreeSkeleton(self._id, new_branches, self.colour)
 
     def as_o3d_linesets(self) -> List[o3d.geometry.LineSet]:
         return [b.as_o3d_lineset() for b in self.branches.values()]

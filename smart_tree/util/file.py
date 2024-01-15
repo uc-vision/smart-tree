@@ -21,7 +21,7 @@ class CloudLoader:
     def load(self, file: str | Path):
         file_path = Path(file)
         if file_path.suffix == ".npz":
-            return self.load_numpy(np.load(file, allow_pickle=True))
+            return self.load_numpy(file_path)
         else:
             return self.load_o3d(file_path)
 
@@ -34,7 +34,8 @@ class CloudLoader:
         except Exception as e:
             raise ValueError(f"Error loading file {file}: {e}")
 
-    def load_numpy(self, data) -> Cloud | LabelledCloud:
+    def load_numpy(self, file: str | Path) -> Cloud | LabelledCloud:
+        data = np.load(file, allow_pickle=True)
         optional_params = [
             f.name for f in fields(LabelledCloud) if f.default is not None
         ]
@@ -73,9 +74,63 @@ class CloudLoader:
         return fields_dict
 
 
-class SkeletonLoader:
-  
+# class CloudLoader:
+#     def load(self, file: str | Path):
+#         file_path = Path(file)
+#         if file_path.suffix == ".npz":
+#             return self.load_numpy(np.load(file, allow_pickle=True))
+#         else:
+#             return self.load_o3d(file_path)
 
+#     def load_o3d(self, file: str | Path) -> Cloud:
+#         try:
+#             pcd = o3d.io.read_point_cloud(str(file))
+#             return self._load_as_cloud(
+#                 {"xyz": np.asarray(pcd.points), "rgb": np.asarray(pcd.colors)}, file
+#             )
+#         except Exception as e:
+#             raise ValueError(f"Error loading file {file}: {e}")
+
+#     def load_numpy(self, data) -> Cloud | LabelledCloud:
+#         optional_params = [
+#             f.name for f in fields(LabelledCloud) if f.default is not None
+#         ]
+
+#         for param in optional_params:
+#             if param in data:
+#                 return self._load_as_labelled_cloud(data, file)
+
+#         return self._load_as_cloud(data, file)
+
+#     def _load_as_cloud(self, data, file_path: Path) -> Cloud:
+#         cloud_fields = self._extract_fields(data, Cloud, file_path)
+#         return Cloud(**cloud_fields)
+
+#     def _load_as_labelled_cloud(self, data, file_path: Path) -> LabelledCloud:
+#         labelled_cloud_fields = self._extract_fields(data, LabelledCloud, file_path)
+#         return LabelledCloud(**labelled_cloud_fields)
+
+#     def _extract_fields(self, data, cloud_type, file_path: Path) -> dict:
+#         fields_dict = {
+#             f.name: data[f.name] for f in fields(cloud_type) if f.name in data
+#         }
+#         for key, value in tqdm(fields_dict.items(), desc="Loading cloud", leave=False):
+#             if isinstance(value, np.ndarray):
+#                 dtype = torch.long if key in ["class_l", "branch_ids"] else torch.float
+#                 if value.ndim == 1:
+#                     fields_dict[key] = torch.from_numpy(value).type(dtype).unsqueeze(1)
+#                 else:
+#                     fields_dict[key] = torch.from_numpy(value).type(dtype)
+
+#         fields_dict["filename"] = file_path
+
+#         # if "vector" in data.keys():
+#         #     fields_dict["medial_vector"] = torch.from_numpy(data["vector"]).type(dtype)
+
+#         return fields_dict
+
+
+class SkeletonLoader:
     def load(self, file: str | Path):
         if Path(file).suffix == ".npz":
             return self.process_numpy(np.load(file))
@@ -88,6 +143,7 @@ class SkeletonLoader:
         branch_parent_id = data["branch_parent_id"]
         skeleton_xyz = data["skeleton_xyz"]
         skeleton_radii = data["skeleton_radii"]
+
         sizes = data["branch_num_elements"]
 
         offsets = np.cumsum(np.append([0], sizes))
@@ -97,27 +153,26 @@ class SkeletonLoader:
 
         for idx, _id, parent_id in zip(branch_idx, branch_id, branch_parent_id):
             branches[int(_id)] = BranchSkeleton(
-                int(_id),
-                int(parent_id),
-                torch.tensor(skeleton_xyz[idx]).float(),
-                torch.tensor(skeleton_radii[idx]).float(),
+                _id=int(_id),
+                parent_id=int(parent_id),
+                xyz=torch.tensor(skeleton_xyz[idx]).float(),
+                radii=torch.tensor(skeleton_radii[idx]).float(),
             )
 
         return TreeSkeleton(int(tree_id), branches)
 
 
 class Skeleton_and_Cloud_Loader:
+    def __init__(self):
+        self.skeleton_loader = SkeletonLoader()
+        self.cloud_loader = CloudLoader()
 
-  def __init__(self):
-    self.skeleton_loader = SkeletonLoader()
-    self.cloud_loader = CloudLoader()
+    def load(self, path: Path):
+        np_data = np.load(path, allow_pickle=True)
+        skeleton = self.skeleton_loader.load_numpy(np_data)
 
-  def load(self, path: Path):
-      np_data = np.load(path, allow_pickle=True)
-      skeleton = self.skeleton_loader.load_numpy(np_data)
-      pcd = self.cloud_loader._load_as_cloud(np_data)
-      return skeleton, pcd
-
+        pcd = self.cloud_loader._load_as_cloud(np_data, path)
+        return skeleton, pcd
 
 
 # def unpackage_data(data: dict) -> Tuple[Cloud, TreeSkeleton]:

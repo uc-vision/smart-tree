@@ -48,10 +48,10 @@ class Pipeline:
         return self.process_cloud(cloud)
 
     def process_cloud(self, cloud: Cloud):
-        preprocessed_cld = self.preprocessing(cloud).to_device(self.device)
+        cloud = self.preprocessing(cloud).to_device(self.device)
 
         # Run cloud through network
-        cloud: LabelledCloud = self.model_inference.forward(preprocessed_cld)
+        cloud: LabelledCloud = self.model_inference.forward(cloud)
 
         if self.view_model_output:
             cloud.view()

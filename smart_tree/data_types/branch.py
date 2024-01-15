@@ -30,6 +30,7 @@ class BranchSkeleton(Base):
     child_id: Optional[int] = None
     colour: TensorType[3] = field(default_factory=lambda: torch.rand(3))
 
+
     def __len__(self) -> int:
         return self.xyz.shape[0]
 

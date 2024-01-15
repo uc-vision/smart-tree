@@ -149,6 +149,8 @@ class LabelledCloud(Cloud):
     vector_loss_mask: Optional[TensorType["N", 1, torch.bool]] = None
     """ Mask for areas where vector loss is not computed (e.g., leaves). """
 
+    loss_mask: Optional[TensorType["N", 1, torch.bool]] = None
+
     def __post_init__(self):
         mask_shape = (len(self.xyz), 1)
 
@@ -234,8 +236,8 @@ class LabelledCloud(Cloud):
         return self.medial_vector.pow(2).sum(1).sqrt().unsqueeze(1)
 
     @property
-    def medial_direction(self) -> torch.Tensor:
-        return F.normalize(self.medial_vector)
+    def medial_direction(self) -> TensorType["N", 3]:
+        return F.normalize(self.medial_vector.float())
 
     @property
     def medial_pts(self) -> TensorType["N", 3]:

@@ -4,8 +4,6 @@ pipeline:
   preprocessing:
     _target_: smart_tree.dataset.augmentations.AugmentationPipeline
     augmentations:
-      - _target_:  smart_tree.dataset.augmentations.FixedRotate
-        xyz: [-1.57, 0.0, 0.0]
       - _target_:  smart_tree.dataset.augmentations.CentreCloud
 
 
@@ -15,8 +13,8 @@ pipeline:
 
     model:
       _target_: smart_tree.model.model_inference.load_model
-      model_path:  /mnt/harry/PhD/smart-tree/smart_tree/model/weights/hardy-bird-278_model.pt
-      weights_path: /mnt/harry/PhD/smart-tree/smart_tree/model/weights/hardy-bird-278_model_weights.pt
+      model_path:  /local/smart-tree/smart_tree/model/weights/iconic-violet-252_model.pt
+      weights_path: /local/smart-tree/smart_tree/model/weights/iconic-violet-252_model_weights.pt
 
     dataloader:
       _target_: smart_tree.model.model_inference.load_dataloader
@@ -29,10 +27,12 @@ pipeline:
         _target_: smart_tree.model.sparse.transform.sparse_voxelize
         _partial_: True
         voxel_size: 0.01
-        input_features: ['xyz']
+        input_feature_names: ['xyz']
+        target_feature_names: []
       collate_fn:
         _target_: smart_tree.model.sparse.util.batch_collate
         _partial_: True
+        fp_16: True
 
   skeletonizer:
     _target_: smart_tree.skeleton.skeletonize.Skeletonizer

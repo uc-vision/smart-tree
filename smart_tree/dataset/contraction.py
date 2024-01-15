@@ -3,8 +3,7 @@ from dataclasses import asdict, dataclass
 
 from pathlib import Path
 import torch
-from smart_tree.data_types.tree import repair_skeleton
-
+# from smart_tree.data_types.tree import repair_skeleton
 
 import geometry_grid.torch_geometry as torch_geom
 from geometry_grid.taichi_geometry.grid import  Grid, morton_sort
@@ -18,7 +17,7 @@ from geometry_grid.functional.distance import batch_point_distances
 from geometry_grid.taichi_geometry.attract_query import attract_query
 from geometry_grid.taichi_geometry.min_query import min_query
 
-from geometry_grid.render_util import display_distances
+# from geometry_grid.render_util import display_distances
 # from open3d_vis import render
 # import open3d as o3d
 
@@ -73,76 +72,76 @@ def to_medial_axis(segments:torch.Tensor, points:torch.Tensor):
    
 
 
-def main():
-    args = parse_args()
+# def main():
+#     args = parse_args()
 
-    ti.init(arch=ti.gpu, debug=args.debug, log_level=ti.INFO)
+#     ti.init(arch=ti.gpu, debug=args.debug, log_level=ti.INFO)
 
-    cloud, skeleton = load_data_npz(args.file_path)
-    # view_synthetic_data([(data, args.file_path)])
-    skeleton = repair_skeleton(skeleton)
-
-
-    device = torch.device(args.device)
-    np_tubes = collate_tubes(skeleton.to_tubes())
+#     cloud, skeleton = load_data_npz(args.file_path)
+#     # view_synthetic_data([(data, args.file_path)])
+#     skeleton = repair_skeleton(skeleton)
 
 
-    tubes = {k:torch.from_numpy(x).to(dtype=torch.float32, device=device) for k, x in asdict(np_tubes).items()}
-
-    segments = torch_geom.Segment(tubes['a'], tubes['b'])
-    radii = torch.stack((tubes['r1'], tubes['r2']), -1).squeeze(0)
+#     device = torch.device(args.device)
+#     np_tubes = collate_tubes(skeleton.to_tubes())
 
 
+#     tubes = {k:torch.from_numpy(x).to(dtype=torch.float32, device=device) for k, x in asdict(np_tubes).items()}
 
-    tubes = torch_geom.Tube(segments, radii)
-    bounds = tubes.bounds.union_all()
-
-    points = torch.from_numpy(cloud.xyz).to(dtype=torch.float32, device=device)
-    points = morton_sort(points, n=256)
+#     segments = torch_geom.Segment(tubes['a'], tubes['b'])
+#     radii = torch.stack((tubes['r1'], tubes['r2']), -1).squeeze(0)
 
 
-    print("Generate grid...")
-    tube_grid = CountedGrid.from_torch(
-        Grid.fixed_size(bounds, (16, 16, 16)), tubes)
 
-    point_grid = DynamicGrid.from_torch(
-        Grid.fixed_size(bounds, (64, 64, 64)), torch_geom.Point(points))
+#     tubes = torch_geom.Tube(segments, radii)
+#     bounds = tubes.bounds.union_all()
+
+#     points = torch.from_numpy(cloud.xyz).to(dtype=torch.float32, device=device)
+#     points = morton_sort(points, n=256)
+
+
+#     print("Generate grid...")
+#     tube_grid = CountedGrid.from_torch(
+#         Grid.fixed_size(bounds, (16, 16, 16)), tubes)
+
+#     point_grid = DynamicGrid.from_torch(
+#         Grid.fixed_size(bounds, (64, 64, 64)), torch_geom.Point(points))
     
-    vis = o3d.visualization.VisualizerWithKeyCallback()
-    vis.create_window("test", width=800, height=600)
+#     vis = o3d.visualization.VisualizerWithKeyCallback()
+#     vis.create_window("test", width=800, height=600)
 
 
-    pcd = render.point_cloud(points, color=(0, 0, 1))
-    vis.add_geometry(pcd)
+#     pcd = render.point_cloud(points, color=(0, 0, 1))
+#     vis.add_geometry(pcd)
 
 
-    def update_points(vis):
-      _, idx = min_query(tube_grid, points, 0.2, relative_distance)
+#     def update_points(vis):
+#       _, idx = min_query(tube_grid, points, 0.2, relative_distance)
 
 
 
-      point_grid.update_objects(torch_geom.Point(points))
-      # forces to regularize points and make them spread out
-      forces = attract_query(point_grid.index, points, 
-                            sigma=0.01, query_radius=0.02) 
+#       point_grid.update_objects(torch_geom.Point(points))
+#       # forces to regularize points and make them spread out
+#       forces = attract_query(point_grid.index, points, 
+#                             sigma=0.01, query_radius=0.02) 
 
-      # # project forces along segment direction only
-      dirs = segments.unit_dir[idx]
-      forces = torch_geom.dot(dirs, forces).unsqueeze(1) * dirs
+#       # # project forces along segment direction only
+#       dirs = segments.unit_dir[idx]
+#       forces = torch_geom.dot(dirs, forces).unsqueeze(1) * dirs
       
-      points.add_(-forces)
+#       points.add_(-forces)
 
-      to_axis = to_medial_axis(segments[idx], points)
-      points.add_(to_axis * 0.1 + torch.randn_like(points) * 0.0001)
+#       to_axis = to_medial_axis(segments[idx], points)
+#       points.add_(to_axis * 0.1 + torch.randn_like(points) * 0.0001)
   
-      pcd.points = o3d.utility.Vector3dVector(points.cpu().numpy())
-      vis.update_geometry(pcd)
+#       pcd.points = o3d.utility.Vector3dVector(points.cpu().numpy())
+#       vis.update_geometry(pcd)
 
 
-    vis.register_key_callback(ord(' '), update_points)
+#     vis.register_key_callback(ord(' '), update_points)
 
-    while (True):
-      vis.poll_events()
+#     while (True):
+#       vis.poll_events()
 
     # display_vectors(points, -points.grad)
     # o3d.visualization.draw(

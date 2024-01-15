@@ -20,7 +20,7 @@ directory: /local/apple/
 json_path: /local/smart-tree/smart_tree/conf/apple/split.json
 voxel_size: 0.01
 input_feature_names : ['xyz']
-target_feature_names: ['medial_vector','class_l']
+target_feature_names: ['radius', 'medial_direction']
 
 vector_classes: [1,2]
 
@@ -91,7 +91,7 @@ validation_data_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: ${batch_size}
   drop_last: False
-  pin_memory: False
+  pin_memory: True
   num_workers: 0
   shuffle: False
   collate_fn:
@@ -121,7 +121,7 @@ test_data_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: ${batch_size}
   drop_last: False
-  pin_memory: False
+  pin_memory: True
   num_workers: 0
   shuffle: False
   collate_fn:
@@ -148,9 +148,9 @@ capture_fn:
 model:
   _target_: smart_tree.model.sparse.model.Smart_Tree
   input_channels: 3
-  unet_planes: [32, 64, 128, 256, 512, 512]
+  unet_planes: [32, 64, 128, 256, 512]
   mlp_layers: 3
-  num_classes: 6
+  num_classes: 2
   target_features: ${target_feature_names}
 
 optimizer:
@@ -162,10 +162,10 @@ scheduler:
   mode: "min"
 
 training_tracker:
-  _target_: smart_tree.model.tracker.SegmentationTracker
+  _target_: smart_tree.model.tracker.Tracker
 
 val_tracker:
-  _target_: smart_tree.model.tracker.SegmentationTracker
+  _target_: smart_tree.model.tracker.Tracker
 
 test_tracker:
-  _target_: smart_tree.model.tracker.SegmentationTracker
+  _target_: smart_tree.model.tracker.Tracker

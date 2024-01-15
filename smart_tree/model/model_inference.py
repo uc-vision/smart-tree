@@ -52,40 +52,44 @@ class ModelInference:
         inputs, masks = [], []
         radius, medial_direction, branch_direction, class_l = [], [], [], []
 
-        for input_feats, coords, mask, filename in tqdm(
-            self.dataloader(cloud), leave=False, desc="Model Inference"
+        for model_input, targets, meta_data in tqdm(
+            self.dataloader(cloud),
+            leave=False,
+            desc="Model Inference",
         ):
-            sparse_input = sparse_from_batch(
-                input_feats,
-                coords,
-                device=self.device,
-            )
+            # sparse_input = sparse_from_batch(
+            #     input_feats,
+            #     coords,
+            #     device=self.device,
+            # )
 
-            preds = self.model.forward(sparse_input)
+            preds = self.model.forward(model_input)
 
-            mask = mask.view(-1)
+            # mask = mask.view(-1)
 
-            # radius.append(preds["radius"][mask])
-            # medial_direction.append(preds["medial_direction"][mask])
+            # quit()
+
+            radius.append(preds["radius"])
+            medial_direction.append(preds["medial_direction"])
             # branch_direction.append(preds["branch_direction"][mask])
-            class_l.append(preds["class_l"][mask])
+            # class_l.append(preds["class_l"])
 
-            inputs.append(input_feats[mask])
+            inputs.append(model_input.features)
 
-        # radius = torch.cat(radius)
-        # medial_direction = torch.cat(medial_direction)
-        class_l = torch.cat(class_l)
+        radius = torch.cat(radius)
+        medial_direction = torch.cat(medial_direction)
+        # class_l = torch.cat(class_l)
         # branch_direction = torch.cat(branch_direction)
         inputs = torch.cat(inputs)
 
-        # medial_vector = torch.exp(radius) * medial_direction
+        medial_vector = torch.exp(radius) * medial_direction
 
-        class_l = torch.argmax(class_l, dim=1, keepdim=True)
+        # class_l = torch.argmax(class_l, dim=1, keepdim=True)
 
         return LabelledCloud(
             xyz=inputs[:, :3],
             # rgb=inputs[:, 3:6],
             # branch_direction=branch_direction,
-            # medial_vector=medial_vector,
-            class_l=class_l,
+            medial_vector=medial_vector,
+            # class_l=class_l,
         ).to_device(self.device)

@@ -81,15 +81,15 @@ class Smart_Tree(nn.Module):
 
         self.output_feats = output.features
 
-        if "radius" in self.target_features:
-            predictions["radius"] = self.radius_head(self.output_feats)
+        # if "radius" in self.target_features:
+        predictions["radius"] = self.radius_head(self.output_feats)
 
-        if "medial_direction" in self.target_features:
-            predictions["medial_direction"] = F.normalize(
-                self.medial_dir_head(self.output_feats)
-            )
-        if "class_l" in self.target_features:
-            predictions["class_l"] = self.class_head(self.output_feats)
+        # if "medial_direction" in self.target_features:
+        predictions["medial_direction"] = F.normalize(
+            self.medial_dir_head(self.output_feats).float()
+        )
+        # if "class_l" in self.target_features:
+        # predictions["class_l"] = self.class_head(self.output_feats)
 
         return predictions
 
