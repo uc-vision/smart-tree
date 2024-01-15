@@ -65,6 +65,7 @@ def strattified_sample(read_dir, json_save_path, split=[0.65, 0.25, 0.1]):
     data["test"] = sorted(flatten_list(test_paths))
     data["validation"] = sorted(flatten_list(val_paths))
 
+
     with open(json_save_path, "w") as outfile:
         json.dump(data, outfile, indent=4, sort_keys=False)
 

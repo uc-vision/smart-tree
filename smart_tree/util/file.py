@@ -21,7 +21,7 @@ class CloudLoader:
     def load(self, file: str | Path):
         file_path = Path(file)
         if file_path.suffix == ".npz":
-            return self.load_numpy(file_path)
+            return self.load_numpy(np.load(file, allow_pickle=True))
         else:
             return self.load_o3d(file_path)
 
@@ -34,8 +34,7 @@ class CloudLoader:
         except Exception as e:
             raise ValueError(f"Error loading file {file}: {e}")
 
-    def load_numpy(self, file: str | Path) -> Cloud | LabelledCloud:
-        data = np.load(file, allow_pickle=True)
+    def load_numpy(self, data) -> Cloud | LabelledCloud:
         optional_params = [
             f.name for f in fields(LabelledCloud) if f.default is not None
         ]
@@ -75,13 +74,15 @@ class CloudLoader:
 
 
 class SkeletonLoader:
+  
+
     def load(self, file: str | Path):
         if Path(file).suffix == ".npz":
             return self.process_numpy(np.load(file))
         else:
             raise ValueError(f"Unsupported file type")
 
-    def process_numpy(self, data):
+    def load_numpy(self, data):
         tree_id = data["tree_id"]
         branch_id = data["branch_id"]
         branch_parent_id = data["branch_parent_id"]
@@ -105,10 +106,18 @@ class SkeletonLoader:
         return TreeSkeleton(int(tree_id), branches)
 
 
-def load_cloud_and_skeleton(path: Path | str):
-    cloud_loader = CloudLoader()
-    skeleton_loader = SkeletonLoader()
-    return cloud_loader.load(path), skeleton_loader.load(path)
+class Skeleton_and_Cloud_Loader:
+
+  def __init__(self):
+    self.skeleton_loader = SkeletonLoader()
+    self.cloud_loader = CloudLoader()
+
+  def load(self, path: Path):
+      np_data = np.load(path, allow_pickle=True)
+      skeleton = self.skeleton_loader.load_numpy(np_data)
+      pcd = self.cloud_loader._load_as_cloud(np_data)
+      return skeleton, pcd
+
 
 
 # def unpackage_data(data: dict) -> Tuple[Cloud, TreeSkeleton]:

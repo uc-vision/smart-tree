@@ -7,7 +7,7 @@ import torch.utils.data
 from typeguard import typechecked
 
 from ..data_types.cloud import Cloud, LabelledCloud
-from ..util.file import CloudLoader
+from ..util.file import CloudLoader, Skeleton_and_Cloud_Loader
 from .augmentations import AugmentationPipeline
 
 
@@ -22,6 +22,7 @@ class Dataset:
         augmentation: Optional[AugmentationPipeline] = None,
         cache: bool = False,
         self_consistency: bool = False,
+        loader=Skeleton_and_Cloud_Loader(),
         device=torch.device("cuda:0"),
     ):
         self.mode = mode
@@ -49,21 +50,22 @@ class Dataset:
         assert not invalid_paths, f"Missing {len(invalid_paths)} files: {invalid_paths}"
 
         self.cache = {} if cache else None
-        self.cloud_loader = CloudLoader()
+      
+        self.loader = loader
 
     def load(self, filename) -> Cloud | LabelledCloud:
         if self.cache is None:
-            return self.cloud_loader.load(filename)
+            return self.loader.load(filename)
 
         if filename not in self.cache:
-            self.cache[filename] = self.cloud_loader.load(filename).pin_memory()
+            self.cache[filename] = self.loader.load(filename).pin_memory()
 
         return self.cache[filename]
 
     def __getitem__(self, idx):
-        cld = self.load(self.full_paths[idx])
+        data = self.load(self.full_paths[idx])
         try:
-            return self.process_cloud(cld)
+            return self.process(data)
         except Exception:
             print(f"Exception processing {self.full_paths[idx]}")
             raise
@@ -71,8 +73,12 @@ class Dataset:
     def __len__(self):
         return len(self.full_paths)
 
-    def process_cloud(self, cld: Cloud | LabelledCloud) -> Any:
-        data = cld.to_device(self.device)
+    def process(self, data) -> Any:
+
+        #data = cld.to_device(self.device)
+        print(len(data))
+
+        quit()
 
         if self.augmentation != None:
             data = self.augmentation(data)
