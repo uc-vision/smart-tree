@@ -21,7 +21,7 @@ The code provided is a deep-learning-based skeletonization method for point clou
 
 ## 💾 Data:
 
-Please download data from this <a href="https://github.com/uc-vision/synthetic-trees">link</a>. <br>
+Please follow instructions to download data from this <a href="https://github.com/uc-vision/synthetic-trees">link</a>. <br>
 
 ## 🔧 Installation:
 
