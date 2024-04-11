@@ -20,6 +20,32 @@ def at_least_2d(tensors: Union[List[torch.tensor], torch.tensor], expand_dim=1):
             return tensors
 
 
+def as_numpy(func):
+    def wrapper(*args, **kwargs):
+        new_args = []
+        for arg in args:
+            if isinstance(arg, torch.Tensor) and arg.is_cuda:
+                new_args.append(arg.cpu())
+            else:
+                new_args.append(arg)
+
+        new_kwargs = {}
+        for key, value in kwargs.items():
+            if isinstance(value, torch.Tensor) and value.is_cuda:
+                new_kwargs[key] = value.cpu()
+            else:
+                new_kwargs[key] = value
+
+        result = func(*new_args, **new_kwargs)
+
+        if isinstance(result, torch.Tensor) and result.is_cuda:
+            return result.cpu()
+        else:
+            return result
+
+    return wrapper
+
+
 def to_torch(numpy_arrays: List[np.array], device=torch.device("cpu")):
     return [torch.from_numpy(np_arr).float().to(device) for np_arr in numpy_arrays]
 
@@ -58,25 +84,18 @@ def points_to_edges(points):
     return torch.column_stack((parents, children))
 
 
-def voxel_downsample(xyz, voxel_size):
-    xyz_quantized = (
-        xyz // voxel_size
-    )  # torch.div(xyz + (voxel_size / 2), voxel_size, rounding_mode="floor")
+def voxel_filter(xyz: torch.Tensor, voxel_size: float) -> torch.Tensor:
+    xyz_quantized = torch.floor(xyz / voxel_size).int()
 
-    unique, idx, counts = torch.unique(
-        xyz_quantized,
-        dim=0,
-        sorted=True,
-        return_counts=True,
-        return_inverse=True,
+    unique, inverse_indices = torch.unique(
+        xyz_quantized, dim=0, sorted=False, return_inverse=True
     )
 
-    _, ind_sorted = torch.sort(idx, stable=True)
-    cum_sum = counts.cumsum(0)
-    cum_sum = torch.cat((torch.tensor([0], device=cum_sum.device), cum_sum[:-1]))
-    first_indicies = ind_sorted[cum_sum[1:]]
+    mask = torch.zeros_like(inverse_indices, dtype=torch.bool)
 
-    return first_indicies
+    mask[torch.unique(inverse_indices, sorted=True)[1]] = True
+
+    return mask
 
 
 def merge_dictionaries(dict1, dict2):

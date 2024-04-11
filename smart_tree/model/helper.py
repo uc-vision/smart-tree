@@ -7,7 +7,7 @@ from py_structs.torch import map_tensors
 
 from smart_tree.data_types.cloud import Cloud
 
-from .sparse import sparse_from_batch
+from .util import sparse_from_batch
 
 
 def get_batch(dataloader, device, fp_16=False):

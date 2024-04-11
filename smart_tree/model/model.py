@@ -1,10 +1,10 @@
-
 import spconv.pytorch as spconv
 import torch.nn as nn
 import torch.nn.functional as F
 
 from smart_tree.model.model_blocks import MLP, SubMConvBlock, UBlock
-
+from .util import SparseVoxelData
+from dataclasses import asdict
 
 
 class Smart_Tree(nn.Module):
@@ -74,14 +74,16 @@ class Smart_Tree(nn.Module):
             m.weight.data.fill_(1.0)
             m.bias.data.fill_(0.0)
 
-    def forward(self, input):
-        predictions = {}
+    def forward(self, input: SparseVoxelData):
+        outputs = {}
 
-        x = self.input_conv(input)
+        sparse_input = spconv.SparseConvTensor(**asdict(input))
+
+        x = self.input_conv(sparse_input)
         unet_out = self.UNet(x)
 
-        predictions["radius"] = self.radius_head(unet_out).features
-        predictions["direction"] = F.normalize(self.direction_head(unet_out).features)
-        predictions["class_l"] = self.class_head(unet_out).features
+        outputs["radius"] = self.radius_head(unet_out).features
+        outputs["direction"] = F.normalize(self.direction_head(unet_out).features)
+        outputs["class_l"] = self.class_head(unet_out).features
 
-        return predictions
+        return outputs

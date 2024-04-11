@@ -17,5 +17,5 @@ data_loader:
   shuffle: True
   #prefetch_factor: None
   collate_fn:
-    _target_: smart_tree.model.sparse.batch_collate
+    _target_: smart_tree.model.util.batch_collate
     _partial_: True

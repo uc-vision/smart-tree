@@ -33,11 +33,11 @@ target_features:
   - class_l
 
 train_dataset:
-  _target_: smart_tree.dataset.dataset.TreeDataset
+  _target_: smart_tree.dataset.dataset.Dataset.from_json
+  json_path: ${json_path}
+  directory: ${directory}
   mode: train
   voxel_size: ${voxel_size}
-  directory: ${directory}
-  json_path: ${json_path}
   input_features: ${input_features}
   target_features: ${target_features}
   augmentation:
@@ -47,11 +47,11 @@ train_dataset:
         size: 4.0
 
 test_dataset:
-  _target_: smart_tree.dataset.dataset.TreeDataset
+  _target_: smart_tree.dataset.dataset.Dataset.from_json
+  json_path: ${json_path}
+  directory: ${directory}
   mode: test
   voxel_size: ${voxel_size}
-  directory: ${directory}
-  json_path: ${json_path}
   input_features: ${input_features}
   target_features: ${target_features}
   augmentation:
@@ -61,11 +61,11 @@ test_dataset:
         size: 4.0
 
 validation_dataset:
-  _target_: smart_tree.dataset.dataset.TreeDataset
+  _target_: smart_tree.dataset.dataset.Dataset.from_json
+  json_path: ${json_path}
+  directory: ${directory}
   mode: validation
   voxel_size: ${voxel_size}
-  directory: ${directory}
-  json_path: ${json_path}
   input_features: ${input_features}
   target_features: ${target_features}
   cache: True
@@ -89,8 +89,9 @@ train_data_loader:
   #   num_samples: 8
   #   data_source: ${train_dataset}
   collate_fn:
-    _target_: smart_tree.model.sparse.batch_collate
+    _target_: smart_tree.model.util.batch_collate
     _partial_: True
+
   dataset: ${train_dataset}
 
 validation_data_loader:
@@ -101,7 +102,7 @@ validation_data_loader:
   num_workers: 0
   shuffle: False
   collate_fn:
-    _target_: smart_tree.model.sparse.batch_collate
+    _target_: smart_tree.model.util.batch_collate
     _partial_: True
   dataset: ${validation_dataset}
 
@@ -113,7 +114,7 @@ test_data_loader:
   num_workers: 0
   shuffle: False
   collate_fn:
-    _target_: smart_tree.model.sparse.batch_collate
+    _target_: smart_tree.model.util.batch_collate
     _partial_: True
   dataset: ${test_dataset}
 

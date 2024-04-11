@@ -1,75 +1,86 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 
-import numpy as np
 import open3d as o3d
 import torch
-from torchtyping import TensorType
+from torchtyping import TensorType, patch_typeguard
 from typeguard import typechecked
 
-from smart_tree.o3d_abstractions.geometries import o3d_path, o3d_tube_mesh
-
+from ..o3d_abstractions.geometries import o3d_path, o3d_tube_mesh
+from ..o3d_abstractions.visualizer import ViewerItem, o3d_viewer
+from .base import Base
+from .graph import Graph
+from .line import LineSegment
 from .tube import Tube
+
+patch_typeguard()
 
 
 @typechecked
 @dataclass
-class BranchSkeleton:
+class BranchSkeleton(Base):
     _id: int
     parent_id: int
-    xyz: TensorType["N", 3]
-    radii: TensorType["N", 1]
+    xyz: TensorType["N", 3, float]
+    radii: TensorType["N", 1, float]
+
+    branch_direction: Optional[TensorType["N", 3, float]] = None
     child_id: Optional[int] = None
+    colour: TensorType[3] = field(default_factory=lambda: torch.rand(3))
 
-    def __post_init__(self) -> None:
-        self.colour = np.random.rand(3)
-
-    def __len__(self) -> np.array:
+    def __len__(self) -> int:
         return self.xyz.shape[0]
 
-    def __str__(self):
-        return f" ID: {self._id} \
-                  Points: {self.xyz} \
-                  Radii {self.radii}"
-
-    def to_o3d_lineset(self, colour=(0, 0, 0)) -> o3d.geometry.LineSet:
-        return o3d_path(self.xyz, colour)
-
-    def to_o3d_tube(self) -> o3d.geometry.TriangleMesh:
-        return o3d_tube_mesh(self.xyz.numpy(), self.radii.numpy(), self.colour)
-
-    def to_tubes(self, colour=(1, 0, 0)) -> List[Tube]:
-        a_, b_, r1_, r2_ = (
-            self.xyz[:-1],
-            self.xyz[1:],
-            self.radii[:-1],
-            self.radii[1:],
-        )
-        return [Tube(a, b, r1, r2) for a, b, r1, r2 in zip(a_, b_, r1_, r2_)]
-
-    def filter(self, mask) -> BranchSkeleton:
-        return BranchSkeleton(
-            self._id,
-            self.parent_id,
-            self.xyz[mask],
-            self.radii[mask],
-            self.child_id,
+    def __str__(self) -> str:
+        return (
+            f"{'*' * 80}"
+            f"Branch ({self._id}):\n"
+            f"Number Points:{len(self)}\n"
+            f"Length: {self.length}\n"
+            f"{'*' * 80}"
         )
 
-    @property
-    def length(self) -> TensorType[1]:
-        return (self.xyz[1:] - self.xyz[:-1]).norm(dim=1).sum()
+    def as_tubes(self) -> List[Tube]:
+        return list(map(Tube, self.xyz, self.xyz[1:], self.radii, self.radii[1:]))
+
+    def as_line_segments(self) -> List[LineSegment]:
+        return list(map(LineSegment, self.xyz, self.xyz[1:]))
+
+    def as_graph(self) -> Graph:
+        edge_idx = torch.arange(len(self.xyz), dtype=torch.long).unsqueeze(0)
+        edge_idx = torch.cat([edge_idx[:, :-1], edge_idx[:, 1:]], dim=0)
+        edge_weights = (self.xyz[1:] - self.xyz[:-1]).norm(dim=1)
+
+        return Graph(
+            self.xyz,
+            edge_idx,
+            edge_weights,
+            radius=self.radii,
+            branch_direction=self.branch_direction,
+        )
 
     @property
-    def initial_radius(self) -> TensorType[1]:
-        return torch.max(self.radii[0], self.radii[-1])
+    def length(self) -> TensorType[float]:
+        return torch.diff(self.xyz, dim=0).norm(dim=1).sum()
 
     @property
-    def biggest_radius_idx(self) -> TensorType[1]:
-        return torch.argmax(self.radii)
+    def initial_radius(self) -> float:
+        return max(self.radii[0].item(), self.radii[-1].item())
+
+    def as_o3d_lineset(self) -> o3d.geometry.LineSet:
+        return o3d_path(self.xyz, self.colour)
+
+    def as_o3d_tube(self) -> o3d.geometry.TriangleMesh:
+        return o3d_tube_mesh(self.xyz, self.radii, self.colour)
 
     @property
-    def biggest_radius(self) -> TensorType[1]:
-        return torch.max(self.radii)
+    def viewer_items(self) -> list[ViewerItem]:
+        return [
+            ViewerItem(f"Branch {self._id} Lineset", self.as_o3d_lineset()),
+            ViewerItem(f"Branch {self._id} Tube", self.as_o3d_tube()),
+        ]
+
+    def view(self):
+        o3d_viewer(self.viewer_items)

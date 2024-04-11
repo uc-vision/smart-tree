@@ -35,7 +35,7 @@ def nn(src, dest, r=1.0, grid=None):
 
 def nn_graph(points: torch.Tensor, radii, K=40):
     idxs, dists, _ = knn(points, points, K=K, r=radii.max().item())
-    idxs[dists > radii.unsqueeze(1)] = -1
+    idxs[dists > radii] = -1
     edges, edge_weights = make_edges(dists, idxs)
     return Graph(points, edges, edge_weights)
 
@@ -57,7 +57,7 @@ def make_edges(dists, idxs):
     edges = torch.stack([parent, idxs], dim=2)
 
     valid = idxs.view(-1) > 0
-    return edges.view(-1, 2)[valid], dists.view(-1)[valid]
+    return edges.view(-1, 2)[valid], dists.view(-1, 1)[valid]
 
 
 def nn_flat(points, K=50, r=1.0, device=torch.device("cuda")):

@@ -6,7 +6,6 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig
 
 
-
 @hydra.main(
     version_base=None,
     config_path="conf",
@@ -16,11 +15,11 @@ def main(cfg: DictConfig):
     pipeline = instantiate(cfg.pipeline)
 
     if "path" in dict(cfg):
-        pipeline.process_cloud(Path(cfg.path))
+        pipeline.run(Path(cfg.path))
 
     elif "directory" in dict(cfg):
         for p in os.listdir(cfg.directory):
-            pipeline.process_cloud(Path(f"{cfg.directory}/{p}"))
+            pipeline.run(Path(f"{cfg.directory}/{p}"))
 
     else:
         print("Please supply a path or directory to point clouds.")

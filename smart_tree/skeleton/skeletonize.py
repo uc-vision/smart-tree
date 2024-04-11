@@ -6,14 +6,12 @@ import torch
 from cugraph import sssp
 from tqdm import tqdm
 
-from ..data_types.cloud import Cloud
+from ..data_types.cloud import LabelledCloud
 from ..data_types.graph import Graph
 from ..data_types.tree import DisjointTreeSkeleton, TreeSkeleton
-from .filter import outlier_removal
 from .graph import decompose_cuda_graph, nn_graph
 from .path import sample_tree
-from .shortest_path import (pred_graph,
-                            shortest_paths)
+from .shortest_path import pred_graph, shortest_paths
 
 
 class Skeletonizer:
@@ -22,18 +20,38 @@ class Skeletonizer:
         K: int,
         min_connection_length: float,
         minimum_graph_vertices: int,
+        outlier_remove_nb_points: int = 8,
+        prune_skeletons=False,
+        min_skeleton_radius=None,
+        min_skeleton_length=None,
+        repair_skeletons=False,
+        smooth_skeletons=False,
+        smooth_kernel_size=11,
         device: torch.device = torch.device("cuda:0"),
     ):
         self.K = K
         self.min_connection_length = min_connection_length
         self.minimum_graph_vertices = minimum_graph_vertices
+        self.outlier_remove_nb_points = outlier_remove_nb_points
+
+        self.prune_skeletons = prune_skeletons
+        self.min_skeleton_radius = min_skeleton_radius
+        self.min_skeleton_length = min_skeleton_length
+        self.repair_skeletons = repair_skeletons
+        self.smooth_skeletons = smooth_skeletons
+        self.smooth_kernel_size = smooth_kernel_size
+
         self.device = device
 
-    def forward(self, cloud: Cloud) -> DisjointTreeSkeleton:
+    def forward(self, cloud: LabelledCloud) -> DisjointTreeSkeleton:
         cloud.to_device(self.device)
 
-        mask = outlier_removal(cloud.medial_pts, cloud.radius.unsqueeze(1), nb_points=8)
-        cloud = cloud.filter(mask)
+        # mask = outlier_removal(
+        #     cloud.medial_pts,
+        #     cloud.radius,
+        #     nb_points=self.outlier_remove_nb_points,
+        # )
+        # cloud = cloud.filter(mask)
 
         graph: Graph = nn_graph(
             cloud.medial_pts,
@@ -46,16 +64,35 @@ class Skeletonizer:
         )
 
         skeletons = []
-        for subgraph_id, subgraph in enumerate(
-            tqdm(subgraphs, desc="Processing Connected Components", leave=False)
-        ):
-            skeletons.append(
-                self.process_subgraph(cloud, subgraph, skeleton_id=subgraph_id)
+
+        pbar = tqdm(subgraphs, desc="Skeletonizing", leave=False)
+        for subgraph_id, subgraph in enumerate(pbar):
+            skeleton = self.process_subgraph(cloud, subgraph, subgraph_id)
+            if len(skeleton.branches) != 0:
+                skeletons.append(skeleton)
+
+        skeleton = DisjointTreeSkeleton(skeletons)
+
+        if self.prune_skeletons:
+            skeleton.prune(
+                min_length=self.min_skeleton_length,
+                min_radius=self.min_skeleton_radius,
             )
 
-        return DisjointTreeSkeleton(skeletons)
+        if self.repair_skeletons:
+            skeleton.repair()
 
-    def process_subgraph(self, cloud, subgraph, skeleton_id=0) -> TreeSkeleton:
+        if self.smooth_skeletons:
+            skeleton.smooth(self.smooth_kernel_size)
+
+        return skeleton
+
+    def process_subgraph(
+        self,
+        cloud: LabelledCloud,
+        subgraph,
+        skeleton_id=0,
+    ) -> TreeSkeleton:
         """Extract skeleton for connected component"""
 
         subgraph_vertice_idx = torch.tensor(
@@ -71,7 +108,7 @@ class Skeletonizer:
             device=self.device,
         )
 
-        verts, preds, distance = shortest_paths(
+        verts, preds, distances = shortest_paths(
             subgraph_cloud.root_idx,
             edges,
             edge_weights,
@@ -86,24 +123,23 @@ class Skeletonizer:
         )
 
         branches = sample_tree(
-            subgraph_cloud.medial_pts,
-            subgraph_cloud.radius.unsqueeze(1),
+            subgraph_cloud,
             preds,
             distances,
-            subgraph_cloud.xyz,
         )
 
-        return TreeSkeleton(skeleton_id, branches)
-
-    @staticmethod
-    def from_cfg(cfg):
-        return Skeletonizer(
-            K=cfg.K,
-            min_connection_length=cfg.min_connection_length,
-            minimum_graph_vertices=cfg.minimum_graph_vertices,
-            edge_non_linear=cfg.edge_non_linear,
-        )
+        return TreeSkeleton(skeleton_id, branches, colour=torch.rand(3))
 
 
-if __name__ == "__main__":
-    main()
+#     @staticmethod
+#     def from_cfg(cfg):
+#         return Skeletonizer(
+#             K=cfg.K,
+#             min_connection_length=cfg.min_connection_length,
+#             minimum_graph_vertices=cfg.minimum_graph_vertices,
+#             edge_non_linear=cfg.edge_non_linear,
+#         )
+
+
+# if __name__ == "__main__":
+#     main()

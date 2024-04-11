@@ -1,74 +1,43 @@
+from __future__ import annotations
+
 import pickle
 from dataclasses import dataclass
-from typing import Dict, List
+from functools import partial
+from typing import Dict, List, Optional
 
 import open3d as o3d
 import torch
 import torch.nn.functional as F
 from torchtyping import TensorType
-from tqdm import tqdm
+from typeguard import typechecked
 
-from ..o3d_abstractions.geometries import (o3d_merge_linesets,
-                                           o3d_merge_meshes)
-from ..o3d_abstractions.visualizer import o3d_viewer
-from ..util.misc import flatten_list, merge_dictionaries
-from ..util.queries import pts_to_nearest_tube_gpu
+from ..o3d_abstractions.geometries import o3d_merge_linesets, o3d_merge_meshes
+from ..o3d_abstractions.visualizer import ViewerItem, o3d_viewer
+from ..util.misc import flatten_list
+from ..util.queries import pts_to_nearest_tube
 from .branch import BranchSkeleton
+from .graph import Graph, join_graphs
+from .line import LineSegment
 from .tube import Tube
 
 
+@typechecked
 @dataclass
 class TreeSkeleton:
     _id: int
     branches: Dict[int, BranchSkeleton]
-
-    def __post_init__(self):
-        self.colour = torch.rand(3)
+    colour: Optional[TensorType[3]] = torch.rand(3)
 
     def __len__(self) -> int:
         return len(self.branches)
 
     def __str__(self) -> str:
-        return f"Tree Skeleton ({self._id}) has {len(self)} branches..."
-
-    def to_o3d_linesets(self) -> List[o3d.geometry.LineSet]:
-        return [b.to_o3d_lineset() for b in self.branches.values()]
-
-    def to_o3d_lineset(self, colour=(0, 0, 0)) -> o3d.geometry.LineSet:
-        return o3d_merge_linesets(self.to_o3d_linesets(), colour=colour)
-
-    def to_o3d_tubes(self) -> List[o3d.geometry.TriangleMesh]:
-        return [b.to_o3d_tube() for b in self.branches.values()]
-
-    def to_o3d_tube(self) -> o3d.geometry.TriangleMesh:
-        return o3d_merge_meshes(self.to_o3d_tubes())
-
-    def view(self):
-        o3d_viewer([self.to_o3d_lineset(), self.to_o3d_tube()])
-
-    def to_tubes(self) -> List[Tube]:
-        return flatten_list([b.to_tubes() for b in self.branches.values()])
-
-    def sample_skeleton(self, spacing):
-        return sample_tubes(self.to_tubes(), spacing)
-
-    def to_device(self, device):
-        for branch_id, branch in self.branches():
-            return BranchSkeleton(
-                _id,
-                parent_id,
-                self.xyz.to(device),
-                self.radii.to(device),
-                child_id,
-            )
-
-    def point_to_skeleton(self):
-        tubes = self.to_tubes()
-
-        def point_to_tube(pt):
-            return pts_to_nearest_tube_gpu(pt.reshape(-1, 3), tubes)
-
-        return point_to_tube  # v, idx, _
+        return (
+            f"{'*' * 80}"
+            f"Tree Skeleton {self._id} :\n"
+            f"Num Branches: {len(self.branches)}\n"
+            f"{'*' * 80}"
+        )
 
     def repair(self):
         """skeletons are not connected between branches.
@@ -82,16 +51,20 @@ class TreeSkeleton:
                 continue
 
             parent_branch = self.branches[branch.parent_id]
-            tubes = parent_branch.to_tubes()
+            tubes = parent_branch.as_tubes()
 
-            v, idx, _ = pts_to_nearest_tube_gpu(branch.xyz[0].reshape(-1, 3), tubes)
+            v, idx, _ = pts_to_nearest_tube(
+                branch.xyz[[0]],
+                tubes,
+                device=torch.device("cuda"),
+            )
 
-            connection_pt = branch.xyz[0].reshape(-1, 3).cpu() + v[0].cpu()
+            connection_pt = branch.xyz[[0]].cpu() + v[0].cpu()
 
             branch.xyz = torch.cat((connection_pt, branch.xyz))
             branch.radii = torch.cat((branch.radii[[0]], branch.radii))
 
-    def prune(self, min_radius: float, min_length: float, root_id=None):
+    def prune(self, min_radius: float, min_length: float, root_id=None) -> TreeSkeleton:
         """
         If a branch doesn't meet the initial radius threshold or length threshold we want to remove it and all
         it's predecessors...
@@ -103,11 +76,7 @@ class TreeSkeleton:
         keep = {root_id: self.branches[root_id]}
         remove = {}
 
-        for branch_id, branch in tqdm(
-            self.branches.items(),
-            leave=False,
-            desc="Pruning Branches",
-        ):
+        for branch_id, branch in self.branches.items():
             if branch.parent_id not in keep and branch._id != root_id:
                 remove[branch_id] = branch
             elif branch.length < min_length:
@@ -120,7 +89,7 @@ class TreeSkeleton:
         self.branches = keep
         return TreeSkeleton(0, remove)
 
-    def smooth(self, kernel_size=5):
+    def smooth(self, kernel_size: int = 5) -> None:
         """
         Smooths the skeleton radius.
         """
@@ -131,10 +100,21 @@ class TreeSkeleton:
                     branch.radii.reshape(1, 1, -1),
                     kernel,
                     padding="same",
-                ).reshape(-1)
+                ).view(-1)
+
+    def branch_from_tube_idx(self, idx):
+        return self.branches[int(self.find_branch_id_from_tube_idx(idx))]
+
+    def find_branch_id_from_tube_idx(self, idx):
+        number_verts = torch.tensor([len(b.to_tubes()) for b in self.branches.values()])
+        number_verts = torch.cumsum(number_verts, dim=0)
+        branch_id = list(self.branches.keys())[
+            torch.searchsorted(number_verts, idx).cpu()
+        ]
+        return branch_id
 
     @property
-    def length(self) -> TensorType[1]:
+    def length(self) -> TensorType:
         return torch.sum(torch.tensor([b.length for b in self.branches.values()]))
 
     @property
@@ -142,19 +122,98 @@ class TreeSkeleton:
         return torch.argmax(self.radii)
 
     @property
-    def key_branch_with_biggest_radius(self) -> TensorType[1]:
-        """Returns the key of the branch with the biggest radius"""
-        biggest_branch_radius = 0
-        for key, branch in self.branches.items():
-            if branch.biggest_radius > biggest_branch_radius:
-                biggest_branch_radius = branch.biggest_radius
-                biggest_branch_radius_key = key
-
-        return biggest_branch_radius_key
+    def max_branch_id(self) -> int:
+        return max(self.branches.keys())
 
     @property
-    def max_branch_id(self):
-        return max(self.branches.keys())
+    def xyz(self) -> TensorType["N", 3]:
+        xyz = []
+        for branch in self.branches.values():
+            xyz.append(branch.xyz)
+        if len(xyz) == 0:
+            return torch.tensor(xyz)
+        return torch.cat(xyz, dim=0)
+
+    def to_tubes(self) -> List[Tube]:
+        return flatten_list([b.as_tubes() for b in self.branches.values()])
+
+    def to_line_segments(self) -> List[LineSegment]:
+        return flatten_list([b.to_line_segments() for b in self.branches.values()])
+
+    def to_graph(self) -> Graph:
+        graphs = []
+
+        offsets = {}
+        offset = 0
+
+        for branch_id, branch in self.branches.items():
+            offsets[branch_id] = offset
+            branch_graph = branch.to_graph()
+
+            if branch.parent_id != -1:
+                parent_branch = self.branches[branch.parent_id]
+                parent_tubes = parent_branch.to_tubes()
+                parent_offset = torch.tensor(offsets[branch.parent_id])
+
+                _, idx, _ = pts_to_nearest_tube(
+                    branch.xyz[[0]],
+                    parent_tubes,
+                    device=torch.device("cuda"),
+                )
+
+                branch_graph.edges += offsets[branch_id]
+
+                parent_edge_idx = (idx + parent_offset).cpu()
+
+                new_edge = torch.hstack(
+                    (parent_edge_idx, torch.tensor(offset))
+                ).reshape(-1, 2)
+
+                branch_graph.edges = torch.cat((branch_graph.edges, new_edge))
+                branch_graph.edge_weights = torch.cat(
+                    (branch_graph.edge_weights, torch.tensor([[1]]))
+                )
+
+            graphs.append(branch_graph)
+            offset += len(branch)
+
+        return join_graphs(graphs, offset_edges=False)
+
+    def pin_memory(self):
+        new_branches = {}
+        for branch_id, branch in self.branches.items():
+            new_branches[branch_id] = branch.pin_memory()
+
+        return TreeSkeleton(self._id, new_branches, self.colour)
+
+    def to_device(self, device: torch.device):
+        new_branches = {}
+        for branch_id, branch in self.branches():
+            new_branches[branch_id] = branch.to_device(device)
+
+        return TreeSkeleton(self._id, new_branches, self.colour)
+
+    def as_o3d_linesets(self) -> List[o3d.geometry.LineSet]:
+        return [b.as_o3d_lineset() for b in self.branches.values()]
+
+    def as_o3d_lineset(self) -> o3d.geometry.LineSet:
+        return o3d_merge_linesets(self.as_o3d_linesets(), colour=self.colour)
+
+    def as_o3d_tubes(self) -> List[o3d.geometry.TriangleMesh]:
+        return [b.as_o3d_tube() for b in self.branches.values()]
+
+    def as_o3d_tube(self, colour=None) -> o3d.geometry.TriangleMesh:
+        return o3d_merge_meshes(self.as_o3d_tubes(), colour)
+
+    @property
+    def viewer_items(self) -> List[ViewerItem]:
+        items = []
+        items += [ViewerItem(f"Tree {self._id} Lineset", self.as_o3d_lineset())]
+        items += [ViewerItem(f"Tree {self._id} Tube", self.as_o3d_tube())]
+        return items
+
+    def view(self):
+        o3d_viewer(self.viewer_items)
 
 
 @dataclass
@@ -175,27 +234,39 @@ class DisjointTreeSkeleton:
         for skeleton in self.skeletons:
             skeleton.smooth(kernel_size=kernel_size)
 
-    def to_o3d_lineset(self):
+    def as_o3d_lineset(self):
         return o3d_merge_linesets(
-            [s.to_o3d_lineset().paint_uniform_color(s.colour) for s in self.skeletons]
+            [s.as_o3d_lineset().paint_uniform_color(s.colour) for s in self.skeletons]
         )
 
-    def to_o3d_tube(self, colour=True):
+    def to_tubes(self) -> List[Tube]:
+        return flatten_list([s.to_tubes() for s in self.skeletons])
+
+    def as_o3d_tube(self, colour=True) -> o3d.geometry.TriangleMesh:
         if colour:
             skeleton_tubes = [
-                skel.to_o3d_tube().paint_uniform_color(skel.colour)
-                for skel in self.skeletons
+                skel.as_o3d_tube(colour=skel.colour) for skel in self.skeletons
             ]
         else:
-            skeleton_tubes = [s.to_o3d_tube() for s in self.skeletons]
+            skeleton_tubes = [s.as_o3d_tube() for s in self.skeletons]
 
         return o3d_merge_meshes(skeleton_tubes)
 
+    @property
+    def viewer_items(self) -> list[ViewerItem]:
+        item = partial(ViewerItem, is_visible=False, group=f"Disconnected_Skeleton")
+        items = flatten_list([s.viewer_items for s in self.skeletons])
+        items += [item(f"Disjoint Lineset", self.as_o3d_lineset())]
+        items += [item(f"Disjoint Tube Coloured", self.as_o3d_tube(True))]
+        items += [item(f"Disjoint Tube ", self.as_o3d_tube(False))]
+
+        return items
+
     def view(self):
-        o3d_viewer([self.to_o3d_lineset(), self.to_o3d_tube()])
+        o3d_viewer(self.viewer_items)
 
     def to_pickle(self, path):
-        with open("disjoint_skeleton.pkl", "wb") as pickle_file:
+        with open(f"{path}", "wb") as pickle_file:
             pickle.dump(self, pickle_file)
 
     @staticmethod
@@ -204,30 +275,44 @@ class DisjointTreeSkeleton:
             return pickle.load(pickle_file)
 
 
-def connect(
-    skeleton_1: TreeSkeleton,
-    skeleton_1_child_branch_key: int,
-    skeleton_1_child_vert_idx: int,
-    skeleton_2: TreeSkeleton,
-    skeleton_2_child_branch_key: int,
-    skeleton_2_child_vert_idx: int,
-) -> TreeSkeleton:
-    # This is bundy, only visually gives appearance of connection...
-    # Need to do some more processing to actually connect the skeletons...
+def generate_new_branch_ids(tree: TreeSkeleton, offset: int):
+    # Generate new branch IDs starting from 'offset'
+    new_branch_ids = {}
+    for branch_id in tree.branches.keys():
+        new_branch_ids[branch_id] = branch_id + offset
+    return new_branch_ids
 
-    parent_branch = skeleton_1.branches[skeleton_1_parent_branch_key]
-    child_branch = skeleton_2.branches[skeleton_2_child_branch_key]
 
-    child_branch.parent_id = skeleton_1_parent_branch_key
-    connection_pt = parent_branch.xyz[skeleton_1_parent_vert_idx]
+def merge_trees(tree1: TreeSkeleton, tree2: TreeSkeleton):
+    # Generate new branch IDs for tree2 branches
+    max_branch_id = max(tree1.branches.keys())
+    new_branch_ids = generate_new_branch_ids(tree2, max_branch_id + 1)
 
-    child_branch.xyz = torch.cat((connection_pt.unsqueeze(0), child_branch.xyz))
-    child_branch.radii = torch.cat((child_branch.radii[[0]], child_branch.radii))
+    # Merge tree2 branches into tree1 while updating IDs
+    merged_branches = {}
+    for branch_id, branch in tree1.branches.items():
+        merged_branches[branch_id] = branch
+    for branch_id, branch in tree2.branches.items():
+        merged_branch = branch
+        # Update branch ID and parent ID
+        merged_branch._id = new_branch_ids[branch_id]
+        merged_branch.parent_id = new_branch_ids.get(branch.parent_id, branch.parent_id)
+        merged_branches[new_branch_ids[branch_id]] = merged_branch
 
-    for key, branch in skeleton_2.branches.items():
-        branch._id += skeleton_1.max_branch_id
+    # Create a new TreeSkeleton instance with merged branches
+    merged_tree = TreeSkeleton(
+        _id=tree1._id, branches=merged_branches, colour=tree1.colour
+    )
+    return merged_tree
 
-        if branch.parent_id != -1:
-            branch.parent_id += skeleton_1.max_branch_id
 
-    return TreeSkeleton(0, merge_dictionaries(skeleton_1.branches, skeleton_2.branches))
+def merge_trees_in_list(tree_list):
+    if not tree_list:
+        return None
+
+    merged_tree = tree_list[0]
+
+    for tree in tree_list[1:]:
+        merged_tree = merge_trees(merged_tree, tree)
+
+    return merged_tree
