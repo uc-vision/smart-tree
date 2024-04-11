@@ -8,10 +8,10 @@ wandb:
   mode: offline
   dir: /local/smart-tree #mnt/maara/singapore_project/wandb/
 
-fp16: True
+fp16: False
 num_epoch: 200
 lr_decay: True
-lr: 0.005
+lr: 0.01
 early_stop_epoch: 20
 early_stop: True
 
@@ -22,7 +22,7 @@ voxel_size: 0.01
 input_feature_names : ['xyz']
 target_feature_names: ['radius', 'medial_direction']
 
-vector_classes: [1,2]
+vector_classes: [0,1,2]
 
 cmap:
     - [1.0, 0.0, 0.0] # Trunk
@@ -79,7 +79,7 @@ validation_dataset:
   mode: validation
   directory: ${directory}
   json_path: ${json_path}
-  cache: True
+  cache: False
   transform:
     _target_ : smart_tree.model.sparse.transform.sparse_voxelize
     _partial_ : True
@@ -91,7 +91,7 @@ validation_data_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: ${batch_size}
   drop_last: False
-  pin_memory: True
+  pin_memory: False
   num_workers: 0
   shuffle: False
   collate_fn:
@@ -109,7 +109,7 @@ test_dataset:
   mode: test
   directory: ${directory}
   json_path: ${json_path}
-  cache: True
+  cache: False
   transform:
     _target_ : smart_tree.model.sparse.transform.sparse_voxelize
     _partial_ : True
@@ -121,7 +121,7 @@ test_data_loader:
   _target_: torch.utils.data.DataLoader
   batch_size: ${batch_size}
   drop_last: False
-  pin_memory: True
+  pin_memory: False
   num_workers: 0
   shuffle: False
   collate_fn:
@@ -148,7 +148,7 @@ capture_fn:
 model:
   _target_: smart_tree.model.sparse.model.Smart_Tree
   input_channels: 3
-  unet_planes: [32, 64, 128, 256, 512]
+  unet_planes: [16, 32, 128, 256, 512]
   mlp_layers: 3
   num_classes: 2
   target_features: ${target_feature_names}

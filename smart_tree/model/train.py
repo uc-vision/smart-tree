@@ -156,6 +156,8 @@ def main(cfg: DictConfig):
                 tracker=training_tracker,
             )
 
+            print(training_tracker)
+
             val_tracker = eval_epoch(val_loader, model, val_tracker)
             test_tracker = eval_epoch(test_loader, model, test_tracker)
 

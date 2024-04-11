@@ -108,6 +108,7 @@ def o3d_merge_clouds(points_clds):
 
 @as_numpy
 def o3d_cloud(points, colour=None, colours=None, normals=None):
+
     cloud = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(points))
     if normals is not None:
         cloud.normals = o3d.utility.Vector3dVector(normals)

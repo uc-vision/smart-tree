@@ -17,7 +17,8 @@ from ..util.file import CloudLoader, Skeleton_and_Cloud_Loader
 from .augmentations import AugmentationPipeline
 
 from .contraction import *
-import geometry_grid.torch_geometry as torch_geom
+
+# import geometry_grid.torch_geometry as torch_geom
 
 
 @typechecked
@@ -67,6 +68,7 @@ class Dataset:
 
     def cache_data(self):
         for path in tqdm(self.full_paths, desc="Caching Dataset", leave=False):
+            data = self.loader.load(path)
             self.cache[path] = self.loader.load(path).pin_memory()
 
     def load(self, filename) -> Cloud | LabelledCloud:
@@ -75,7 +77,7 @@ class Dataset:
 
         if filename not in self.cache:
             # self.cache[filename] = [x.pin_memory() for x in self.loader.load(filename)]
-            self.cache[filename] = self.loader.load(filename).pin_memory()
+            self.cache[filename] = self.loader.load(filename)
 
         return self.cache[filename]
 

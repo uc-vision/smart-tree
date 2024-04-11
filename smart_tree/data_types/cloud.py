@@ -236,7 +236,7 @@ class LabelledCloud(Cloud):
         return self.medial_vector.pow(2).sum(1).sqrt().unsqueeze(1)
 
     @property
-    def medial_direction(self) -> TensorType["N", 3]:
+    def medial_direction(self) -> torch.Tensor:
         return F.normalize(self.medial_vector.float())
 
     @property
@@ -250,17 +250,24 @@ class LabelledCloud(Cloud):
         if cmap is None:
             cmap = torch.tensor(
                 [
-                    [1.0, 0.0, 0.0],  # Trunk
-                    [0.0, 1.0, 0.0],  # Spur /|\ Cane /|\ Shoot
-                    [0.0, 0.0, 1.0],  # Node
-                    [1.0, 1.0, 0.0],  # Wire
-                    [0.0, 1.0, 1.0],  # PostS
-                    [1.0, 0.5, 1.0],
+                    [1.0, 0.0, 0.0],  # Red
+                    [0.0, 1.0, 0.0],  # Green
+                    [0.0, 0.0, 1.0],  # Blue
+                    [1.0, 1.0, 0.0],  # Yellow
+                    [0.0, 1.0, 1.0],  # Cyan
+                    [1.0, 0.5, 1.0],  # Pink
+                    [1.0, 0.8, 0.1],  # Orange
+                    [0.5, 0.0, 0.5],  # Purple
+                    [0.5, 0.5, 0.0],  # Olive
+                    [0.8, 0.2, 0.8],  # Lavender
                 ]
             )
 
-        colours = cmap.to(self.device)[self.class_l.view(-1).long()]
-        return o3d_cloud(self.xyz, colours=colours)
+        label = self.class_l.view(-1).long()
+        valid = label != -1
+
+        colours = cmap.to(self.device)[label[valid]]
+        return o3d_cloud(self.xyz[valid], colours=colours)
 
     def as_o3d_trunk_cld(self) -> o3d.geometry.PointCloud:
         trunk_id = self.branch_ids[0]

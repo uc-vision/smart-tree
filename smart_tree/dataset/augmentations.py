@@ -6,7 +6,7 @@ from typing import Sequence, Tuple
 import numpy as np
 import torch
 
-# from taichi_perlin import dropout_3d
+from taichi_perlin import dropout_3d
 
 from ..data_types.cloud import Cloud, LabelledCloud, merge_labelled_cloud
 from ..util.maths import euler_angles_to_rotation
@@ -210,18 +210,18 @@ class RandomTranslate(Augmentation):
         )
 
 
-# class Dropout3D(Augmentation):
-#     def __init__(self, **kwargs):
-#         kwargs = {
-#             k: tuple(v) if isinstance(v, Sequence) else v for k, v in kwargs.items()
-#         }
+class Dropout3D(Augmentation):
+    def __init__(self, **kwargs):
+        kwargs = {
+            k: tuple(v) if isinstance(v, Sequence) else v for k, v in kwargs.items()
+        }
 
-#         self.params = dropout_3d.DropoutParams(**kwargs)
-#         self.dropout = dropout_3d.PointDropout(self.params)
+        self.params = dropout_3d.DropoutParams(**kwargs)
+        self.dropout = dropout_3d.PointDropout(self.params)
 
-#     def __call__(self, cloud):
-#         points, mask = self.dropout(cloud.xyz)
-#         return cloud.filter(mask).with_xyz(points)
+    def __call__(self, cloud):
+        points, mask = self.dropout(cloud.xyz)
+        return cloud.filter(mask).with_xyz(points)
 
 
 class RandomDropout:
