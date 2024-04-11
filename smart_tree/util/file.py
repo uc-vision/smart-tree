@@ -4,15 +4,11 @@ from typing import Tuple
 
 import numpy as np
 import open3d as o3d
-import open3d.visualization.rendering as rendering
 import yaml
-from plyfile import PlyData, PlyElement
-from tqdm import tqdm
 
 from smart_tree.data_types.branch import BranchSkeleton
 from smart_tree.data_types.cloud import Cloud
 from smart_tree.data_types.tree import TreeSkeleton
-from smart_tree.o3d_abstractions.geometries import o3d_cloud, o3d_line_set
 
 
 def unpackage_data(data: dict) -> Tuple[Cloud, TreeSkeleton]:
@@ -165,10 +161,7 @@ def load_cloud(path: Path):
     xyz = np.asarray(data.points)
     rgb = np.asarray(data.colors) if np.asarray(data.colors).shape[0] != 0 else None
 
-    if rgb != None:
-        return Cloud.from_numpy(xyz=xyz, rgb=rgb)
-
-    return Cloud.from_numpy(xyz=xyz, rgb=np.ones((xyz.shape[0], 3)))
+    return Cloud.from_numpy(xyz=xyz, rgb=rgb)
 
 
 def load_yaml(path: Path):

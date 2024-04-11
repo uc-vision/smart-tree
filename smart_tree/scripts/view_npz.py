@@ -1,15 +1,12 @@
-import os
 import argparse
-import numpy as np
-
+from pathlib import Path
 from typing import List, Tuple
 
-from pathlib import Path
 
-from smart_tree.data_types.tree import TreeSkeleton
 from smart_tree.data_types.cloud import Cloud
-from smart_tree.util.file import load_data_npz
+from smart_tree.data_types.tree import TreeSkeleton
 from smart_tree.o3d_abstractions.visualizer import ViewerItem, o3d_viewer
+from smart_tree.util.file import load_data_npz
 
 
 def view_synthetic_data(data: List[Tuple[Cloud, TreeSkeleton]], line_width=1):

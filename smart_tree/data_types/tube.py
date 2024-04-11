@@ -3,9 +3,7 @@ from typing import List
 
 import numpy as np
 import torch
-from torch import Tensor, rand
-from torchtyping import TensorDetail, TensorType
-from typeguard import typechecked
+from torchtyping import TensorType
 
 
 @dataclass

@@ -13,7 +13,6 @@ import random
 from pathlib import Path
 
 import click
-import numpy as np
 
 
 def flatten_list(l):

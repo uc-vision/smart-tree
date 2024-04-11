@@ -1,15 +1,10 @@
-import functools
+
 import spconv.pytorch as spconv
-import torch
-import torch.cuda.amp
 import torch.nn as nn
 import torch.nn.functional as F
 
-from smart_tree.model.model_blocks import SparseFC, UBlock, SubMConvBlock, MLP
-from smart_tree.util.maths import torch_normalized
+from smart_tree.model.model_blocks import MLP, SubMConvBlock, UBlock
 
-
-from .fp16 import force_fp32
 
 
 class Smart_Tree(nn.Module):

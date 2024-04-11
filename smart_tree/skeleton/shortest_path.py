@@ -72,19 +72,3 @@ def edge_graph(edges, edge_weights, renumber=False):
     g = cugraph.Graph(directed=False)
     g.from_cudf_edgelist(d, edge_attr="weights", renumber=renumber)
     return g
-
-
-def dijkstra_cuda(root, edges: np.array, edge_weights: np.array):
-    d = DataFrame()
-
-    d["source"] = edges[:, 0]
-    d["destination"] = edges[:, 1]
-    d["weights"] = edge_weights
-
-    g = cugraph.Graph(directed=False)
-    g.from_cudf_edgelist(d, edge_attr="weights", renumber=False)
-
-    r = cugraph.sssp(g, source=root)
-    edges = np.stack([r["vertex"].to_numpy(), r["predecessor"].to_numpy()], axis=1)
-
-    return edges, r["distance"].to_numpy()

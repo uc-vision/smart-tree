@@ -1,25 +1,18 @@
 import pickle
-from copy import deepcopy
 from dataclasses import dataclass
 from typing import Dict, List
 
-import numpy as np
 import open3d as o3d
 import torch
 import torch.nn.functional as F
-from torch import Tensor, rand
-from torchtyping import TensorDetail, TensorType
+from torchtyping import TensorType
 from tqdm import tqdm
-from typeguard import typechecked
 
-from ..util.queries import pts_to_nearest_tube_gpu
-from ..o3d_abstractions.geometries import (
-    o3d_merge_clouds,
-    o3d_merge_linesets,
-    o3d_merge_meshes,
-)
-from ..util.misc import flatten_list, merge_dictionaries
+from ..o3d_abstractions.geometries import (o3d_merge_linesets,
+                                           o3d_merge_meshes)
 from ..o3d_abstractions.visualizer import o3d_viewer
+from ..util.misc import flatten_list, merge_dictionaries
+from ..util.queries import pts_to_nearest_tube_gpu
 from .branch import BranchSkeleton
 from .tube import Tube
 

@@ -22,11 +22,11 @@ dependencies = [
     'wandb',
     'cmapy',
     'plyfile',
+    'torch',
     'py_structs',
     'torchtyping',
     'beartype',
     'typeguard==2.11.1'
-
 ]
 
 [tool.setuptools.packages]

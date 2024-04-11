@@ -2,17 +2,11 @@ from __future__ import annotations
 
 from typing import List
 
-import matplotlib.pyplot as plt
 import numpy as np
-import open3d as o3d
-import plotly.figure_factory as ff
 import torch
-import torch.nn.functional as F
-
 from tqdm import tqdm
 
 from smart_tree.data_types.tube import CollatedTube, Tube, collate_tubes
-from smart_tree.util.misc import to_numpy
 
 """ 
 For the following :

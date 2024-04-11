@@ -1,10 +1,7 @@
-from typing import Optional
+from typing import List
 
 import cugraph
 import cupy
-import numpy as np
-import open3d as o3d
-import open3d.visualization.rendering as rendering
 import torch
 from cugraph import sssp
 from tqdm import tqdm
@@ -12,18 +9,11 @@ from tqdm import tqdm
 from ..data_types.cloud import Cloud
 from ..data_types.graph import Graph
 from ..data_types.tree import DisjointTreeSkeleton, TreeSkeleton
-from ..o3d_abstractions.geometries import (
-    o3d_cloud,
-    o3d_line_set,
-    o3d_merge_clouds,
-    o3d_merge_linesets,
-    o3d_path,
-)
-from ..o3d_abstractions.visualizer import o3d_viewer
 from .filter import outlier_removal
-from .graph import connected_components, decompose_cuda_graph, nn_graph
+from .graph import decompose_cuda_graph, nn_graph
 from .path import sample_tree
-from .shortest_path import edge_graph, graph_shortest_paths, pred_graph, shortest_paths
+from .shortest_path import (pred_graph,
+                            shortest_paths)
 
 
 class Skeletonizer:

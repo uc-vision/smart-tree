@@ -1,9 +1,7 @@
 import torch
 import torch.nn as nn
-
 import torch.nn.functional as F
 
-from smart_tree.util.maths import torch_normalized
 
 
 def compute_loss(

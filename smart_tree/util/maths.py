@@ -1,8 +1,8 @@
+from typing import List
+
 import numpy as np
 import torch
 import torch.nn.functional as F
-
-from typing import List
 
 
 def np_normalized(a: np.array, axis=-1, order=2) -> np.array:

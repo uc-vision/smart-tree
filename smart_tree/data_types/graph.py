@@ -6,12 +6,10 @@ import cupy
 import open3d as o3d
 import torch
 from cudf import DataFrame
-from torch import Tensor, rand
-from torchtyping import TensorDetail, TensorType
+from torchtyping import TensorType
 from tqdm import tqdm
-from typeguard import typechecked
 
-from ..o3d_abstractions.geometries import o3d_line_set, o3d_merge_linesets
+from ..o3d_abstractions.geometries import o3d_line_set
 
 
 @dataclass
@@ -32,7 +30,9 @@ class Graph:
         )
 
     def connected_cugraph_components(self, minimum_vertices=10) -> List[cugraph.Graph]:
+
         g = cuda_graph(self.edges, self.edge_weights)
+
         df = cugraph.connected_components(g)
 
         components = []
@@ -52,6 +52,7 @@ class Graph:
 
 
 def cuda_graph(edges, edge_weights, renumber=False):
+
     edges = cupy.asarray(edges)
     edge_weights = cupy.asarray(edge_weights)
 

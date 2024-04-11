@@ -6,8 +6,7 @@ from typing import List, Optional
 import numpy as np
 import open3d as o3d
 import torch
-from torch import Tensor, rand
-from torchtyping import TensorDetail, TensorType
+from torchtyping import TensorType
 from typeguard import typechecked
 
 from smart_tree.o3d_abstractions.geometries import o3d_path, o3d_tube_mesh

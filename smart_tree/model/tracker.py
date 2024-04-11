@@ -1,5 +1,6 @@
-import wandb
 import numpy as np
+
+import wandb
 
 
 class Tracker:

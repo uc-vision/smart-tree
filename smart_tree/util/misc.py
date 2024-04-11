@@ -1,14 +1,9 @@
 import math
 from typing import List, Union
 
-import sys
 import cmapy
 import numpy as np
-import open3d as o3d
-import open3d.visualization.rendering as rendering
-import spconv.pytorch as spconv
 import torch
-import torch.nn.functional as F
 
 
 def flatten_list(l):

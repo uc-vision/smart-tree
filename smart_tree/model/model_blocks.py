@@ -2,7 +2,6 @@ import spconv.pytorch as spconv
 import torch
 import torch.cuda.amp
 import torch.nn as nn
-import torch.nn.functional as F
 from spconv.pytorch import SparseModule
 
 

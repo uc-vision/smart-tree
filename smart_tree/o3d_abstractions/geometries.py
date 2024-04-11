@@ -1,18 +1,10 @@
 import numpy as np
 import open3d as o3d
 import torch
-import torch.nn.functional as F
-
 
 # from o3d_abstractions.viewimport o3d_view_geometries
-from smart_tree.util.maths import (
-    gen_tangents,
-    make_transformation_matrix,
-    random_unit,
-    rotation_matrix_from_vectors_torch,
-    torch_normalized,
-    vertex_dirs,
-)
+from smart_tree.util.maths import (gen_tangents, random_unit,
+                                   vertex_dirs)
 
 
 def o3d_mesh(verts, tris):

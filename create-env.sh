@@ -1,9 +1,12 @@
 #!/bin/bash
 eval "$(conda shell.bash hook)"
 
-conda env create --file enviroment.yml
+conda create -n smart-tree python=3.10
 conda run -n smart-tree pip install -e .
 
+echo Installing FRNN
 git clone --recursive https://github.com/lxxue/FRNN.git
 conda run -n smart-tree pip install -e FRNN/external/prefix_sum/.
 conda run -n smart-tree pip install -e FRNN/.
+
+conda run -n smart-tree conda install cudf=24.02 cugraph=24.02 -c rapidsai -c conda-forge -c nvidia

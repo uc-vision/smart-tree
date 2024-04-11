@@ -1,10 +1,7 @@
 import json
-import time
 from pathlib import Path
 from typing import List
 
-import numpy as np
-import spconv.pytorch as spconv
 import torch
 import torch.utils.data
 from spconv.pytorch.utils import PointToVoxel
@@ -12,13 +9,10 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from ..data_types.cloud import Cloud
-from .augmentations import AugmentationPipeline
-from ..model.sparse import batch_collate, sparse_quantize
+from ..model.sparse import batch_collate
 from ..util.file import load_cloud
+from ..util.maths import cube_filter
 from ..util.misc import at_least_2d
-from ..util.maths import cube_filter, np_normalized, torch_normalized
-from ..o3d_abstractions.visualizer import o3d_viewer
-from ..o3d_abstractions.geometries import o3d_cloud
 
 
 class TreeDataset:
