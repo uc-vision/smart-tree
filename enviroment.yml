@@ -7,14 +7,14 @@ channels:
   - nodefaults
 
 dependencies:
-  - python=3.10.*
+  - python=3.10.* 
   - mamba
-  - pip
-  #- conda-forge:cudatoolkit-dev=11.7 # NVCC for compiling FRNN
+  - pip  
+  - conda-forge:cudatoolkit-dev=11.7 # NVCC for compiling FRNN
   - conda-forge:cub
-  #- conda-forge:cudatoolkit=11.7
-  #- pytorch::pytorch-cuda=11.7
-  #- pytorch::pytorch
-  #- rapidsai::rapids=23.02
-  #- rapidsai::cugraph=23.02
-  #- rapidsai::cudf=23.02
+#  - conda-forge:cudatoolkit=11.7
+  - pytorch::pytorch-cuda=11.7
+  - pytorch::pytorch
+  - rapidsai::rapids=23.02
+  - rapidsai::cugraph=23.02
+  - rapidsai::cudf=23.02
