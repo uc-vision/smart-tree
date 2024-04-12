@@ -18,7 +18,7 @@ dependencies = [
     'hydra-core>=1.2.0',
     'click',
     'oauthlib',
-    'spconv-cu117',
+    'spconv-cu118',
     'wandb',
     'cmapy',
     'plyfile',
