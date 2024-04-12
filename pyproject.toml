@@ -22,7 +22,7 @@ dependencies = [
     'wandb',
     'cmapy',
     'plyfile',
-    'torch',
+    #'torch',
     'py_structs',
     'torchtyping',
     'beartype',
