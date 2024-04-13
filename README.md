@@ -26,6 +26,7 @@ Please follow instructions to download data from this <a href="https://github.co
 ## 🔧 Installation:
 
 First, make sure you have Conda installed.
+We recommend you install <a href="https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community">mamba solver</a >.
 To install smart-tree please use <br>`bash create-env.sh`<br>
 Then activate the environment using: <br>`conda activate smart-tree`
 
