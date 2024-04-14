@@ -12,8 +12,7 @@ from ..data_types.tree import DisjointTreeSkeleton, TreeSkeleton
 from .filter import outlier_removal
 from .graph import decompose_cuda_graph, nn_graph
 from .path import sample_tree
-from .shortest_path import (pred_graph,
-                            shortest_paths)
+from .shortest_path import pred_graph, shortest_paths
 
 
 class Skeletonizer:

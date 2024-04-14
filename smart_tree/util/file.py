@@ -159,8 +159,11 @@ def load_cloud(path: Path):
 
     data = o3d.io.read_point_cloud(str(path))
     xyz = np.asarray(data.points)
-    rgb = np.asarray(data.colors) if np.asarray(data.colors).shape[0] != 0 else None
-
+    rgb = (
+        np.asarray(data.colors)
+        if np.asarray(data.colors).shape[0] != 0
+        else np.zeros_like(xyz)
+    )
     return Cloud.from_numpy(xyz=xyz, rgb=rgb)
 
 
