@@ -12,5 +12,4 @@ git clone --recursive https://github.com/lxxue/FRNN.git
 conda run -n smart-tree pip install FRNN/external/prefix_sum/. &&
 conda run -n smart-tree pip install -e FRNN/. &&
 
-#conda run -n smart-tree conda install -c rapidsai -c conda-forge -c nvidia cudf=23.12 cugraph=23.12  python=3.10 cuda-version=11.8 --solver=libmamba 
-conda run -n smart-tree conda install -c rapidsai -c conda-forge -c nvidia cudf=23.02 cugraph=23.02 python=3.10 cuda-version=11.8
+conda run -n smart-tree conda install -c rapidsai -c conda-forge -c nvidia cudf=23.02 cugraph=23.02 python=3.10 cuda-version=11.8 --solver=libmamba 
