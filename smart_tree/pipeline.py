@@ -52,9 +52,11 @@ class Pipeline:
         self.cmap = np.asarray(cmap)
         self.device = device
 
-    def process_cloud(self, path: Path):
+    def process_cloud(self, path: Path =None, cloud: Cloud=None):
         # Load point cloud
-        cloud: Cloud = load_cloud(path).to_device(self.device)
+        cloud: Cloud = load_cloud(path) if path != None else cloud
+        
+        cloud = cloud.to_device(self.device)
         cloud = self.preprocessing(cloud)
 
         # Run point cloud through model to predict class, radius, direction

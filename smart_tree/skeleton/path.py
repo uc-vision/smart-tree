@@ -82,14 +82,13 @@ def sample_tree(
     pbar = tqdm(
         total=distances.shape[0],
         leave=False,
-        miniters=1,
-        mininterval=0,
         desc="Allocating Points",
     )
 
     while True:
-        pbar.update((distances > 0).sum().item() - pbar.n)
-
+        pbar.update(n=((distances < 0).sum().item() - pbar.n))
+        pbar.refresh()
+        
         farthest = distances.argmax().item()
 
         if distances[farthest] <= 0:
