@@ -10,10 +10,15 @@ import torch.nn.functional as F
 from torchtyping import TensorType
 from typeguard import typechecked
 
-from ..o3d_abstractions.geometries import o3d_cloud, o3d_lines_between_clouds
+from ..o3d_abstractions.geometries import (
+    o3d_cloud,
+    o3d_lines_between_clouds,
+    o3d_scalar_cloud,
+)
 from ..o3d_abstractions.visualizer import o3d_viewer
 from ..util.misc import voxel_downsample
 from ..util.queries import skeleton_to_points
+from ..skeleton.graph import relative_density
 
 
 @typechecked
@@ -186,6 +191,16 @@ class Cloud:
             geoms.append(o3d_lines_between_clouds(cpu_cld.to_o3d_cld(), projected))
 
         o3d_viewer(geoms)
+
+    def view_density(self):
+
+        density = relative_density(
+            self.medial_pts.cuda(),
+            self.radius.cuda(),
+            tolerance=1,
+        )
+
+        o3d_viewer([o3d_scalar_cloud(self.medial_pts, density.cpu().unsqueeze(1))])
 
     def voxel_down_sample(self, voxel_size):
         idx = voxel_downsample(self.xyz, voxel_size)

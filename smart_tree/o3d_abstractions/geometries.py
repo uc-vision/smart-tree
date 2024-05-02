@@ -3,8 +3,7 @@ import open3d as o3d
 import torch
 
 # from o3d_abstractions.viewimport o3d_view_geometries
-from smart_tree.util.maths import (gen_tangents, random_unit,
-                                   vertex_dirs)
+from smart_tree.util.maths import gen_tangents, random_unit, vertex_dirs
 
 
 def o3d_mesh(verts, tris):
@@ -96,6 +95,11 @@ def o3d_cloud(points, colour=None, colours=None, normals=None):
         return cloud
 
     return cloud.paint_uniform_color([1, 0, 0])
+
+
+def o3d_scalar_cloud(points, t, c1=np.array([[1, 0, 0]]), c2=np.array([[0, 1, 0]])):
+    colours = (1 - t) * c1 + t * c2
+    return o3d_cloud(points, colours=colours)
 
 
 def class_label_o3d_cloud(cloud, class_labels, cmap=[]):
@@ -199,16 +203,32 @@ def o3d_lines_between_clouds(cld1, cld2):
     )
 
 
-def o3d_tube_mesh(points, radii, colour=(1, 0, 0), n=10):
-    points = tube_vertices(points, radii, n)
+def o3d_tube_mesh(points, radii, colour=(1, 0, 0), n=8):
+    tube_points = tube_vertices(points, radii, n)
 
-    n, m, _ = points.shape
-    indexes = cylinder_triangles(m, n)
+    n, m, _ = tube_points.shape
+    tube_indexes = cylinder_triangles(m, n)
+    tube_points = tube_points.reshape(-1, 3)
 
-    mesh = o3d_mesh(points.reshape(-1, 3), indexes)
-    mesh.compute_vertex_normals()
+    start_cap_vertice = points[0]
+    end_cap_vertice = points[-1]
 
-    return mesh.paint_uniform_color(colour)
+    vertices = np.vstack([tube_points, start_cap_vertice, end_cap_vertice])
+
+    top = vertices.shape[0] - 2
+    bot = top + 1
+
+    top_indices = np.stack(
+        [np.full(m, top), np.arange(m), np.roll(np.arange(m), 1)],
+        axis=1,
+    )
+    bot_indices = top_indices + (m * (n - 1))
+    bot_indices[:, 0] = bot
+
+    indexes = np.vstack([tube_indexes, top_indices, bot_indices])
+    mesh = o3d_mesh(vertices, indexes)
+
+    return mesh.compute_vertex_normals().paint_uniform_color(colour)
 
 
 def sample_o3d_lineset(lineset, sample_rate):
@@ -233,3 +253,32 @@ def sample_o3d_lineset(lineset, sample_rate):
             pts.append(start + direction * spaced_points)
 
     return np.concatenate(pts, axis=0)
+
+
+if __name__ == "__main__":
+
+    points = np.array([[0, 0, 0], [0, 0, 1], [0, 0, 2]])
+    radii = np.array([[1], [1], [1]])
+
+    tube = o3d_tube_mesh(points, radii)
+
+    mesh = tube
+
+    edge_manifold = mesh.is_edge_manifold(allow_boundary_edges=True)
+    edge_manifold_boundary = mesh.is_edge_manifold(allow_boundary_edges=False)
+    vertex_manifold = mesh.is_vertex_manifold()
+    self_intersecting = mesh.is_self_intersecting()
+    watertight = mesh.is_watertight()
+    orientable = mesh.is_orientable()
+
+    print(f"  edge_manifold:          {edge_manifold}")
+    print(f"  edge_manifold_boundary: {edge_manifold_boundary}")
+    print(f"  vertex_manifold:        {vertex_manifold}")
+    print(f"  self_intersecting:      {self_intersecting}")
+    print(f"  watertight:             {watertight}")
+    print(f"  orientable:             {orientable}")
+
+    print(tube.get_volume())
+    from smart_tree.o3d_abstractions.visualizer import o3d_viewer
+
+    o3d_viewer([tube])

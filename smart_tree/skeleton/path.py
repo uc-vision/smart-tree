@@ -1,4 +1,3 @@
-
 import torch
 from tqdm import tqdm
 
@@ -37,7 +36,7 @@ def select_path_points(
     )  # where the path idx is less than the distance to the point
 
     on_path = point_path.new_zeros(point_path.shape, dtype=torch.bool)
-    on_path[point_path >= 0] = valid  # points that are on the path.
+    on_path[point_path >= 0] = valid  # points thalt are on the path.
 
     idx_point = on_path.nonzero().squeeze(1)
     idx_path = point_path[idx_point]
@@ -88,7 +87,7 @@ def sample_tree(
     while True:
         pbar.update(n=((distances < 0).sum().item() - pbar.n))
         pbar.refresh()
-        
+
         farthest = distances.argmax().item()
 
         if distances[farthest] <= 0:

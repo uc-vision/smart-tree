@@ -6,7 +6,6 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig
 
 
-
 @hydra.main(
     version_base=None,
     config_path="conf",

@@ -124,3 +124,22 @@ def connected_components(edges, edge_weights, minimum_vertices=0, max_components
         )
 
     return graphs
+
+
+def relative_density(points: torch.Tensor, radii: torch.Tensor, K=256, tolerance=0.5):
+    idxs, dists, _ = knn(points, points, K=K, r=radii.max().item() * tolerance)
+
+    valid = (dists < (radii * tolerance).unsqueeze(1)) & (idxs >= 0)
+
+    v = points.unsqueeze(1) - points[idxs]
+    v[~valid] = 0.0
+
+    n = valid.sum(1, keepdim=True)
+
+    avg_dir = v.sum(dim=1) / n
+    avg_dist = torch.norm(avg_dir, dim=1)
+
+    rel_dist = (1 - avg_dist / (radii * tolerance)).pow(2)
+    rel_dist[n.squeeze(1) == 1] = 0
+
+    return rel_dist

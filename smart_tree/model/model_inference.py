@@ -94,6 +94,8 @@ class ModelInference:
             class_l=class_l,
         )
 
+        lc.view_density()
+
         if return_masked:
             return lc.filter(masks)
 

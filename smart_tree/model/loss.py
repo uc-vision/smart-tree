@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-
 def compute_loss(
     preds,
     targets,
@@ -97,6 +96,5 @@ def focal_loss(outputs, targets):
 
 
 def nll_loss(outputs, targets):
-    return torch.tensor([0]).cuda()
     weights = targets.shape[0] / (torch.bincount(targets))  # Balance class weights
     return F.nll_loss(F.log_softmax(outputs, dim=1), targets, weight=weights)
