@@ -3,9 +3,10 @@ from pathlib import Path
 import torch
 from tqdm import tqdm
 
-from smart_tree.data_types.cloud import Cloud
+from smart_tree.data_types.cloud import Cloud, merge_clouds
 from smart_tree.dataset.dataset import load_dataloader
-from smart_tree.model.sparse import sparse_from_batch
+from spconv.pytorch.utils import gather_features_by_pc_voxel_id
+from dataclasses import asdict
 
 
 def load_model(model_path, weights_path, device=torch.device("cuda:0")):
@@ -46,9 +47,10 @@ class ModelInference:
         if self.verbose:
             print("Model Loaded Succesfully")
 
+    @torch.no_grad()
     def forward(self, cloud: Cloud, return_masked=True):
-        inputs, masks = [], []
-        radius, direction, class_l = [], [], []
+
+        clouds = []
 
         dataloader = load_dataloader(
             cloud,
@@ -59,47 +61,49 @@ class ModelInference:
             self.batch_size,
         )
 
-        for features, coordinates, mask, filename in tqdm(
+        for sparse_input, voxel_ids, voxel_mask, cloud in tqdm(
             dataloader, desc="Inferring", leave=False
         ):
-            sparse_input = sparse_from_batch(
-                features[:, :3],
-                coordinates,
-                device=self.device,
-            )
+
+            sparse_input = sparse_input.to(self.device)
 
             preds = self.model.forward(sparse_input)
 
-            radius.append(preds["radius"].detach().cpu())
-            direction.append(preds["direction"].detach().cpu())
-            class_l.append(preds["class_l"].detach().cpu())
+            voxel_radius = preds["radius"]  # [mask]
+            voxel_direction = preds["direction"]  # [mask]
+            voxel_class = preds["class_l"]  # [mask]
 
-            inputs.append(features.detach().cpu())
-            masks.append(mask.detach().cpu())
+            # voxel_mask = voxel_mask.bool()
 
-        radius = torch.cat(radius)
-        direction = torch.cat(direction)
-        class_l = torch.cat(class_l)
+            # print(voxel_ids.max(), voxel_ids.shape)
 
-        inputs = torch.cat(inputs)
-        masks = torch.cat(masks)
+            pt_radius = gather_features_by_pc_voxel_id(voxel_radius, voxel_ids)
+            pt_direction = gather_features_by_pc_voxel_id(voxel_direction, voxel_ids)
+            pt_class = gather_features_by_pc_voxel_id(voxel_class, voxel_ids)
+            pt_mask = gather_features_by_pc_voxel_id(voxel_mask, voxel_ids).bool()
 
-        medial_vector = torch.exp(radius) * direction
-        class_l = torch.argmax(class_l, dim=1, keepdim=True)
+            # pt_radius = voxel_radius
+            # pt_direction = voxel_direction
+            # pt_class = voxel_class
 
-        lc = Cloud(
-            xyz=inputs[:, :3],
-            rgb=inputs[:, 3:6],
-            medial_vector=medial_vector,
-            class_l=class_l,
-        )
+            # print(pt_class)
 
-        lc.view_density()
+            class_l = torch.argmax(pt_class, dim=1, keepdim=True)
+            medial_vector = torch.exp(pt_radius) * pt_direction
 
-        if return_masked:
-            return lc.filter(masks)
+            cld = Cloud(
+                xyz=cloud.xyz.cpu(),
+                medial_vector=medial_vector.cpu(),
+                class_l=class_l,
+            )
+            cld = cld.filter(pt_mask)
 
-        return lc
+            clouds.append(cld)
+
+        merged_cloud = merge_clouds(clouds)
+        merged_cloud.view()
+
+        return merge_clouds(clouds)
 
     @staticmethod
     def from_cfg(cfg):

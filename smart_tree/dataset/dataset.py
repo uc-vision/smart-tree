@@ -13,6 +13,7 @@ from ..model.sparse import batch_collate
 from ..util.file import load_cloud
 from ..util.maths import cube_filter
 from ..util.misc import at_least_2d
+from ..model.transform import sparse_voxelize
 
 
 class TreeDataset:
@@ -119,7 +120,7 @@ class TreeDataset:
             device=data.device,
         )
 
-        feats, coords, _, _ = surface_voxel_generator.generate_voxel_with_id(data)
+        feats, coords, num_pts, _ = surface_voxel_generator.generate_voxel_with_id(data)
 
         indice = torch.zeros(
             (coords.shape[0], 1),
@@ -150,6 +151,8 @@ class SingleTreeInference:
         buffer_size: float = 0.4,
         min_points=20,
         file_name=None,
+        use_xyz=True,
+        use_rgb=False,
         device=torch.device("cuda:0"),
     ):
         self.cloud = cloud
@@ -160,6 +163,8 @@ class SingleTreeInference:
         self.min_points = min_points
         self.device = device
         self.file_name = file_name
+        self.use_xyz = use_xyz
+        self.use_rgb = use_rgb
 
         self.compute_blocks()
 
@@ -191,39 +196,26 @@ class SingleTreeInference:
 
     def __getitem__(self, idx):
         block_centre = self.block_centres[idx]
-        cloud: Cloud = self.clouds[idx]
+        block_cloud: Cloud = self.clouds[idx]
 
-        xyzmin, _ = torch.min(cloud.xyz, axis=0)
-        xyzmax, _ = torch.max(cloud.xyz, axis=0)
+        block_cloud.mask = cube_filter(
+            block_cloud.xyz,
+            block_centre,
+            self.block_size,
+        ).unsqueeze(1)
 
-        surface_voxel_generator = PointToVoxel(
-            vsize_xyz=[self.voxel_size] * 3,
-            coors_range_xyz=[
-                xyzmin[0],
-                xyzmin[1],
-                xyzmin[2],
-                xyzmax[0],
-                xyzmax[1],
-                xyzmax[2],
-            ],
-            num_point_features=6,
-            max_num_voxels=len(cloud),
-            max_num_points_per_voxel=1,
+        transformed_cloud = sparse_voxelize(
+            block_cloud,
+            self.voxel_size,
+            use_xyz=self.use_xyz,
+            use_rgb=self.use_rgb,
+            voxelize_class=False,
+            voxelize_direction=False,
+            voxelize_radius=False,
+            voxelize_mask=True,
         )
 
-        feats, coords, _, voxel_id_tv = surface_voxel_generator.generate_voxel_with_id(
-            torch.cat((cloud.xyz, cloud.rgb), dim=1).contiguous()
-        )  #
-
-        indice = torch.zeros((coords.shape[0], 1), dtype=torch.int32)
-        coords = torch.cat((indice, coords), dim=1)
-
-        feats = feats.squeeze(1)
-        coords = coords.squeeze(1)
-
-        mask = cube_filter(feats[:, :3], block_centre, self.block_size)
-
-        return feats, coords, mask, self.file_name
+        return transformed_cloud
 
     def __len__(self):
         return len(self.clouds)

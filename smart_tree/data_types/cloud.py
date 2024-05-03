@@ -231,6 +231,10 @@ class Cloud:
         return torch.max(self.xyz, 0)[0]
 
     @property
+    def device(self) -> torch.device:
+        return self.xyz.device
+
+    @property
     def min_xyz(self) -> torch.Tensor:
         return torch.min(self.xyz, 0)[0]
 
@@ -277,3 +281,47 @@ class Cloud:
     @staticmethod
     def from_o3d_cld(cld) -> Cloud:
         return Cloud.from_numpy(xyz=np.asarray(cld.points), rgb=np.asarray(cld.colors))
+
+
+def merge_clouds(clouds: list[Cloud]) -> Cloud:
+    merged_xyz = torch.cat([cloud.xyz for cloud in clouds], dim=0)
+    merged_rgb = (
+        torch.cat([cloud.rgb for cloud in clouds], dim=0)
+        if all(cloud.rgb is not None for cloud in clouds)
+        else None
+    )
+    merged_medial_vector = (
+        torch.cat([cloud.medial_vector for cloud in clouds], dim=0)
+        if all(cloud.medial_vector is not None for cloud in clouds)
+        else None
+    )
+    merged_branch_direction = (
+        torch.cat([cloud.branch_direction for cloud in clouds], dim=0)
+        if all(cloud.branch_direction is not None for cloud in clouds)
+        else None
+    )
+    merged_class_l = (
+        torch.cat([cloud.class_l for cloud in clouds], dim=0)
+        if all(cloud.class_l is not None for cloud in clouds)
+        else None
+    )
+    merged_branch_ids = (
+        torch.cat([cloud.branch_ids for cloud in clouds], dim=0)
+        if all(cloud.branch_ids is not None for cloud in clouds)
+        else None
+    )
+    merged_filename = (
+        clouds[0].filename
+        if all(cloud.filename == clouds[0].filename for cloud in clouds)
+        else None
+    )
+
+    return Cloud(
+        xyz=merged_xyz,
+        rgb=merged_rgb,
+        medial_vector=merged_medial_vector,
+        branch_direction=merged_branch_direction,
+        class_l=merged_class_l,
+        branch_ids=merged_branch_ids,
+        filename=merged_filename,
+    )

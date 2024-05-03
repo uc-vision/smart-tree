@@ -22,7 +22,7 @@ pipeline:
     min_connection_length: 0.02 
     minimum_graph_vertices: 32
 
-  view_model_output : False
+  view_model_output : True
   view_skeletons : True
   save_path: /
   save_outputs : False

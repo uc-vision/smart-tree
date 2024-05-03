@@ -139,7 +139,7 @@ def relative_density(points: torch.Tensor, radii: torch.Tensor, K=256, tolerance
     avg_dir = v.sum(dim=1) / n
     avg_dist = torch.norm(avg_dir, dim=1)
 
-    rel_dist = (1 - avg_dist / (radii * tolerance)).pow(2)
+    rel_dist = (1 - avg_dist / (radii * tolerance)).pow(4)
     rel_dist[n.squeeze(1) == 1] = 0
 
     return rel_dist
