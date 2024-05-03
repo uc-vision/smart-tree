@@ -4,14 +4,13 @@ from pathlib import Path
 import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig
+
+from smart_tree.dataset.augmentations import CentreCloud
 from smart_tree.model.model_inference import ModelInference
-from smart_tree.util.file import load_cloud
-
-from smart_tree.skeleton.graph import relative_density
-
 from smart_tree.o3d_abstractions.geometries import o3d_scalar_cloud
 from smart_tree.o3d_abstractions.visualizer import o3d_viewer
-from smart_tree.dataset.augmentations import CentreCloud
+from smart_tree.skeleton.graph import relative_density
+from smart_tree.util.file import load_cloud
 
 
 def view_density(cloud):

@@ -8,12 +8,12 @@ from typing import List
 import hydra
 import numpy as np
 import torch
+import wandb
 from hydra.core.hydra_config import HydraConfig
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
-import wandb
 from smart_tree.data_types.cloud import Cloud
 from smart_tree.o3d_abstractions.camera import Renderer
 

@@ -8,8 +8,7 @@ import torch.nn.functional as F
 from torchtyping import TensorType
 from tqdm import tqdm
 
-from ..o3d_abstractions.geometries import (o3d_merge_linesets,
-                                           o3d_merge_meshes)
+from ..o3d_abstractions.geometries import o3d_merge_linesets, o3d_merge_meshes
 from ..o3d_abstractions.visualizer import o3d_viewer
 from ..util.misc import flatten_list, merge_dictionaries
 from ..util.queries import pts_to_nearest_tube_gpu

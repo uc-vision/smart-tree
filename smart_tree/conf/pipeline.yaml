@@ -9,13 +9,45 @@ pipeline:
 
   model_inference: 
     _target_: smart_tree.model.model_inference.ModelInference
-    model_path: smart_tree/model/weights/noble-elevator-58_model.pt
-    weights_path: smart_tree/model/weights/noble-elevator-58_model_weights.pt
-    voxel_size: 0.01
-    block_size: 4
-    buffer_size: 0.4
-    num_workers : 8
-    batch_size : 1
+
+    model:
+      _target_: smart_tree.util.file.load_model
+      model_path: smart_tree/model/weights/noble-elevator-58_model.pt
+      weights_path: smart_tree/model/weights/noble-elevator-58_model_weights.pt
+
+    dataloader:
+      _target_: torch.utils.data.DataLoader
+      _partial_: True
+      batch_size: 1
+      num_workers: 0
+      collate_fn:
+        _target_: smart_tree.model.collate.collate
+        _partial_: True
+
+
+    dataset:
+        _target_: smart_tree.dataset.dataset.SingleTreeInference
+        _partial_: True
+        block_size: 4
+        buffer_size: 0.4
+        min_points: 20
+
+        # transform: 
+        #   _target_ : smart_tree.model.transform.sparse_voxelize
+        #   _partial_ : True
+        #   voxel_size: ${voxel_size}
+
+        #   fp_16: False
+
+
+        #           cloud: Cloud,
+
+
+    # voxel_size: 0.01
+    # block_size: 4
+    # buffer_size: 0.4
+    # num_workers : 8
+    # batch_size : 1
 
   skeletonizer:
     _target_: smart_tree.skeleton.skeletonize.Skeletonizer

@@ -1,10 +1,10 @@
+from dataclasses import asdict
+
 import spconv.pytorch as spconv
 import torch.nn as nn
 import torch.nn.functional as F
 
 from smart_tree.model.model_blocks import MLP, SubMConvBlock, UBlock
-
-from dataclasses import asdict
 
 
 class Smart_Tree(nn.Module):

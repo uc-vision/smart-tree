@@ -5,6 +5,7 @@ from typing import Tuple
 import numpy as np
 import open3d as o3d
 import yaml
+import torch
 
 from smart_tree.data_types.branch import BranchSkeleton
 from smart_tree.data_types.cloud import Cloud
@@ -175,3 +176,9 @@ def load_yaml(path: Path):
     with open(f"{path}") as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
     return config
+
+def load_model(model_path, weights_path, device=torch.device("cuda:0")):
+    model = torch.load(f"{model_path}", map_location=device)
+    model.load_state_dict(torch.load(f"{weights_path}"))
+    model.eval()
+    return model

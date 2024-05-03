@@ -2,7 +2,6 @@ import argparse
 from pathlib import Path
 from typing import List, Tuple
 
-
 from smart_tree.data_types.cloud import Cloud
 from smart_tree.data_types.tree import TreeSkeleton
 from smart_tree.o3d_abstractions.visualizer import ViewerItem, o3d_viewer

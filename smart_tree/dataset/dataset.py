@@ -8,13 +8,12 @@ from spconv.pytorch.utils import PointToVoxel
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-
-from ..data_types.cloud import Cloud, merge_clouds
+from ..data_types.cloud import Cloud  # , merge_clouds
+from ..model.transform import sparse_voxelize
 # from ..model.sparse import batch_collate
 from ..util.file import load_cloud
 from ..util.maths import cube_filter
 from ..util.misc import at_least_2d
-from ..model.transform import sparse_voxelize
 
 
 class TreeDataset:
@@ -147,25 +146,19 @@ class SingleTreeInference:
     def __init__(
         self,
         cloud: Cloud,
-        voxel_size: float,
         block_size: float = 4,
         buffer_size: float = 0.4,
         min_points=20,
-        file_name=None,
-        use_xyz=True,
-        use_rgb=False,
+
         device=torch.device("cuda:0"),
     ):
         self.cloud = cloud
 
-        self.voxel_size = voxel_size
         self.block_size = block_size
         self.buffer_size = buffer_size
         self.min_points = min_points
+
         self.device = device
-        self.file_name = file_name
-        self.use_xyz = use_xyz
-        self.use_rgb = use_rgb
 
         self.compute_blocks()
 
@@ -205,7 +198,6 @@ class SingleTreeInference:
             self.block_size,
         ).unsqueeze(1)
 
-
         return block_cloud
 
         # transformed_cloud = sparse_voxelize(
@@ -235,4 +227,4 @@ def load_dataloader(
 ):
     dataset = SingleTreeInference(cloud, voxel_size, block_size, buffer_size)
 
-    return DataLoader(dataset, batch_size, num_workers, collate_fn=merge_clouds)
+    return DataLoader(dataset, batch_size, num_workers) #collate_fn=merge_clouds)

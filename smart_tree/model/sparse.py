@@ -1,16 +1,15 @@
+from dataclasses import asdict, dataclass
 from itertools import repeat
-from typing import List, Tuple, Union, Optional
-
-from tensordict import TensorDict
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import spconv.pytorch as spconv
 import torch
-
-from dataclasses import asdict, dataclass
+from tensordict import TensorDict
 
 from .transform import TransformedCloud
-from ..data_types.cloud import merge_clouds
+
+#from ..data_types.cloud import merge_clouds
 
 
 @dataclass
@@ -49,17 +48,17 @@ def merge_voxelized_cloud(data: List[TransformedCloud]) -> TransformedCloud:
         voxel_mask = torch.cat([d.voxel_mask for d in data])
 
     cloud = None
-    if all(d.input_cloud is not None for d in data):
-        cloud = merge_clouds([d.input_cloud for d in data])
+    # if all(d.input_cloud is not None for d in data):
+    #     cloud = merge_clouds([d.input_cloud for d in data])
 
-    return TransformedCloud(
-        voxel_features,
-        voxel_targets,
-        voxel_coords,
-        voxel_ids=voxel_ids,
-        voxel_mask=voxel_mask,
-        input_cloud=cloud,
-    )
+    # return TransformedCloud(
+    #     voxel_features,
+    #     voxel_targets,
+    #     voxel_coords,
+    #     voxel_ids=voxel_ids,
+    #     voxel_mask=voxel_mask,
+    #     input_cloud=cloud,
+    # )
 
 
 def cloud_to_sparse_tensor(cloud: TransformedCloud):

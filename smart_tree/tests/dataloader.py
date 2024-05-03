@@ -6,7 +6,6 @@ from omegaconf import DictConfig
 from tqdm import tqdm
 
 
-
 @hydra.main(
     version_base=None,
     config_path=".",
