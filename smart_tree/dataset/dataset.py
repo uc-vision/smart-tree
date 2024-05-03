@@ -198,7 +198,7 @@ class SingleTreeInference:
             self.block_size,
         ).unsqueeze(1)
 
-        return block_cloud
+        return block_cloud, voxel_feats, voxel_coords
 
         # transformed_cloud = sparse_voxelize(
         #     block_cloud,

@@ -45,14 +45,10 @@ def sparse_quantize(
 
 
 
-
-
-
-
 if __name__ == "__main__":
     loader = CloudLoader()
     cloud = loader.load("/mnt/harry/PhD/training-data/apple/apple_1.npz")
-    coords, feats = cloud.xyz // 0.5, np.array(cloud.xyz)
+    coords, feats = cloud.xyz , cloud.xyz
     coords -= torch.min(coords, axis=0, keepdims=True)[0]
     coords, indices, inverse_indices = sparse_quantize(coords, 0.5, return_index=True, return_inverse=True)
     voxel_coords = coords
@@ -65,4 +61,4 @@ if __name__ == "__main__":
     point_rgb = voxel_rgb[inverse_indices]
     
     # Visualize the original point cloud with the mapped RGB values
-    Cloud(torch.tensor(feats), rgb=point_rgb).view()
+    Cloud(feats, rgb=point_rgb).view()
