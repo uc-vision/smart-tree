@@ -62,8 +62,9 @@ def merge_voxelized_cloud(data: List[TransformedCloud]) -> TransformedCloud:
     )
 
 
-def transform_cloud_to_sparse_tensor(cloud: TransformedCloud, batch_size):
+def cloud_to_sparse_tensor(cloud: TransformedCloud):
     values, _ = torch.max(cloud.voxel_coords, 0)
+    batch_size = values[0] + 1
 
     return SparseVoxelTensor(
         cloud.voxel_features,
@@ -73,21 +74,45 @@ def transform_cloud_to_sparse_tensor(cloud: TransformedCloud, batch_size):
     )
 
 
-def batch_collate(batch: List[TransformedCloud]):
+# def batch_collate(batch: List[TransformedCloud]):
 
-    transformed = merge_voxelized_cloud(batch)
-    batch_size = len(batch)
+#     transformed = merge_voxelized_cloud(batch)
+#     batch_size = len(batch)
 
-    print(f"Batch size {batch_size}")
 
-    sparse_tensor = transform_cloud_to_sparse_tensor(transformed, batch_size)
+#     sparse_tensor = transform_cloud_to_sparse_tensor(transformed, batch_size)
 
-    return (
-        sparse_tensor,
-        transformed.voxel_ids,
-        transformed.voxel_mask,
-        transformed.input_cloud,
-    )
+#     return (
+#         sparse_tensor,
+#         transformed.voxel_ids,
+#         transformed.voxel_mask,
+#         transformed.input_cloud,
+#     )
+
+# def split_sparse(sparse_tensor):
+#     cloud_ids = sparse_tensor.indices[:, 0]
+#     num_clouds = cloud_ids.max() + 1
+#     spatial_shape = sparse_tensor.spatial_shape
+#     split_sparse = []
+#     for i in range(num_clouds):
+#         feats = sparse_tensor.features[cloud_ids == i]
+#         coords = sparse_tensor.indices[cloud_ids == i]
+#         coords = sparse_tensor.indices[cloud_ids == i]
+
+
+#     return
+
+
+    # return [SparseVoxelTensor(feats, coords, spatial_shape, )
+
+
+    # return [
+    #     (sparse_tensor.indices[cloud_ids == i], sparse_tensor.features[cloud_ids == i])
+    #     for i in range(num_clouds)
+    # ]
+
+
+
 
 
 # def sparse_from_batch(features, coordinates, device):

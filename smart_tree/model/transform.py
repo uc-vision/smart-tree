@@ -70,6 +70,8 @@ def sparse_voxelize(
         voxel_gen.generate_voxel_with_id(features)
     )
 
+
+
     voxel_features = voxel_features.squeeze(1)
     voxel_coordinates = voxel_coordinates.squeeze(1)
     indice = torch.zeros(

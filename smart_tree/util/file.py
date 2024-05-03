@@ -156,8 +156,12 @@ def load_o3d_mesh(path: Path):
 def load_cloud(path: Path):
     if path.suffix == ".npz":
         return Cloud.from_numpy(**np.load(path))
+    
+    if path.suffix == ".txt":
+      data = o3d.io.read_point_cloud(str(path), format="xyzrgb")
+    else:
+      data = o3d.io.read_point_cloud(str(path))
 
-    data = o3d.io.read_point_cloud(str(path), format="xyz")
     xyz = np.asarray(data.points)
     rgb = (
         np.asarray(data.colors)

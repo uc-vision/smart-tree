@@ -8,8 +8,9 @@ from spconv.pytorch.utils import PointToVoxel
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from ..data_types.cloud import Cloud
-from ..model.sparse import batch_collate
+
+from ..data_types.cloud import Cloud, merge_clouds
+# from ..model.sparse import batch_collate
 from ..util.file import load_cloud
 from ..util.maths import cube_filter
 from ..util.misc import at_least_2d
@@ -204,18 +205,21 @@ class SingleTreeInference:
             self.block_size,
         ).unsqueeze(1)
 
-        transformed_cloud = sparse_voxelize(
-            block_cloud,
-            self.voxel_size,
-            use_xyz=self.use_xyz,
-            use_rgb=self.use_rgb,
-            voxelize_class=False,
-            voxelize_direction=False,
-            voxelize_radius=False,
-            voxelize_mask=True,
-        )
 
-        return transformed_cloud
+        return block_cloud
+
+        # transformed_cloud = sparse_voxelize(
+        #     block_cloud,
+        #     self.voxel_size,
+        #     use_xyz=self.use_xyz,
+        #     use_rgb=self.use_rgb,
+        #     voxelize_class=False,
+        #     voxelize_direction=False,
+        #     voxelize_radius=False,
+        #     voxelize_mask=True,
+        # )
+
+        # return transformed_cloud
 
     def __len__(self):
         return len(self.clouds)
@@ -231,4 +235,4 @@ def load_dataloader(
 ):
     dataset = SingleTreeInference(cloud, voxel_size, block_size, buffer_size)
 
-    return DataLoader(dataset, batch_size, num_workers, collate_fn=batch_collate)
+    return DataLoader(dataset, batch_size, num_workers, collate_fn=merge_clouds)

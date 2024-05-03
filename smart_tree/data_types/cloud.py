@@ -30,6 +30,8 @@ class Cloud:
     branch_direction: Optional[TensorType["N", 3]] = None
     branch_ids: Optional[TensorType["N", 1]] = None
     class_l: Optional[TensorType["N", 1]] = None
+    mask: Optional[TensorType["N", 1]] = None
+
     filename: Optional[Path] = None
 
     def __len__(self):
@@ -310,6 +312,12 @@ def merge_clouds(clouds: list[Cloud]) -> Cloud:
         if all(cloud.branch_ids is not None for cloud in clouds)
         else None
     )
+    merged_mask = (
+        torch.cat([cloud.mask for cloud in clouds], dim=0)
+        if all(cloud.mask is not None for cloud in clouds)
+        else None
+    )
+
     merged_filename = (
         clouds[0].filename
         if all(cloud.filename == clouds[0].filename for cloud in clouds)
@@ -323,5 +331,6 @@ def merge_clouds(clouds: list[Cloud]) -> Cloud:
         branch_direction=merged_branch_direction,
         class_l=merged_class_l,
         branch_ids=merged_branch_ids,
+        mask=merged_mask,
         filename=merged_filename,
     )

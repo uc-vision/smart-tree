@@ -61,7 +61,7 @@ class Pipeline:
         # Run point cloud through model to predict class, radius, direction
         lc: Cloud = self.model_inference.forward(cloud).to_device(self.device)
         if self.view_model_output:
-            lc.view(self.cmap)
+            lc.view()
 
         # Filter only the branch points for skeletonizaiton
         branch_cloud: Cloud = lc.filter_by_class(self.branch_classes)
