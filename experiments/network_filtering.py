@@ -1,9 +1,4 @@
-import os
 from pathlib import Path
-
-import hydra
-from hydra.utils import instantiate
-from omegaconf import DictConfig
 
 from smart_tree.dataset.augmentations import CentreCloud
 from smart_tree.model.model_inference import ModelInference

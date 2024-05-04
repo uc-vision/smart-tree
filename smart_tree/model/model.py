@@ -3,6 +3,7 @@ from dataclasses import asdict
 import spconv.pytorch as spconv
 import torch.nn as nn
 import torch.nn.functional as F
+from tensordict import TensorDict
 
 from smart_tree.model.model_blocks import MLP, SubMConvBlock, UBlock
 
@@ -75,7 +76,7 @@ class Smart_Tree(nn.Module):
             m.bias.data.fill_(0.0)
 
     def forward(self, input):
-        predictions = {}
+        predictions = TensorDict({}, batch_size=[input.features.shape[0]])
 
         input = spconv.SparseConvTensor(**asdict(input))
 

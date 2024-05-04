@@ -1,24 +1,32 @@
-from dataclasses import asdict
-from pathlib import Path
-from typing import List
-
 import torch
 from spconv.pytorch.utils import gather_features_by_pc_voxel_id
-from tqdm import tqdm
-
-from smart_tree.data_types.cloud import Cloud, LabelledCloud  # , merge_clouds
-from smart_tree.dataset.dataset import load_dataloader
 from torch.nn import Module
-
-from .sparse import cloud_to_sparse_tensor
-from .transform import sparse_voxelize
 from torch.utils.data import DataLoader
+
+from smart_tree.data_types.cloud import Cloud, LabelledCloud, merge_clouds
 from smart_tree.dataset.dataset import SingleTreeInference
 
-from spconv.pytorch.utils import PointToVoxel
-from .voxelize import SparseVoxelizer
+from .sparse import split_sparse_features
 
-""" Loads model and model weights, then returns the input, outputs and mask """
+
+def label_cloud(cloud: Cloud, voxel_preds, point_ids, mask):
+
+    pt_radius = gather_features_by_pc_voxel_id(voxel_preds["radius"], point_ids)
+    pt_direction = gather_features_by_pc_voxel_id(voxel_preds["direction"], point_ids)
+    pt_class = gather_features_by_pc_voxel_id(voxel_preds["class_l"], point_ids)
+    pt_mask = gather_features_by_pc_voxel_id(mask, point_ids).bool()
+
+    class_l = torch.argmax(pt_class, dim=1, keepdim=True)
+    medial_vector = torch.exp(pt_radius) * pt_direction
+
+    cld = LabelledCloud(
+        xyz=cloud.xyz,
+        rgb=cloud.rgb,
+        medial_vector=medial_vector,
+        class_l=class_l,
+    )
+
+    return cld.filter(pt_mask)
 
 
 class ModelInference:
@@ -37,90 +45,34 @@ class ModelInference:
     @torch.no_grad()
     def forward(self, cloud: Cloud | LabelledCloud):
 
+        output_clouds = []
+
         data_loader = self.data_loader(self.dataset(cloud))
 
-        for block_cloud in data_loader:
+        for sparse_tensor, point_ids, input_clouds, voxel_masks in data_loader:
 
-            print(block_cloud)
+            sparse_tensor = sparse_tensor.to(self.device)
+            preds = self.model.forward(sparse_tensor)
 
-            Cloud(block_cloud[0].voxel_features[:, :3]).view()
+            voxel_features = split_sparse_features(sparse_tensor)
 
-            # voxelized_clouds = self.voxelizer.voxelize_clouds(clouds)
+            cloud_preds = preds.split(
+                [feats.shape[0] for feats in voxel_features],
+                dim=0,
+            )
 
-            # Voxelize clouds?
+            for preds, _ids, cld, mask in zip(
+                cloud_preds,
+                point_ids,
+                input_clouds,
+                voxel_masks,
+            ):
 
-            pass
+                output_clouds.append(
+                    label_cloud(cld, preds, _ids, mask).translate(-cld.offset_vector)
+                )
 
-        quit()
-
-        # voxel_features, voxel_coordinates, num_pts, voxel_ids = (
-        #    voxel_gen.generate_voxel_with_id(cloud.xyz)
-        # )
-
-        #     pt_radius = gather_features_by_pc_voxel_id(preds["radius"] , voxel_cloud.voxel_ids)
-        #     pt_direction = gather_features_by_pc_voxel_id( preds["direction"], voxel_cloud.voxel_ids)
-        #     pt_class = gather_features_by_pc_voxel_id(preds["class_l"], voxel_cloud.voxel_ids)
-        #     pt_mask = gather_features_by_pc_voxel_id(voxel_cloud.voxel_mask, voxel_cloud.voxel_ids).bool()
-
-        # quit()
-
-        # clouds = []
-
-        # dataloader = load_dataloader(
-        #     cloud,
-        #     self.voxel_size,
-        #     self.block_size,
-        #     self.buffer_size,
-        #     self.num_workers,
-        #     self.batch_size,
-        # )
-
-        # for cloud in tqdm(dataloader, desc="Inferring", leave=False):
-
-        #     voxel_cloud = sparse_voxelize(
-        #         cloud,
-        #         self.voxel_size,
-        #         use_xyz=True,
-        #         use_rgb=False,
-        #         voxelize_radius=False,
-        #         voxelize_direction=False,
-        #         voxelize_class=False,
-        #         voxelize_mask=True,
-        #     )
-
-        #     sparse_input = cloud_to_sparse_tensor(voxel_cloud)
-        #     sparse_input = sparse_input.to(self.device)
-
-        #     preds = self.model.forward(sparse_input)
-
-        #     pt_radius = gather_features_by_pc_voxel_id(preds["radius"] , voxel_cloud.voxel_ids)
-        #     pt_direction = gather_features_by_pc_voxel_id( preds["direction"], voxel_cloud.voxel_ids)
-        #     pt_class = gather_features_by_pc_voxel_id(preds["class_l"], voxel_cloud.voxel_ids)
-        #     pt_mask = gather_features_by_pc_voxel_id(voxel_cloud.voxel_mask, voxel_cloud.voxel_ids).bool()
-
-        #     class_l = torch.argmax(pt_class, dim=1, keepdim=True)
-        #     medial_vector = torch.exp(pt_radius) * pt_direction
-
-        #     cld = Cloud(
-        #         xyz=cloud.xyz.cpu(),
-        #         medial_vector=medial_vector.cpu(),
-        #         class_l=class_l,
-        #     )        self.device = device
-        # self.verbose = verbose
-        # self.voxel_size = voxel_size
-        # self.block_size = block_size
-        # self.buffer_size = buffer_size
-
-        # self.num_workers = num_workers
-        # self.batch_size = batch_size
-
-        # self.model = model.to(device)
-
-        #     cld = cld.filter(pt_mask)
-
-        #     clouds.append(cld)
-
-        # #return merge_clouds(clouds)
+        return merge_clouds(output_clouds).cpu()
 
     @staticmethod
     def from_cfg(cfg):

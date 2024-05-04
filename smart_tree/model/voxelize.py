@@ -7,15 +7,14 @@ from tensordict import TensorDict
 
 from ..data_types.cloud import Cloud
 from ..util.misc import Singleton
-from ..util.function_timer import timer
 
 
 @dataclass
 class VoxelizedCloud:
-    voxel_features: torch.Tensor
-    voxel_targets: Optional[TensorDict]
-    voxel_coords: torch.Tensor
-    voxel_ids: torch.Tensor
+    features: torch.Tensor
+    targets: Optional[TensorDict]
+    coords: torch.Tensor
+    point_ids: torch.Tensor  # Used to map voxels back to points
     voxel_mask: Optional[torch.Tensor] = None
     filename: Optional[str | List[str]] = None
     original_cloud: Optional[Cloud] = None
@@ -36,7 +35,7 @@ class SparseVoxelizer:
         max_xyz: List,
         max_num_voxels: int,
         fp_16: bool = False,
-        device=torch.device("cpu"),
+        device=torch.device("cuda"),
     ):
 
         self.voxel_size = voxel_size
@@ -46,6 +45,10 @@ class SparseVoxelizer:
         self.voxelize_direction = voxelize_direction
         self.voxelize_class = voxelize_class
         self.voxelize_mask = voxelize_mask
+
+        self.max_num_voxels = max_num_voxels
+        self.min_xyz = min_xyz
+        self.max_xyz = max_xyz
 
         self.device = device
         self.fp_16 = fp_16
@@ -75,8 +78,14 @@ class SparseVoxelizer:
             device=self.device,
         )
 
-    @timer
     def __call__(self, cld: Cloud):
+
+        if torch.any(cld.min_xyz < torch.tensor(self.min_xyz, device=self.device)):
+            raise ValueError("Cloud minimum coordinates are not within bounds.")
+        if torch.any(cld.max_xyz > torch.tensor(self.max_xyz, device=self.device)):
+            raise ValueError("Cloud maximum coordinates are not within bounds.")
+        if len(cld) > self.max_num_voxels:
+            raise ValueError("Max nummber voxel less that number of points.")
 
         features = []
 
@@ -112,8 +121,7 @@ class SparseVoxelizer:
 
         dtype = torch.float16 if self.fp_16 else torch.float32
 
-        input_voxel_features = voxel_features[:, : self.num_input_features].to(dtype)
-
+        inputs = voxel_features[:, : self.num_input_features].to(dtype)
         targets = TensorDict({}, batch_size=[voxel_features.shape[0]])
 
         index = self.num_input_features
@@ -131,14 +139,11 @@ class SparseVoxelizer:
         voxel_mask = voxel_features[:, -1].to(dtype) if self.voxelize_mask else None
 
         return VoxelizedCloud(
-            voxel_features=input_voxel_features,
-            voxel_targets=targets,
-            voxel_coords=voxel_coordinates,
-            voxel_ids=voxel_ids,
+            features=inputs,
+            targets=targets,
+            coords=voxel_coordinates,
+            point_ids=voxel_ids,
             filename=cld.filename,
             voxel_mask=voxel_mask,
             original_cloud=cld,
         )
-
-    def voxelize_clouds(self, clouds: List[Cloud]):
-        return [self.__call__(cloud.to_device(self.device)) for cloud in clouds]

@@ -25,7 +25,7 @@ class Cloud(Base):
     rgb: Optional[TensorType["N", 3]] = None
     filename: Optional[Path] = None
 
-    offset: Optional[TensorType] = None  # Used to store a translation
+    offset_vector: Optional[TensorType] = None  # Used to store a translation
     _root_idx: Optional[int] = None
 
     def __len__(self) -> int:
@@ -42,19 +42,25 @@ class Cloud(Base):
         )
 
     def scale(self, factor) -> Cloud:
-        scaled_xyz = self.xyz * factor
-        return self.__class__(xyz=scaled_xyz, rgb=self.rgb, filename=self.filename)
+        args = asdict(self)
+        args["xyz"] = args["xyz"] * factor
+        return self.__class___(**args)
 
-    def translate(self, translation_vector: TensorType[3]) -> Cloud:
-        translated_xyz = self.xyz + translation_vector
-        return self.__class__(xyz=translated_xyz, rgb=self.rgb, filename=self.filename)
+    def translate(self, translation_vector) -> Cloud:
+        args = asdict(self)
+        args["xyz"] = args["xyz"] + translation_vector
+        return self.__class___(**args)
+
+    def offset(self, translation_vector):
+        self.offset_vector = translation_vector
+        return self.translate(translation_vector)
 
     def rotate(self, rotation_matrix: TensorType[3, 3, float]) -> Cloud:
-        rotated_xyz = torch.matmul(self.xyz, rotation_matrix.T.to(self.xyz.device)).to(
-            torch.float32
-        )
-
-        return self.__class__(xyz=rotated_xyz, rgb=self.rgb, filename=self.filename)
+        args = asdict(self)
+        args["xyz"] = torch.matmul(
+            args["xyz"], rotation_matrix.T.to(args["xyz"].device)
+        ).to(torch.float32)
+        return self.__class___(**args)
 
     def delete(self, delete_idx) -> Cloud:
         return self.filter(
@@ -195,6 +201,7 @@ class LabelledCloud(Cloud):
                 base_str += f"\nContains: {k}"
                 if isinstance(v, torch.Tensor):
                     base_str += f" Shape: {tuple(v.shape)}"
+                    base_str += f" Device: {v.device}"
         base_str += f"\n{'*' * 80}"
         return f"{base_str}"
 
@@ -329,3 +336,33 @@ class LabelledCloud(Cloud):
 
     def view(self):
         o3d_viewer(self.viewer_items)
+
+
+@typechecked
+def merge_clouds(clouds: List[Cloud | LabelledCloud]) -> LabelledCloud:
+    """
+    Merge multiple Cloud or LabelledCloud objects into a single LabelledCloud.
+
+    Args:
+        clouds: List of Cloud or LabelledCloud objects to merge.
+
+    Returns:
+        A single LabelledCloud object containing the merged data.
+    """
+    merged_data = {}
+
+    for field in fields(LabelledCloud):
+        field_name = field.name
+        field_data = []
+
+        for cloud in clouds:
+            if hasattr(cloud, field_name):
+                field_data.append(getattr(cloud, field_name))
+
+        if field_data:
+            if isinstance(field_data[0], torch.Tensor):
+                merged_data[field_name] = torch.cat(field_data, dim=0)
+            else:
+                merged_data[field_name] = field_data[0]
+
+    return LabelledCloud(**merged_data)

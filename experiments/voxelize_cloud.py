@@ -1,11 +1,10 @@
-from smart_tree.util.cloud_loader import CloudLoader
-from smart_tree.data_types.cloud import Cloud
+from typing import List, Tuple, Union
+
 import torch
-from itertools import repeat
 
-import numpy as np
+from smart_tree.data_types.cloud import Cloud
+from smart_tree.util.cloud_loader import CloudLoader
 
-from typing import List, Union, Tuple
 
 def ravel_hash(x: torch.Tensor) -> torch.Tensor:
     assert x.ndim == 2, x.shape

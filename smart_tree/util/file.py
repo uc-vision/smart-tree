@@ -4,8 +4,8 @@ from typing import Tuple
 
 import numpy as np
 import open3d as o3d
-import yaml
 import torch
+import yaml
 
 from smart_tree.data_types.branch import BranchSkeleton
 from smart_tree.data_types.cloud import Cloud

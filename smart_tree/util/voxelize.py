@@ -1,8 +1,11 @@
-from smart_tree.data_types.cloud import Cloud
+from typing import List, Tuple, Union
+
 import torch
 
+from smart_tree.data_types.cloud import Cloud
+
 from .function_timer import timer
-from typing import List, Union, Tuple
+
 
 def ravel_hash(x: torch.Tensor) -> torch.Tensor:
     assert x.ndim == 2, x.shape

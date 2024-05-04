@@ -7,7 +7,7 @@ from .data_types.cloud import Cloud
 from .data_types.tree import DisjointTreeSkeleton
 from .o3d_abstractions.visualizer import o3d_viewer
 from .util.cloud_loader import CloudLoader
-from .util.file import load_cloud, save_o3d_cloud, save_o3d_lineset, save_o3d_mesh
+from .util.file import save_o3d_cloud, save_o3d_lineset, save_o3d_mesh
 
 
 class Pipeline:
@@ -58,12 +58,15 @@ class Pipeline:
         # Load point cloud
         cloud: Cloud = self.cloud_loader.load(path) if path != None else cloud
 
+        print("cloud loaded", cloud)
+
         # cloud = cloud.to_device(self.device)
         cloud = self.preprocessing(cloud)
 
         # Run point cloud through model to predict class, radius, direction
-        lc: Cloud = self.model_inference.forward(cloud).to_device(self.device)
+        lc = self.model_inference.forward(cloud)  # .to_device(self.device)
 
+        lc.view()
         quit()
         if self.view_model_output:
             lc.view()

@@ -18,12 +18,11 @@ pipeline:
     dataloader:
       _target_: torch.utils.data.DataLoader
       _partial_: True
-      batch_size: 1
-      num_workers: 0
+      batch_size: 4
+      num_workers: 4
       collate_fn:
         _target_: smart_tree.model.collate.inference_collate
         _partial_: True
-
 
 
     dataset:
@@ -32,6 +31,7 @@ pipeline:
       block_size: 4
       buffer_size: 0.4
       min_points: 20
+      device: ${device}
       voxelizer:
         _target_: smart_tree.model.voxelize.SparseVoxelizer
         voxel_size: 0.01
@@ -42,26 +42,10 @@ pipeline:
         voxelize_class: False
         voxelize_mask: True
         min_xyz: [0,0,0]
-        max_xyz: [4,4,4]
-        max_num_voxels: 500000
+        max_xyz: [4.8,4.8,4.8] # block + (buffer * 2)
+        max_num_voxels: 5000000
 
 
-        # transform: 
-        #   _target_ : smart_tree.model.transform.sparse_voxelize
-        #   _partial_ : True
-        #   voxel_size: ${voxel_size}
-
-        #   fp_16: False
-
-
-        #           cloud: Cloud,
-
-
-    # voxel_size: 0.01
-    # block_size: 4
-    # buffer_size: 0.4
-    # num_workers : 8
-    # batch_size : 1
 
   skeletonizer:
     _target_: smart_tree.skeleton.skeletonize.Skeletonizer
@@ -85,3 +69,4 @@ pipeline:
   prune_skeletons : True 
   min_skeleton_radius : 0.01 
   min_skeleton_length : 0.02
+

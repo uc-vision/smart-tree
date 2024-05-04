@@ -53,7 +53,7 @@ class Base:
                 print(f"Tensor '{key}' contains NaNs.")
 
     def cpu(self):
-        return self.__class__.to_device(self, torch.device("cpu"))
+        return self.to_device(torch.device("cpu"))
 
     def cuda(self):
-        return self.__class__.to_device(self, torch.device("cuda"))
+        return self.to_device(torch.device("cuda"))

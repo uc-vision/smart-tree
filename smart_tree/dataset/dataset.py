@@ -9,14 +9,12 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from ..data_types.cloud import Cloud  # , merge_clouds
-from ..model.transform import sparse_voxelize
-
+from ..model.voxelize import SparseVoxelizer
 # from ..model.sparse import batch_collate
 from ..util.file import load_cloud
+from ..util.function_timer import timer
 from ..util.maths import cube_filter
 from ..util.misc import at_least_2d
-from ..model.voxelize import SparseVoxelizer
-from ..util.function_timer import timer
 
 
 class TreeDataset:
@@ -154,7 +152,6 @@ class SingleTreeInference:
         buffer_size: float = 0.4,
         min_points=20,
     ):
-        print(cloud.device)
 
         self.cloud = cloud
         self.voxelizer = voxelizer
@@ -183,7 +180,7 @@ class SingleTreeInference:
 
         self.clouds: List[Cloud] = []
 
-        for centre in self.block_centres:
+        for centre in tqdm(self.block_centres, desc="Computing blocks"):
             mask = cube_filter(
                 self.cloud.xyz,
                 centre,
@@ -203,11 +200,11 @@ class SingleTreeInference:
             self.block_size,
         ).unsqueeze(1)
 
-        offset = -torch.min(block_cloud.xyz, dim=0)[0]
-        block_cloud = block_cloud.translate(offset)
-        block_cloud.offset = offset
+        offset_vector = -torch.min(block_cloud.xyz, dim=0)[0]
+        block_cloud = block_cloud.offset(offset_vector)
+        voxel_cloud = self.voxelizer(block_cloud)
 
-        return self.voxelizer(block_cloud)
+        return voxel_cloud
 
         # transformed_cloud = sparse_voxelize(
         #     block_cloud,

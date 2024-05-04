@@ -1,15 +1,28 @@
 from dataclasses import asdict, dataclass
 from itertools import repeat
-from typing import List, Optional, Tuple, Union
+from typing import List, Tuple, Union
 
 import numpy as np
-import spconv.pytorch as spconv
 import torch
-from tensordict import TensorDict
 
 from .transform import TransformedCloud
 
-#from ..data_types.cloud import merge_clouds
+# from ..data_types.cloud import merge_clouds
+
+
+def sparse_from_batch(features, coordinates):
+    batch_size = features.shape[0]
+
+    values, _ = torch.max(coordinates, 0)  # BXYZ -> XYZ (Biggest Spatial Size)
+
+    return SparseVoxelTensor(features, coordinates.int(), values[1:], batch_size)
+
+
+def split_sparse_features(sparse_tensor):
+    cloud_ids = sparse_tensor.indices[:, 0]
+    num_clouds = cloud_ids.max() + 1
+
+    return [sparse_tensor.features[cloud_ids == i] for i in range(num_clouds)]
 
 
 @dataclass
@@ -25,40 +38,6 @@ class SparseVoxelTensor:
         data["indices"] = self.indices.to(device)
 
         return SparseVoxelTensor(**data)
-
-
-def merge_voxelized_cloud(data: List[TransformedCloud]) -> TransformedCloud:
-    for i, d in enumerate(data, start=0):
-        d.voxel_coords += i
-
-    voxel_features = torch.cat([data.voxel_features for data in data])
-    voxel_targets = torch.cat([data.voxel_targets for data in data])
-    voxel_coords = torch.cat([data.voxel_coords for data in data])
-
-    voxel_ids = None
-    if all(d.voxel_ids is not None for d in data):
-        voxel_ids = torch.cat([d.voxel_ids for d in data])
-
-    filenames = None
-    if all(d.filename is not None for d in data):
-        filenames = [d.filename for d in data]
-
-    voxel_mask = None
-    if all(d.voxel_mask is not None for d in data):
-        voxel_mask = torch.cat([d.voxel_mask for d in data])
-
-    cloud = None
-    # if all(d.input_cloud is not None for d in data):
-    #     cloud = merge_clouds([d.input_cloud for d in data])
-
-    # return TransformedCloud(
-    #     voxel_features,
-    #     voxel_targets,
-    #     voxel_coords,
-    #     voxel_ids=voxel_ids,
-    #     voxel_mask=voxel_mask,
-    #     input_cloud=cloud,
-    # )
 
 
 def cloud_to_sparse_tensor(cloud: TransformedCloud):
@@ -102,16 +81,13 @@ def cloud_to_sparse_tensor(cloud: TransformedCloud):
 #     return
 
 
-    # return [SparseVoxelTensor(feats, coords, spatial_shape, )
+# return [SparseVoxelTensor(feats, coords, spatial_shape, )
 
 
-    # return [
-    #     (sparse_tensor.indices[cloud_ids == i], sparse_tensor.features[cloud_ids == i])
-    #     for i in range(num_clouds)
-    # ]
-
-
-
+# return [
+#     (sparse_tensor.indices[cloud_ids == i], sparse_tensor.features[cloud_ids == i])
+#     for i in range(num_clouds)
+# ]
 
 
 # def sparse_from_batch(features, coordinates, device):

@@ -1,29 +1,29 @@
 from typing import List
 
-from ..data_types.cloud import Cloud, LabelledCloud
+import torch
+
+from .collate import VoxelizedCloud
+from .sparse import sparse_from_batch
 from .voxelize import VoxelizedCloud
 
 
-def inference_collate(data):
-    return data
+def inference_collate(clouds: List[VoxelizedCloud]):
 
-    # clouds, sparse_data = zip(*data)
+    features = []
+    coords = []
+    voxel_masks = []
+    point_ids = []
+    input_clouds = []
 
-    # if len(sparse_data) == 1:
-    #     (feats, coords, inverse_indices) = sparse_data
-    # else:
-    #     (feats, coords, inverse_indices) = zip(*sparse_data)
+    for i, voxel_cloud in enumerate(clouds):
+        features.append(voxel_cloud.features)
+        voxel_cloud.coords[:, 0] = torch.tensor([i], dtype=torch.float32)
 
-    # print(feats)
+        coords.append(voxel_cloud.coords)
+        voxel_masks.append(voxel_cloud.voxel_mask)
+        point_ids.append(voxel_cloud.point_ids)
+        input_clouds.append(voxel_cloud.original_cloud)
 
-    # return clouds
+    sparse_t = sparse_from_batch(torch.cat(features, dim=0), torch.cat(coords, dim=0))
 
-
-def voxelized_clouds_to_sparse_tensor(clouds: List[VoxelizedCloud]):
-
-    return False
-
-
-def split_sparse_tensor(sparse_tensor):
-
-    return
+    return sparse_t, point_ids, input_clouds, voxel_masks
