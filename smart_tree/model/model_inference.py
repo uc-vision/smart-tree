@@ -54,10 +54,9 @@ class ModelInference:
             sparse_tensor = sparse_tensor.to(self.device)
             preds = self.model.forward(sparse_tensor)
 
-            voxel_features = split_sparse_features(sparse_tensor)
-
+            cloud_voxel_features = split_sparse_features(sparse_tensor)
             cloud_preds = preds.split(
-                [feats.shape[0] for feats in voxel_features],
+                [feats.shape[0] for feats in cloud_voxel_features],
                 dim=0,
             )
 
@@ -72,7 +71,7 @@ class ModelInference:
                     label_cloud(cld, preds, _ids, mask).translate(-cld.offset_vector)
                 )
 
-        return merge_clouds(output_clouds).cpu()
+        return merge_clouds(output_clouds)
 
     @staticmethod
     def from_cfg(cfg):
