@@ -50,7 +50,7 @@ class Pipeline:
         self.save_path = save_path
         self.cloud_loader = cloud_loader
 
-        self.branch_classes = branch_classes
+        self.branch_classes = torch.tensor(branch_classes, device=device)
         self.cmap = np.asarray(cmap)
         self.device = device
 
@@ -58,16 +58,11 @@ class Pipeline:
         # Load point cloud
         cloud: Cloud = self.cloud_loader.load(path) if path != None else cloud
 
-        print("cloud loaded", cloud)
-
-        # cloud = cloud.to_device(self.device)
         cloud = self.preprocessing(cloud)
 
         # Run point cloud through model to predict class, radius, direction
-        lc = self.model_inference.forward(cloud)  # .to_device(self.device)
+        lc = self.model_inference.forward(cloud).to_device(self.device)
 
-        lc.view()
-        quit()
         if self.view_model_output:
             lc.view()
 
@@ -92,12 +87,12 @@ class Pipeline:
             )
 
         if self.save_outputs:
-            print("Saving Outputs")
             sp = self.save_path
-            save_o3d_lineset(f"{sp}/skeleton.ply", skeleton.to_o3d_lineset())
-            save_o3d_mesh(f"{sp}/mesh.ply", skeleton.to_o3d_tube())
-            save_o3d_cloud(f"{sp}/cloud.ply", lc.to_o3d_cld())
-            save_o3d_cloud(f"{sp}/seg_cld.ply", lc.to_o3d_seg_cld(self.cmap))
+            name = cloud.filename.stem
+            save_o3d_lineset(f"{sp}/{name}_skeleton.ply", skeleton.to_o3d_lineset())
+            save_o3d_mesh(f"{sp}/{name}_mesh.ply", skeleton.to_o3d_tube())
+            save_o3d_cloud(f"{sp}/{name}_cloud.ply", lc.to_o3d_cld())
+            save_o3d_cloud(f"{sp}/{name}_seg_cld.ply", lc.to_o3d_seg_cld(self.cmap))
 
     def post_process(self, skeleton: DisjointTreeSkeleton):
         if self.prune_skeletons:

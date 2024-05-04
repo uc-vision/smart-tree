@@ -4,8 +4,9 @@ from typing import Sequence
 import torch
 from beartype import beartype
 
-from smart_tree.data_types.cloud import Cloud
-from smart_tree.util.maths import euler_angles_to_rotation
+from ..data_types.cloud import Cloud
+from ..util.maths import euler_angles_to_rotation
+from ..skeleton.filter import outlier_removal
 
 
 class Augmentation(ABC):
@@ -37,8 +38,7 @@ class FixedRotate(Augmentation):
 
 class CentreCloud(Augmentation):
     def __call__(self, cloud: Cloud) -> Cloud:
-        centre, (x, y, z) = cloud.bbox
-        return cloud.translate(-centre + torch.tensor([0, y, 0], device=centre.device))
+        return cloud.translate(-cloud.centre)
 
 
 class VoxelDownsample(Augmentation):
@@ -55,6 +55,20 @@ class FixedTranslate(Augmentation):
 
     def __call__(self, cloud: Cloud) -> Cloud:
         return cloud.translate(self.xyz)
+
+
+class RadiusOutlierRemoval(Augmentation):
+    def __init__(self, number_points: int = 8, radius: float = 0.025):
+        self.number_points = number_points
+        self.radius = torch.tensor(radius)
+
+    def __call__(self, cloud: Cloud) -> Cloud:
+
+        mask = outlier_removal(
+            cloud.xyz, self.radius.to(cloud.device), nb_points=self.number_points
+        )
+
+        return cloud.filter(mask)
 
 
 class RandomCrop(Augmentation):
@@ -89,20 +103,65 @@ class RandomCubicCrop(Augmentation):
         return cloud.filter(mask)
 
 
-class RandomDropout(Augmentation):
-    def __init__(self, max_drop_out):
-        self.max_drop_out = max_drop_out
+class FilterByClass(Augmentation):
+    def __init__(self, classes: list):
+        self.classes = torch.tensor(classes)
 
-    def __call__(self, cloud: Cloud) -> Cloud:
-        num_indices = int(
-            (1.0 - (self.max_drop_out * torch.rand(1, device=cloud.xyz.device)))
-            * cloud.xyz.shape[0]
+    def __call__(self, cloud):
+        mask = torch.isin(cloud.class_l, self.classes.to(cloud.device))
+        return cloud.filter(mask.view(-1))
+
+
+class RandomTranslate(Augmentation):
+    def __init__(self, max_x, max_y, max_z):
+        self.max_translation = torch.tensor([max_x, max_y, max_z])
+
+    def __call__(self, cloud):
+        return cloud.translate(
+            (torch.rand(3, device=cloud.xyz.device) - 0.5)
+            * self.max_translation.to(device=cloud.xyz.device)
         )
 
-        indices = torch.randint(
-            high=cloud.xyz.shape[0], size=(num_indices, 1), device=cloud.xyz.device
-        ).squeeze(1)
-        return cloud.filter(indices)
+
+class RandomDropout(Augmentation):
+    def __init__(self, prob: float):
+        self.prob = prob
+
+    def __call__(self, cloud: Cloud) -> Cloud:
+        mask = torch.rand(cloud.xyz.shape[0]) < self.prob
+        return cloud.filter(~mask)
+
+
+class RandomFlips(Augmentation):
+    def __init__(self, x_prob: float = 0.0, y_prob: float = 0.0, z_prob: float = 0.0):
+        self.prob = torch.tensor([x_prob, y_prob, z_prob], dtype=torch.float)
+
+    def __call__(self, cloud: Cloud):
+        flips = (
+            (torch.rand(3) < self.prob)
+            .to(dtype=cloud.xyz.dtype, device=cloud.device)
+            .view(1, 3)
+        )
+        return cloud.scale(-flips * 2.0 + 1.0)
+
+
+class RandomGaussianNoise(Augmentation):
+    def __init__(self, mean=0.0, std=0.01, prob=0.0, magnitude=1.0):
+        self.mean = mean
+        self.std = std
+        self.prob = prob
+        self.magnitude = magnitude
+
+    def __call__(self, cloud):
+        mask = torch.rand(cloud.xyz.shape[0]) < self.prob
+        noise = (
+            torch.randn(cloud.xyz.shape, device=cloud.xyz.device, dtype=cloud.xyz.dtype)
+            * self.std
+            + self.mean
+        )
+        noise *= self.magnitude
+        cloud.xyz[mask] += noise[mask].to(cloud.xyz.dtype)
+        return cloud.with_xyz(cloud.xyz)
 
 
 class AugmentationPipeline(Augmentation):

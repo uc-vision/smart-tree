@@ -35,7 +35,7 @@ class SparseVoxelizer:
         max_xyz: List,
         max_num_voxels: int,
         fp_16: bool = False,
-        device=torch.device("cuda"),
+        device=torch.device("cpu"),
     ):
 
         self.voxel_size = voxel_size

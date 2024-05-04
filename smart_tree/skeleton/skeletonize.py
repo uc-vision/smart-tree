@@ -31,7 +31,7 @@ class Skeletonizer:
     def forward(self, cloud: Cloud) -> DisjointTreeSkeleton:
         cloud.to_device(self.device)
 
-        mask = outlier_removal(cloud.medial_pts, cloud.radius.unsqueeze(1), nb_points=8)
+        mask = outlier_removal(cloud.medial_pts, cloud.radius, nb_points=8)
         cloud = cloud.filter(mask)
 
         graph: Graph = nn_graph(
@@ -48,9 +48,17 @@ class Skeletonizer:
         for subgraph_id, subgraph in enumerate(
             tqdm(subgraphs, desc="Processing Connected Components", leave=False)
         ):
-            skeletons.append(
-                self.process_subgraph(cloud, subgraph, skeleton_id=subgraph_id)
-            )
+
+            skeleton =                 self.process_subgraph(cloud, subgraph, skeleton_id=subgraph_id)
+
+
+            if len(skeleton) < 1:
+                continue
+
+
+            skeletons.append(skeleton            )
+
+
 
         return DisjointTreeSkeleton(skeletons)
 
@@ -86,7 +94,7 @@ class Skeletonizer:
 
         branches = sample_tree(
             subgraph_cloud.medial_pts,
-            subgraph_cloud.radius.unsqueeze(1),
+            subgraph_cloud.radius,
             preds,
             distances,
             subgraph_cloud.xyz,

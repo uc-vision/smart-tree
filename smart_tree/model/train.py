@@ -123,84 +123,84 @@ def main(cfg: DictConfig):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     data_loaders = instantiate(cfg.dataset)
-    trackers = instantiate(cfg.tracker)
+    # trackers = instantiate(cfg.tracker)
 
-    log.info(f"Train Dataset Size: {len(data_loaders.train.dataset)}")
-    log.info(f"Validation Dataset Size: {len(data_loaders.validation.dataset)}")
-    log.info(f"Test Dataset Size: {len(data_loaders.test.dataset)}")
+    # log.info(f"Train Dataset Size: {len(data_loaders.train.dataset)}")
+    # log.info(f"Validation Dataset Size: {len(data_loaders.validation.dataset)}")
+    # log.info(f"Test Dataset Size: {len(data_loaders.test.dataset)}")
 
-    # Model
-    model = instantiate(cfg.model).to(device).train()
-    torch.save(model, f"{run_dir}/{run_name}_model.pt")
+    # # Model
+    # model = instantiate(cfg.model).to(device).train()
+    # torch.save(model, f"{run_dir}/{run_name}_model.pt")
 
-    # Optimizer / Scheduler
-    optimizer = instantiate(cfg.optimizer, params=model.parameters())
-    scheduler = instantiate(cfg.scheduler, optimizer=optimizer)
-    loss_fn = instantiate(cfg.loss)
+    # # Optimizer / Scheduler
+    # optimizer = instantiate(cfg.optimizer, params=model.parameters())
+    # scheduler = instantiate(cfg.scheduler, optimizer=optimizer)
+    # loss_fn = instantiate(cfg.loss)
 
-    # FP-16
-    amp_ctx = torch.cuda.amp.autocast() if cfg.fp16 else contextlib.nullcontext()
-    scaler = torch.cuda.amp.grad_scaler.GradScaler()
+    # # FP-16
+    # amp_ctx = torch.cuda.amp.autocast() if cfg.fp16 else contextlib.nullcontext()
+    # scaler = torch.cuda.amp.grad_scaler.GradScaler()
 
-    epochs_no_improve = 0
-    best_val_loss = torch.inf
+    # epochs_no_improve = 0
+    # best_val_loss = torch.inf
 
-    # Epochs
-    for epoch in (pbar := tqdm(range(0, cfg.num_epoch), leave=True, desc="Epoch")):
-        with amp_ctx:
-            trackers.train, scaler = train_epoch(
-                data_loaders.train,
-                model,
-                optimizer,
-                loss_fn,
-                scaler=scaler,
-                device=device,
-                tracker=trackers.train,
-            )
+    # # Epochs
+    # for epoch in (pbar := tqdm(range(0, cfg.num_epoch), leave=True, desc="Epoch")):
+    #     with amp_ctx:
+    #         trackers.train, scaler = train_epoch(
+    #             data_loaders.train,
+    #             model,
+    #             optimizer,
+    #             loss_fn,
+    #             scaler=scaler,
+    #             device=device,
+    #             tracker=trackers.train,
+    #         )
 
-            trackers.validation = eval_epoch(
-                data_loaders.validation,
-                model,
-                loss_fn,
-                device=device,
-                tracker=trackers.validation,
-            )
+    #         trackers.validation = eval_epoch(
+    #             data_loaders.validation,
+    #             model,
+    #             loss_fn,
+    #             device=device,
+    #             tracker=trackers.validation,
+    #         )
 
-            trackers.test = eval_epoch(
-                data_loaders.test,
-                model,
-                loss_fn,
-                tracker=trackers.test,
-            )
+    #         trackers.test = eval_epoch(
+    #             data_loaders.test,
+    #             model,
+    #             loss_fn,
+    #             tracker=trackers.test,
+    #         )
 
-            # if (epoch + 1) % cfg.capture_output == 0:
-            #     capture_and_log(test_loader, model, epoch, wandb.run, cfg)
-            #     capture_and_log(val_loader, model, epoch, wandb.run, cfg)
+    #         # if (epoch + 1) % cfg.capture_output == 0:
+    #         #     capture_and_log(test_loader, model, epoch, wandb.run, cfg)
+    #         #     capture_and_log(val_loader, model, epoch, wandb.run, cfg)
 
-        scheduler.step(trackers.validation.epoch_loss) if cfg.lr_decay else None
+    #     scheduler.step(trackers.validation.epoch_loss) if cfg.lr_decay else None
 
-        # pbar.set_description(
-        #     f"Epoch {epoch} - Train Loss: {trackers.train.epoch_loss:.4f}, \
-        #       Validation Loss: {trackers.validation.epoch_loss:.4f}"
-        # )
+    #     # pbar.set_description(
+    #     #     f"Epoch {epoch} - Train Loss: {trackers.train.epoch_loss:.4f}, \
+    #     #       Validation Loss: {trackers.validation.epoch_loss:.4f}"
+    #     # )
 
-        # Save Best Model
-        if trackers.validation.epoch_loss < best_val_loss:
-            epochs_no_improve = 0
-            best_val_loss = trackers.validation.epoch_loss
-            wandb.run.summary["Best Test Loss"] = best_val_loss
-            torch.save(model.state_dict(), f"{run_dir}/{run_name}_model_weights.pt")
-            log.info(f"Weights Saved at epoch: {epoch}")
-        else:
-            epochs_no_improve += 1
+    #     # Save Best Model
+    #     if trackers.validation.epoch_loss < best_val_loss:
+    #         epochs_no_improve = 0
+    #         best_val_loss = trackers.validation.epoch_loss
+    #         wandb.run.summary["Best Test Loss"] = best_val_loss
+    #         torch.save(model.state_dict(), f"{run_dir}/{run_name}_model_weights.pt")
+    #         log.info(f"Weights Saved at epoch: {epoch}")
+    #     else:
+    #         epochs_no_improve += 1
 
-        if epochs_no_improve == cfg.early_stop_epoch and cfg.early_stop:
-            log.info("Training Ended (Evaluation Test Score Not Improving)")
-            break
+    #     if epochs_no_improve == cfg.early_stop_epoch and cfg.early_stop:
+    #         log.info("Training Ended (Evaluation Test Score Not Improving)")
+    #         break
 
-        trackers.train.log(epoch).reset()
-        trackers.validation.log(epoch).reset()
-        trackers.test.log(epoch).reset()
+    #     trackers.train.log(epoch).reset()
+    #     trackers.validation.log(epoch).reset()
+    #     trackers.test.log(epoch).reset()
 
 
 if __name__ == "__main__":

@@ -27,6 +27,7 @@ class Cloud(Base):
 
     offset_vector: Optional[TensorType] = None  # Used to store a translation
     _root_idx: Optional[int] = None
+    mask: Optional[TensorType["N", 1, torch.bool]] = None # When doing inferencing buffer out edges.
 
     def __len__(self) -> int:
         return self.xyz.shape[0]
@@ -44,12 +45,12 @@ class Cloud(Base):
     def scale(self, factor) -> Cloud:
         args = asdict(self)
         args["xyz"] = args["xyz"] * factor
-        return self.__class___(**args)
+        return Cloud(**args)
 
     def translate(self, translation_vector) -> Cloud:
         args = asdict(self)
         args["xyz"] = args["xyz"] + translation_vector
-        return self.__class___(**args)
+        return Cloud(**args)
 
     def offset(self, translation_vector):
         self.offset_vector = translation_vector
@@ -60,7 +61,7 @@ class Cloud(Base):
         args["xyz"] = torch.matmul(
             args["xyz"], rotation_matrix.T.to(args["xyz"].device)
         ).to(torch.float32)
-        return self.__class___(**args)
+        return Cloud(**args)
 
     def delete(self, delete_idx) -> Cloud:
         return self.filter(
@@ -171,7 +172,6 @@ class LabelledCloud(Cloud):
 
     loss_mask: Optional[TensorType["N", 1, torch.bool]] = None
 
-    mask: Optional[TensorType["N", 1, torch.bool]] = None
 
     def __post_init__(self):
         mask_shape = (len(self.xyz), 1)

@@ -1,13 +1,10 @@
 from dataclasses import fields
 from pathlib import Path
-
 import numpy as np
 import open3d as o3d
 import torch
 from tqdm import tqdm
-
 from ..data_types.cloud import Cloud, LabelledCloud
-
 
 class CloudLoader:
     def load(self, file: str | Path):
@@ -19,10 +16,16 @@ class CloudLoader:
 
     def load_o3d(self, file: str | Path) -> Cloud:
         try:
-            pcd = o3d.io.read_point_cloud(str(file))
-            return self._load_as_cloud(
-                {"xyz": np.asarray(pcd.points), "rgb": np.asarray(pcd.colors)}, file
-            )
+            if file.suffix == ".txt":
+                pcd = o3d.io.read_point_cloud(str(file), format="xyz")
+            else:
+                pcd = o3d.io.read_point_cloud(str(file))
+
+            data = {"xyz": np.asarray(pcd.points)}
+            if pcd.has_colors():
+                data["rgb"] = np.asarray(pcd.colors)
+
+            return self._load_as_cloud(data, file)
         except Exception as e:
             raise ValueError(f"Error loading file {file}: {e}")
 
@@ -34,11 +37,9 @@ class CloudLoader:
         optional_params = [
             f.name for f in fields(LabelledCloud) if f.default is not None
         ]
-
         for param in optional_params:
             if param in data:
                 return self._load_as_labelled_cloud(data, file_path)
-
         return self._load_as_cloud(data, file_path)
 
     def _load_as_cloud(self, data, file_path: Path) -> Cloud:
@@ -53,6 +54,7 @@ class CloudLoader:
         fields_dict = {
             f.name: data[f.name] for f in fields(cloud_type) if f.name in data
         }
+
         for key, value in tqdm(fields_dict.items(), desc="Loading cloud", leave=False):
             if isinstance(value, np.ndarray):
                 dtype = torch.long if key in ["class_l", "branch_ids"] else torch.float
@@ -64,7 +66,6 @@ class CloudLoader:
         fields_dict["filename"] = file_path
 
         if "vector" in data.keys():
-
             fields_dict["medial_vector"] = torch.from_numpy(data["vector"]).type(
                 torch.float
             )

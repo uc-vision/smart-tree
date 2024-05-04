@@ -35,7 +35,7 @@ def nn(src, dest, r=1.0, grid=None):
 
 def nn_graph(points: torch.Tensor, radii, K=40):
     idxs, dists, _ = knn(points, points, K=K, r=radii.max().item())
-    idxs[dists > radii.unsqueeze(1)] = -1
+    idxs[dists > radii] = -1
     edges, edge_weights = make_edges(dists, idxs)
     return Graph(points, edges, edge_weights)
 
@@ -44,7 +44,7 @@ def medial_nn_graph(points: torch.Tensor, radii, medial_dist, K=40):
     # edges weighted based on distance to medial axis
     idxs, dists, _ = knn(points, points, K=K, r=radii.max().item() / 4.0)
     dists_ = dists + medial_dist[idxs]  # Add medial distance to distance graph...
-    idxs[dists > radii.unsqueeze(1)] = -1
+    idxs[dists > radii] = -1
 
     return make_edges(dists_, idxs)
 

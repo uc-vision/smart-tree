@@ -2,7 +2,6 @@ from typing import List
 
 import torch
 
-from .collate import VoxelizedCloud
 from .sparse import sparse_from_batch
 from .voxelize import VoxelizedCloud
 

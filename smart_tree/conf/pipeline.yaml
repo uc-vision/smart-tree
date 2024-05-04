@@ -31,7 +31,6 @@ pipeline:
       block_size: 4
       buffer_size: 0.4
       min_points: 20
-      device: ${device}
       voxelizer:
         _target_: smart_tree.model.voxelize.SparseVoxelizer
         voxel_size: 0.01
@@ -53,8 +52,8 @@ pipeline:
     min_connection_length: 0.02 
     minimum_graph_vertices: 32
 
-  view_model_output : True
-  view_skeletons : True
+  view_model_output : False
+  view_skeletons : False
   save_path: /
   save_outputs : False
   

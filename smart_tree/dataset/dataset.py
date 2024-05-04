@@ -1,146 +1,118 @@
 import json
 from pathlib import Path
-from typing import List
 
 import torch
 import torch.utils.data
-from spconv.pytorch.utils import PointToVoxel
-from torch.utils.data import DataLoader
+
 from tqdm import tqdm
-
-from ..data_types.cloud import Cloud  # , merge_clouds
+from beartype.typing import Any, List, Literal, Optional, Union
+from typeguard import typechecked
+from ..data_types.cloud import Cloud
 from ..model.voxelize import SparseVoxelizer
-# from ..model.sparse import batch_collate
-from ..util.file import load_cloud
-from ..util.function_timer import timer
+from ..util.cloud_loader import CloudLoader
+from .augmentations import AugmentationPipeline
 from ..util.maths import cube_filter
-from ..util.misc import at_least_2d
+
+FilePath = Union[str, Path]
+DatasetModes = Literal["train", "validation", "test", "capture"]
+Device = Literal["cpu", "cuda"]
 
 
-class TreeDataset:
+@typechecked
+class Dataset:
     def __init__(
         self,
-        voxel_size: int,
-        json_path: Path,
-        directory: Path,
-        mode: str,
-        input_features: List[str],
-        target_features: List[str],
-        augmentation=None,
-        cache: bool = False,
-        device=torch.device("cuda:0"),
+        tree_paths: List[Path] | List[str],
+        transform: Optional[callable] = None,
+        augmentation: Optional[AugmentationPipeline] = None,
+        cache: bool = None,
+        device: Device = "cpu",
+        loader=CloudLoader(),
     ):
-        self.voxel_size = voxel_size
-        self.mode = mode
+        self.transform = transform
         self.augmentation = augmentation
-        self.directory = directory
-        self.device = device
+        self.tree_paths = tree_paths
+        self.device = torch.device(device)
+        self.loader = loader
+        self.cache = {} if cache else False
 
-        self.input_features = input_features
-        self.target_features = target_features
-
-        assert Path(
-            json_path
-        ).is_file(), f"json metadata does not exist at '{json_path}'"
-        json_data = json.load(open(json_path))
-
-        if self.mode == "train":
-            self.tree_paths = json_data["train"]
-        elif self.mode == "validation":
-            self.tree_paths = json_data["validation"]
-        elif self.mode == "test":
-            self.tree_paths = json_data["test"]
-
-        missing = [
-            path
-            for path in self.tree_paths
-            if not Path(f"{self.directory}/{path}").is_file()
-        ]
-
-        assert len(missing) == 0, f"Missing {len(missing)} files: {missing}"
-
-        self.cache = {} if cache else None
-        self.load_cloud = load_cloud if self.mode != "test" else load_cloud
-
-    def load(self, filename) -> Cloud:
-        if self.cache is None:
-            return self.load_cloud(filename)
+    def load(self, filename):  # -> Cloud | LabelledCloud:
+        if self.cache is False:
+            return self.loader.load(filename)
 
         if filename not in self.cache:
-            self.cache[filename] = self.load_cloud(filename).pin_memory()
+            self.cache[filename] = self.loader.load(filename).pin_memory()
 
         return self.cache[filename]
 
     def __getitem__(self, idx):
-        filename = Path(f"{self.directory}/{self.tree_paths[idx]}")
-        cld = self.load(filename)
-
+        cld = self.load(self.tree_paths[idx])
         try:
-            return self.process_cloud(cld, self.tree_paths[idx])
+            return self.process_cloud(cld)
         except Exception:
-            print(f"Exception processing {filename} with {len(cld)} points")
+            print(f"Exception processing {cld}")
             raise
 
-    def process_cloud(self, cld: Cloud, filename: str):
+    def __len__(self):
+        return len(self.tree_paths)
+
+    def process_cloud(self, cld) -> Any:  #: Cloud | LabelledCloud
+
         cld = cld.to_device(self.device)
 
         if self.augmentation != None:
             cld = self.augmentation(cld)
 
-        xyzmin, _ = torch.min(cld.xyz, axis=0)
-        xyzmax, _ = torch.max(cld.xyz, axis=0)
+        if self.transform != None:
+            cld = self.transform(cld)
 
-        # data = cld.cat()
-        input_features = torch.cat(
-            [at_least_2d(getattr(cld, attr)) for attr in self.input_features], dim=1
-        )
+        return cld
 
-        target_features = torch.cat(
-            [at_least_2d(getattr(cld, attr)) for attr in self.target_features], dim=1
-        )
+    @staticmethod
+    def from_directory(directory: Union[str, Path], *args, **kwargs) -> "Dataset":
+        assert Path(directory).is_dir(), f"Directory path is invalid: {directory}"
+        valid_extensions = ["*.ply", "*.pcd", "*.npz"]
+        tree_paths = [
+            str(file)
+            for ext in valid_extensions
+            for file in Path(directory).rglob(ext)
+            if file.is_file()
+        ]
+        if len(tree_paths) == 0:
+            raise ValueError("Directory contains no valid data")
 
-        data = torch.cat([input_features, target_features], dim=1)
+        return Dataset(tree_paths=tree_paths, *args, **kwargs)
 
-        assert (
-            data.shape[0] > 0
-        ), f"Empty cloud after augmentation: {self.tree_paths[idx]}"
+    @staticmethod
+    def from_path(path: FilePath, *args, **kwargs) -> "Dataset":
+        assert Path(path).exists(), f"path is invalid: {path}"
+        return Dataset(tree_paths=[path], *args, **kwargs)
 
-        surface_voxel_generator = PointToVoxel(
-            vsize_xyz=[self.voxel_size] * 3,
-            coors_range_xyz=[
-                xyzmin[0],
-                xyzmin[1],
-                xyzmin[2],
-                xyzmax[0],
-                xyzmax[1],
-                xyzmax[2],
-            ],
-            num_point_features=data.shape[1],
-            max_num_voxels=data.shape[0],
-            max_num_points_per_voxel=1,
-            device=data.device,
-        )
+    @staticmethod
+    def from_json(
+        json_path: FilePath,
+        directory: FilePath,
+        mode: DatasetModes,
+        *args,
+        **kwargs,
+    ) -> "Dataset":
 
-        feats, coords, num_pts, _ = surface_voxel_generator.generate_voxel_with_id(data)
+        json_data = json.load(open(json_path))
+        paths = [Path(f"{directory}/{p}") for p in json_data[mode]]
+        invalid_paths = [path for path in paths if not path.exists()]
+        assert not invalid_paths, f"Missing {len(invalid_paths)} files: {invalid_paths}"
+        return Dataset(tree_paths=paths, *args, **kwargs)
 
-        indice = torch.zeros(
-            (coords.shape[0], 1),
-            dtype=coords.dtype,
-            device=feats.device,
-        )
-        coords = torch.cat((indice, coords), dim=1)
+    @staticmethod
+    def from_auto(input_path: FilePath, *args, **kwargs) -> "Dataset":
+        path_obj = Path(input_path)
 
-        feats = feats.squeeze(1)
-        coords = coords.squeeze(1)
-        loss_mask = torch.ones(feats.shape[0], dtype=torch.bool, device=feats.device)
-
-        input_feats = feats[:, : input_features.shape[1]]
-        target_feats = feats[:, input_features.shape[1] :]
-
-        return (input_feats, target_feats), coords, loss_mask, filename
-
-    def __len__(self):
-        return len(self.tree_paths)
+        if path_obj.is_dir():
+            return Dataset.from_directory(directory=input_path, *args, **kwargs)
+        elif path_obj.is_file():
+            return Dataset.from_path(path=input_path, *args, **kwargs)
+        else:
+            raise ValueError(f"Input path is not a file nor a directory: {input_path}")
 
 
 class SingleTreeInference:
@@ -161,7 +133,6 @@ class SingleTreeInference:
 
         self.compute_blocks()
 
-    @timer
     def compute_blocks(self):
 
         xyz_quantized = torch.div(
@@ -206,18 +177,6 @@ class SingleTreeInference:
 
         return voxel_cloud
 
-        # transformed_cloud = sparse_voxelize(
-        #     block_cloud,
-        #     self.voxel_size,
-        #     use_xyz=self.use_xyz,
-        #     use_rgb=self.use_rgb,
-        #     voxelize_class=False,
-        #     voxelize_direction=False,
-        #     voxelize_radius=False,
-        #     voxelize_mask=True,
-        # )
-
-        # return transformed_cloud
 
     def __len__(self):
         return len(self.clouds)
