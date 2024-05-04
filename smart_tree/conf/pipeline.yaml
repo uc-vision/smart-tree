@@ -21,16 +21,30 @@ pipeline:
       batch_size: 1
       num_workers: 0
       collate_fn:
-        _target_: smart_tree.model.collate.collate
+        _target_: smart_tree.model.collate.inference_collate
         _partial_: True
+
 
 
     dataset:
-        _target_: smart_tree.dataset.dataset.SingleTreeInference
-        _partial_: True
-        block_size: 4
-        buffer_size: 0.4
-        min_points: 20
+      _target_: smart_tree.dataset.dataset.SingleTreeInference
+      _partial_: True
+      block_size: 4
+      buffer_size: 0.4
+      min_points: 20
+      voxelizer:
+        _target_: smart_tree.model.voxelize.SparseVoxelizer
+        voxel_size: 0.01
+        use_xyz: True
+        use_rgb: False
+        voxelize_radius: False
+        voxelize_direction: False
+        voxelize_class: False
+        voxelize_mask: True
+        min_xyz: [0,0,0]
+        max_xyz: [4,4,4]
+        max_num_voxels: 500000
+
 
         # transform: 
         #   _target_ : smart_tree.model.transform.sparse_voxelize

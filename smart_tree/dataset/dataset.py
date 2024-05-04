@@ -10,10 +10,12 @@ from tqdm import tqdm
 
 from ..data_types.cloud import Cloud  # , merge_clouds
 from ..model.transform import sparse_voxelize
+
 # from ..model.sparse import batch_collate
 from ..util.file import load_cloud
 from ..util.maths import cube_filter
 from ..util.misc import at_least_2d
+from ..model.voxelize import SparseVoxelizer
 
 
 class TreeDataset:
@@ -146,31 +148,36 @@ class SingleTreeInference:
     def __init__(
         self,
         cloud: Cloud,
+        voxelizer: SparseVoxelizer,
         block_size: float = 4,
         buffer_size: float = 0.4,
         min_points=20,
-
         device=torch.device("cuda:0"),
     ):
         self.cloud = cloud
-
+        self.voxelizer = voxelizer
         self.block_size = block_size
         self.buffer_size = buffer_size
         self.min_points = min_points
-
         self.device = device
 
         self.compute_blocks()
 
     def compute_blocks(self):
+
+        self.cloud.to_device(self.device)
+
         self.xyz_quantized = torch.div(
-            self.cloud.xyz, self.block_size, rounding_mode="floor"
+            self.cloud.xyz,
+            self.block_size,
+            rounding_mode="floor",
         )
         self.block_ids, pnt_counts = torch.unique(
-            self.xyz_quantized, return_counts=True, dim=0
+            self.xyz_quantized,
+            return_counts=True,
+            dim=0,
         )
 
-        # Remove blocks that have less than specified amount of points...
         self.block_ids = self.block_ids[pnt_counts > self.min_points]
         self.block_centres = (self.block_ids * self.block_size) + (self.block_size / 2)
 
@@ -186,11 +193,12 @@ class SingleTreeInference:
 
             self.clouds.append(block_cloud)
 
+        self.cloud.to_device(torch.device("cpu"))
         self.block_centres = self.block_centres.to(torch.device("cpu"))
 
     def __getitem__(self, idx):
         block_centre = self.block_centres[idx]
-        block_cloud: Cloud = self.clouds[idx]
+        block_cloud = self.clouds[idx]
 
         block_cloud.mask = cube_filter(
             block_cloud.xyz,
@@ -198,7 +206,11 @@ class SingleTreeInference:
             self.block_size,
         ).unsqueeze(1)
 
-        return block_cloud, voxel_feats, voxel_coords
+        offset = -torch.min(block_cloud.xyz, dim=0)[0]
+        block_cloud = block_cloud.translate(offset)
+        block_cloud.offset = offset
+
+        return self.voxelizer(block_cloud)
 
         # transformed_cloud = sparse_voxelize(
         #     block_cloud,
@@ -227,4 +239,4 @@ def load_dataloader(
 ):
     dataset = SingleTreeInference(cloud, voxel_size, block_size, buffer_size)
 
-    return DataLoader(dataset, batch_size, num_workers) #collate_fn=merge_clouds)
+    return DataLoader(dataset, batch_size, num_workers)  # collate_fn=merge_clouds)

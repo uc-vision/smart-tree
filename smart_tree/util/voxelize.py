@@ -1,10 +1,7 @@
-from smart_tree.util.cloud_loader import CloudLoader
 from smart_tree.data_types.cloud import Cloud
 import torch
-from itertools import repeat
 
-import numpy as np
-
+from .function_timer import timer
 from typing import List, Union, Tuple
 
 def ravel_hash(x: torch.Tensor) -> torch.Tensor:
@@ -18,6 +15,7 @@ def ravel_hash(x: torch.Tensor) -> torch.Tensor:
         h *= xmax[k + 1]
     h += x[:, -1]
     return h
+
 
 def sparse_quantize(
     coords: torch.Tensor,
@@ -43,7 +41,7 @@ def sparse_quantize(
         outputs += [inverse_indices]
     return outputs[0] if len(outputs) == 1 else outputs
 
-
+@timer
 def voxelize_cloud(cloud: Cloud, voxel_size: float, use_xyz: True, use_rgb: False):
     
     feats = []
@@ -51,8 +49,8 @@ def voxelize_cloud(cloud: Cloud, voxel_size: float, use_xyz: True, use_rgb: Fals
         feats.append(cloud.xyz)
     if use_rgb:
         feats.append(cloud.rgb)
-    if len(feats) > 1:
-        feats = torch.cat(feats, 1)
+    
+    feats = torch.cat(feats, 1) if len(feats) > 1 else feats[0]
 
     coords, feats = cloud.xyz // voxel_size, feats
     coords -= torch.min(coords, axis=0, keepdims=True)[0]
@@ -61,23 +59,3 @@ def voxelize_cloud(cloud: Cloud, voxel_size: float, use_xyz: True, use_rgb: Fals
     voxel_feats = feats[indices]
 
     return voxel_feats, voxel_coords, inverse_indices
-
-
-
-if __name__ == "__main__":
-    loader = CloudLoader()
-    cloud = loader.load("/mnt/harry/PhD/training-data/apple/apple_1.npz")
-    coords, feats = cloud.xyz , cloud.xyz
-    coords -= torch.min(coords, axis=0, keepdims=True)[0]
-    coords, indices, inverse_indices = sparse_quantize(coords, 0.5, return_index=True, return_inverse=True)
-    voxel_coords = coords
-    voxel_feats = feats[indices]
-    
-    # Generate random RGB values for each voxel
-    voxel_rgb = torch.rand(voxel_coords.shape[0], 3)
-    
-    # Map the voxel RGB values back to the original points
-    point_rgb = voxel_rgb[inverse_indices]
-    
-    # Visualize the original point cloud with the mapped RGB values
-    Cloud(feats, rgb=point_rgb).view()

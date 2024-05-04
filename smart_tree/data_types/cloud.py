@@ -25,6 +25,7 @@ class Cloud(Base):
     rgb: Optional[TensorType["N", 3]] = None
     filename: Optional[Path] = None
 
+    offset: Optional[TensorType] = None  # Used to store a translation
     _root_idx: Optional[int] = None
 
     def __len__(self) -> int:
@@ -163,6 +164,8 @@ class LabelledCloud(Cloud):
     """ Mask for areas where vector loss is not computed (e.g., leaves). """
 
     loss_mask: Optional[TensorType["N", 1, torch.bool]] = None
+
+    mask: Optional[TensorType["N", 1, torch.bool]] = None
 
     def __post_init__(self):
         mask_shape = (len(self.xyz), 1)

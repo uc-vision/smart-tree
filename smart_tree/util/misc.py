@@ -6,6 +6,17 @@ import numpy as np
 import torch
 
 
+def Singleton(cls):
+    instances = {}
+
+    def get_instance(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+
+    return get_instance
+
+
 def flatten_list(l):
     return [item for sublist in l for item in sublist]
 
