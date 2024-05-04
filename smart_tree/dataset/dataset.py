@@ -16,6 +16,7 @@ from ..util.file import load_cloud
 from ..util.maths import cube_filter
 from ..util.misc import at_least_2d
 from ..model.voxelize import SparseVoxelizer
+from ..util.function_timer import timer
 
 
 class TreeDataset:
@@ -152,49 +153,45 @@ class SingleTreeInference:
         block_size: float = 4,
         buffer_size: float = 0.4,
         min_points=20,
-        device=torch.device("cuda:0"),
     ):
+        print(cloud.device)
+
         self.cloud = cloud
         self.voxelizer = voxelizer
         self.block_size = block_size
         self.buffer_size = buffer_size
         self.min_points = min_points
-        self.device = device
 
         self.compute_blocks()
 
+    @timer
     def compute_blocks(self):
 
-        self.cloud.to_device(self.device)
-
-        self.xyz_quantized = torch.div(
+        xyz_quantized = torch.div(
             self.cloud.xyz,
             self.block_size,
             rounding_mode="floor",
         )
-        self.block_ids, pnt_counts = torch.unique(
-            self.xyz_quantized,
+        block_ids, pnt_counts = torch.unique(
+            xyz_quantized,
             return_counts=True,
             dim=0,
         )
 
-        self.block_ids = self.block_ids[pnt_counts > self.min_points]
-        self.block_centres = (self.block_ids * self.block_size) + (self.block_size / 2)
+        valid_block_ids = block_ids[pnt_counts > self.min_points]
+        self.block_centres = (valid_block_ids * self.block_size) + (self.block_size / 2)
 
         self.clouds: List[Cloud] = []
 
-        for centre in tqdm(self.block_centres, desc="Computing blocks...", leave=False):
+        for centre in self.block_centres:
             mask = cube_filter(
                 self.cloud.xyz,
                 centre,
                 self.block_size + (self.buffer_size * 2),
             )
-            block_cloud = self.cloud.filter(mask).to_device(torch.device("cpu"))
+            block_cloud = self.cloud.filter(mask)
 
             self.clouds.append(block_cloud)
-
-        self.cloud.to_device(torch.device("cpu"))
-        self.block_centres = self.block_centres.to(torch.device("cpu"))
 
     def __getitem__(self, idx):
         block_centre = self.block_centres[idx]

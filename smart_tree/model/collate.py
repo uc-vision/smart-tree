@@ -1,6 +1,7 @@
 from typing import List
 
 from ..data_types.cloud import Cloud, LabelledCloud
+from .voxelize import VoxelizedCloud
 
 
 def inference_collate(data):
@@ -16,3 +17,13 @@ def inference_collate(data):
     # print(feats)
 
     # return clouds
+
+
+def voxelized_clouds_to_sparse_tensor(clouds: List[VoxelizedCloud]):
+
+    return False
+
+
+def split_sparse_tensor(sparse_tensor):
+
+    return

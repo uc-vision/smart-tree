@@ -7,6 +7,7 @@ from tensordict import TensorDict
 
 from ..data_types.cloud import Cloud
 from ..util.misc import Singleton
+from ..util.function_timer import timer
 
 
 @dataclass
@@ -17,7 +18,7 @@ class VoxelizedCloud:
     voxel_ids: torch.Tensor
     voxel_mask: Optional[torch.Tensor] = None
     filename: Optional[str | List[str]] = None
-    input_cloud: Optional[Cloud] = None
+    original_cloud: Optional[Cloud] = None
 
 
 @Singleton
@@ -74,10 +75,8 @@ class SparseVoxelizer:
             device=self.device,
         )
 
-    def __call__(
-        self,
-        cld: Cloud,
-    ):
+    @timer
+    def __call__(self, cld: Cloud):
 
         features = []
 
@@ -138,19 +137,8 @@ class SparseVoxelizer:
             voxel_ids=voxel_ids,
             filename=cld.filename,
             voxel_mask=voxel_mask,
+            original_cloud=cld,
         )
 
     def voxelize_clouds(self, clouds: List[Cloud]):
         return [self.__call__(cloud.to_device(self.device)) for cloud in clouds]
-
-        quit()
-
-        # return TransformedCloud(
-        #     voxel_features=input_voxel_features,
-        #     voxel_targets=target_voxel_features,
-        #     voxel_coords=voxel_coordinates,
-        #     voxel_ids=voxel_ids,
-        #     filename=cld.filename,
-        #     input_cloud=cld,
-        #     voxel_mask=voxel_mask,
-        # )

@@ -37,15 +37,13 @@ class ModelInference:
     @torch.no_grad()
     def forward(self, cloud: Cloud | LabelledCloud):
 
-        cloud = cloud.to_device(self.device)
         data_loader = self.data_loader(self.dataset(cloud))
 
-        clouds: List[Cloud]
-        for clouds in data_loader:
+        for block_cloud in data_loader:
 
-            print(clouds)
+            print(block_cloud)
 
-            Cloud(clouds[0].voxel_features[:, :3]).view()
+            Cloud(block_cloud[0].voxel_features[:, :3]).view()
 
             # voxelized_clouds = self.voxelizer.voxelize_clouds(clouds)
 
